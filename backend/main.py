@@ -15,7 +15,7 @@ load_dotenv(dotenv_path=env_path)
 
 app = FastAPI(title="Asambleas API")
 
-# Configuración CORS
+# CORS
 if os.getenv("RAILWAY_ENVIRONMENT"):
     app.add_middleware(
         CORSMiddleware,
@@ -37,18 +37,21 @@ else:
 init_db()
 create_default_admin_from_env()
 
-# Incluir rutas API
+# Endpoints API (antes de montar estáticos)
 app.include_router(auth_routes.router, prefix="/api")
 app.include_router(participants.router, prefix="/api")
 app.include_router(voting.router, prefix="/api")
 
-# Ruta absoluta a la carpeta frontend
+@app.get("/api")
+def api_status():
+    return {"status": "API funcionando correctamente"}
+
+# Ruta absoluta frontend
 frontend_path = Path(__file__).resolve().parent.parent / "frontend"
 
+# Fallback para servir AsambleaWEB.html como raíz
 if frontend_path.exists():
-    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
-else:
-    print(f"⚠️ Carpeta frontend no encontrada en {frontend_path}")
+    app.mount("/static", StaticFiles(directory=frontend_path, html=True), name="static")
 
     @app.get("/")
     def read_root():
@@ -56,14 +59,5 @@ else:
         if file_path.exists():
             return FileResponse(file_path)
         return {"error": "Frontend file not found"}
-
-    @app.get("/AsambleaWEB.html")
-    def read_html():
-        file_path = frontend_path / "AsambleaWEB.html"
-        if file_path.exists():
-            return FileResponse(file_path)
-        return {"error": "HTML file not found"}
-
-@app.get("/api")
-def api_status():
-    return {"status": "API funcionando correctamente"}
+else:
+    print(f"⚠️ Carpeta frontend no encontrada en {frontend_path}")
