@@ -1,0 +1,1669 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Votación para Asambleas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #2c3e50;
+        }
+
+        .container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+            padding: 2rem;
+            width: 90%;
+            max-width: 800px;
+            position: relative;
+            min-height: 600px;
+            border: 1px solid #e1e8ed;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid #e1e8ed;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .header p {
+            color: #7f8c8d;
+            font-size: 1rem;
+        }
+
+        .login-section {
+            text-align: center;
+            padding: 2rem 0;
+        }
+
+        .code-input {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            padding: 1rem 1.5rem;
+            font-size: 1.2rem;
+            text-align: center;
+            width: 100%;
+            max-width: 300px;
+            margin: 1rem auto;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 500;
+            color: #2c3e50;
+            transition: border-color 0.3s ease;
+        }
+
+        .code-input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 0.8rem 2rem;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 0.5rem;
+        }
+
+        .btn:hover {
+            background: #2980b9;
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-admin {
+            background: #6c757d;
+            font-size: 0.9rem;
+            padding: 0.7rem 1.5rem;
+            margin: 1rem auto;
+            display: block;
+            border-radius: 25px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .btn-admin:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        .btn-large {
+            padding: 1rem 2.5rem;
+            font-size: 1.1rem;
+            margin: 1rem;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn-success {
+            background: #27ae60;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .admin-panel {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        .admin-panel h3 {
+            color: #2c3e50;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .voting-section {
+            background: #fff;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        .question-form {
+            margin: 1rem auto;
+            padding: 2rem;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            text-align: center;
+        }
+
+        .question-form input, .question-form select, .question-form textarea {
+            width: 100%;
+            padding: 1rem;
+            margin: 0.8rem 0;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: all 0.3s ease;
+            background: white;
+            text-align: left;
+        }
+
+        .question-form input:focus, .question-form select:focus, .question-form textarea:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+
+        .multiple-selection-panel {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding: 0.8rem;
+            background: rgba(255,255,255,0.8);
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+
+        .checkbox-container:hover {
+            background: rgba(255,255,255,0.95);
+            transform: translateY(-1px);
+        }
+
+        .candidates-input {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .vote-option {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 0.8rem 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 1rem;
+            font-weight: 500;
+            text-align: center;
+            display: inline-block;
+            min-width: 120px;
+            margin-right: 10px;
+        }
+
+        .vote-option:hover {
+            border-color: #3498db;
+            background: #e3f2fd;
+        }
+
+        .vote-option.selected {
+            background: #3498db;
+            border-color: #3498db;
+            color: white;
+        }
+
+        .vote-option.yes-option {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+
+        .vote-option.yes-option:hover {
+            background: #c3e6cb;
+            border-color: #28a745;
+        }
+
+        .vote-option.no-option {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        .vote-option.no-option:hover {
+            background: #f5c6cb;
+            border-color: #dc3545;
+        }
+
+        .results-panel {
+            background: #f1f8e9;
+            border: 1px solid #c8e6c9;
+            border-radius: 6px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem;
+            margin: 0.5rem 0;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #e8f5e8;
+            min-height: 50px;
+        }
+
+        .result-item span {
+            white-space: nowrap; 
+            min-width: fit-content;
+        }
+
+        .result-item span:first-child {
+            flex: 0 0 auto;
+            margin-right: 1rem;
+        }
+
+        .result-item span:last-child {
+            flex: 0 0 auto;
+            text-align: right;
+            margin-left: 1rem;
+        }
+
+        .progress-bar {
+            width: 200px;
+            height: 16px;
+            background: #e9ecef;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 0 1rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #3498db;
+            transition: width 0.5s ease;
+        }
+
+        .status-panel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(44, 62, 80, 0.9);
+            color: white;
+            padding: 1rem;
+            border-radius: 6px;
+            min-width: 250px;
+            font-size: 0.9rem;
+            z-index: 1000;
+        }
+
+        .voter-info {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 1rem 0;
+            text-align: center;
+        }
+
+        .logout-btn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .logout-btn:hover {
+            background: #c0392b;
+        }
+
+        .admin-login-container {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 1rem;
+            margin: 1rem auto;
+            max-width: 300px;
+        }
+
+        .admin-login-container input {
+            font-size: 0.9rem;
+            padding: 0.6rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 1rem;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #3498db;
+            margin-bottom: 0.3rem;
+        }
+
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 0.85rem;
+        }
+
+        .attendance-info {
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+            color: #27ae60;
+            font-weight: 500;
+        }
+
+        .loading {
+            text-align: center;
+            color: #7f8c8d;
+            padding: 2rem;
+        }
+
+        .file-upload {
+            border: 2px dashed #dee2e6;
+            border-radius: 6px;
+            padding: 1rem;
+            text-align: center;
+            margin: 1rem 0;
+            cursor: pointer;
+            transition: border-color 0.3s ease;
+        }
+
+        .file-upload:hover {
+            border-color: #3498db;
+        }
+
+        .file-upload input[type="file"] {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                width: 95%;
+                padding: 1rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .result-item {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .progress-bar {
+                margin: 0.5rem 0;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <button class="logout-btn hidden" onclick="logout()">Salir</button>
+        
+        <!-- Pantalla de Bienvenida -->
+        <div id="welcome-screen">
+            <div class="header">
+                <h1>Sistema de Votación Electrónica</h1>
+                <p>Asamblea General</p>
+            </div>
+            
+            <div class="login-section">
+                <h3>Ingrese su código de acceso:</h3>
+                <p style="color: #7f8c8d; font-size: 0.9rem; margin-bottom: 1rem;">
+                    Formato: Torre-Apartamento (ejemplo: 1-201, 2-1503)
+                </p>
+                <input type="text" class="code-input" id="access-code" placeholder="1-201" maxlength="10">
+                <br>
+                <button class="btn btn-large" onclick="validateAccess()">Ingresar a Votación</button>
+                <br>
+                <button class="btn btn-admin" onclick="showAdminLogin()">Acceso Administrador</button>
+            </div>
+            
+            <div id="admin-login" class="admin-login-container hidden">
+                <input type="text" class="code-input" id="admin-username" placeholder="Usuario" style="max-width: 100%; font-size: 0.9rem;">
+                <input type="password" class="code-input" id="admin-password" placeholder="Contraseña" style="max-width: 100%; font-size: 0.9rem;">
+                <button class="btn btn-admin" onclick="validateAdmin()">Ingresar</button>
+            </div>
+        </div>
+
+        <!-- Panel de Administrador -->
+        <div id="admin-screen" class="hidden">
+            <div class="header">
+                <h1>Panel de Administrador</h1>
+                <p>Gestión de Votaciones en Tiempo Real</p>
+            </div>
+
+            <!-- Carga de Excel -->
+            <div class="admin-panel">
+                <h3>Cargar Participantes</h3>
+                <div class="file-upload" onclick="document.getElementById('excel-file').click()">
+                    <input type="file" id="excel-file" accept=".xlsx,.xls" onchange="uploadExcel()">
+                    <p>📄 Clic para cargar archivo Excel (.xlsx)</p>
+                    <small>El archivo debe contener las columnas: code, name, coefficient</small>
+                </div>
+                <div id="upload-status"></div>
+            </div>
+
+            <!-- Estado de la Asamblea -->
+            <div class="admin-panel">
+                <h3>Estado de la Asamblea</h3>
+                <div class="aforo-container" style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: center;">
+                    <!-- Porcentaje grande lado izquierdo -->
+                    <div style="text-align: center; padding: 2rem; background: linear-gradient(135deg, #27ae60, #2ecc71); border-radius: 12px; color: white; box-shadow: 0 8px 25px rgba(46, 204, 113, 0.3);">
+                        <div id="coefficient-percentage" style="font-size: 4rem; font-weight: 800; margin-bottom: 0.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">-%</div>
+                        <div style="font-size: 1.2rem; font-weight: 500; opacity: 0.9;">Aforo por Coeficiente</div>
+                    </div>
+                                    
+                    <!-- Panel de estado lado derecho -->
+                    <div class="status-container">
+                        <div class="stats-grid" style="grid-template-columns: 1fr 1fr;">
+                            <div class="stat-card">
+                                <div class="stat-number" id="total-participants">-</div>
+                                <div class="stat-label">Registrados</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number" id="present-count">-</div>
+                                <div class="stat-label">Presentes</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number" id="own-votes-count">-</div>
+                                <div class="stat-label">Aptos Propios</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number" id="power-votes-count">-</div>
+                                <div class="stat-label">Con Poder</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Panel de Quórum -->
+                        <div class="quorum-panel" style="background: #f8f9fa; border: 2px solid #e9ecef; border-radius: 8px; padding: 1.5rem; margin-top: 1rem;">
+                            <h4 style="margin-bottom: 1rem; color: #2c3e50; text-align: center;">Estado del Quórum</h4>
+                            
+                            <div class="quorum-status" style="text-align: center; margin-bottom: 1rem;">
+                                <span id="quorum-indicator" style="font-size: 2rem;">❓</span>
+                                <p id="quorum-text" style="margin: 0.8rem 0; font-weight: 700; font-size: 1.4rem;">Calculando...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Crear Nueva Votación -->
+            <div class="admin-panel">
+                <h3>Crear Nueva Votación</h3>
+                <div class="question-form">
+                    <select id="question-type">
+                        <option value="yesno">Pregunta Sí/No</option>
+                        <option value="multiple">Elección de Candidatos</option>
+                    </select>
+                    <input type="text" id="question-text" placeholder="Escriba la pregunta o cargo a elegir">
+                    <textarea id="candidates-list" class="candidates-input" placeholder="Para elecciones, escriba cada candidato en una línea nueva:&#10;Juan Pérez&#10;María García&#10;Carlos López" style="display:none;"></textarea>
+                    
+                    <!-- Opciones de selección múltiple -->
+                    <div id="multiple-options" style="display:none;" class="multiple-selection-panel">
+                        <label style="display: block; margin-bottom: 1rem; font-weight: 500; color: #2c3e50;">
+                            Máximo número de selecciones permitidas:
+                        </label>
+                        <input type="number" id="max-selections" min="1" value="1" style="width: 120px; padding: 0.8rem; text-align: center; font-weight: 600; margin-bottom: 1rem;">
+                        <p style="font-size: 0.9rem; color: #7f8c8d; margin: 0;">
+                            Si es mayor a 1, se permitirá selección múltiple automáticamente
+                        </p>
+                    </div>
+                    <button class="btn" onclick="createQuestion()">Crear Votación</button>
+                </div>
+            </div>
+
+            <!-- Votaciones Activas -->
+            <div class="admin-panel">
+                <h3>Votaciones Activas</h3>
+                <div id="active-questions">
+                    <div class="loading">Cargando preguntas...</div>
+                </div>
+            </div>
+
+            <!-- Resultados en Tiempo Real -->
+            <div class="admin-panel">
+                <h3>Resultados en Tiempo Real</h3>
+                <div id="results-container">
+                    <div class="loading">Cargando resultados...</div>
+                </div>
+            </div>
+
+            <!-- Acciones Administrativas -->
+            <div class="admin-panel">
+                <h3>Acciones</h3>
+                <button class="btn btn-success" onclick="downloadPDF()">📄 Descargar PDF Asistencia</button>
+                <button class="btn btn-danger" onclick="resetDatabase()">🗑️ Limpiar Base de Datos</button>
+            </div>
+        </div>
+
+        <!-- Panel de Votante -->
+        <div id="voter-screen" class="hidden">
+            <div class="header">
+                <h1>Sus Votaciones</h1>
+                <p>Complete todas las votaciones disponibles</p>
+            </div>
+
+            <div class="voter-info">
+                <h3 id="voter-name">Bienvenido/a</h3>
+                <p>Código: <strong id="voter-code">-</strong></p>
+                <p>Estado: <span id="voter-status">Conectado</span></p>
+                <div class="attendance-info">✅ Asistencia registrada automáticamente</div>
+            </div>
+
+            <div style="text-align: center; margin: 1rem 0;">
+                <button class="btn" onclick="loadVotingQuestions()">🔄 Actualizar Votaciones</button>
+            </div>
+
+            <div id="voting-questions">
+                <div class="loading">Cargando votaciones...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-panel hidden" id="status-panel">
+        <div id="status-content"></div>
+    </div>
+
+    <script>
+        // Configuración de la API
+        const API_BASE = 'http://127.0.0.1:8000';
+        
+        // Variables globales
+        let adminToken = null;
+        let voterToken = null;
+        let currentUser = null;
+        let isAdmin = false;
+        let updateInterval = null;
+
+        // Utilidades de localStorage (para tokens)
+        function saveToken(type, token) {
+            localStorage.setItem(`${type}_token`, token);
+        }
+
+        function getToken(type) {
+            return localStorage.getItem(`${type}_token`);
+        }
+
+        function clearTokens() {
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('voter_token');
+        }
+
+        // Funciones de API
+        async function apiCall(endpoint, options = {}) {
+            const token = isAdmin ? adminToken : voterToken;
+            
+            const config = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                },
+                ...options
+            };
+
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, config);
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.detail || `HTTP ${response.status}`);
+                }
+
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return await response.json();
+                } else {
+                    return response;
+                }
+            } catch (error) {
+                console.error('API Error:', error);
+                throw error;
+            }
+        }
+
+        // Funciones de navegación
+        function showScreen(screenId) {
+            document.querySelectorAll('.container > div').forEach(div => div.classList.add('hidden'));
+            document.getElementById(screenId).classList.remove('hidden');
+            document.querySelector('.logout-btn').classList.toggle('hidden', screenId === 'welcome-screen');
+        }
+
+        function logout() {
+            clearTokens();
+            adminToken = null;
+            voterToken = null;
+            currentUser = null;
+            isAdmin = false;
+            
+            if (updateInterval) {
+                clearInterval(updateInterval);
+                updateInterval = null;
+            }
+
+            document.getElementById('access-code').value = '';
+            document.getElementById('admin-username').value = '';
+            document.getElementById('admin-password').value = '';
+            document.getElementById('admin-login').classList.add('hidden');
+            showScreen('welcome-screen');
+            hideStatus();
+        }
+
+        // Funciones de acceso
+        function showAdminLogin() {
+            document.getElementById('admin-login').classList.remove('hidden');
+        }
+
+        async function validateAccess() {
+            const code = document.getElementById('access-code').value.trim().toUpperCase();
+            
+            if (!code) {
+                showStatus('Por favor ingrese su código', 'error');
+                return;
+            }
+            
+            // Validar formato Torre-Apto (ej: 1-201, 2-1503)
+            const codePattern = /^\d+-\d+$/;
+            if (!codePattern.test(code)) {
+                showStatus('Formato de código inválido. Use formato Torre-Apto (ej: 1-201)', 'error');
+                return;
+            }
+
+            try {
+                showStatus('Verificando acceso...', 'info');
+                
+                // Siempre intentar login primero
+                let response = await apiCall('/auth/login/voter', {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        code: code,
+                        is_power: false  // valor temporal que se ignora si ya existe
+                    })
+                });
+                
+                // Si skip_power_question es false, significa que es primera vez
+                if (!response.skip_power_question) {
+                    const isPower = await showPowerQuestion();
+                    console.log("DEBUG: isPower recibido =", isPower);
+                    response = await apiCall('/auth/login/voter', {
+                        method: 'POST',
+                        body: JSON.stringify({ 
+                            code: code,
+                            is_power: isPower
+                        })
+                    });
+                }
+
+                voterToken = response.access_token;
+                saveToken('voter', voterToken);
+                currentUser = {
+                    code: code,
+                    name: response.name || 'Usuario',
+                    id: response.user_id || null
+                };
+                isAdmin = false;
+                
+                showVoterScreen();
+                showStatus('Acceso autorizado - Asistencia registrada', 'success');
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        function showPowerQuestion() {
+            return new Promise((resolve) => {
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0,0,0,0.5); display: flex; align-items: center; 
+                    justify-content: center; z-index: 2000;
+                `;
+                
+                modal.innerHTML = `
+                    <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 400px; text-align: center;">
+                        <h3 style="margin-bottom: 1rem; color: #2c3e50;">Información del Apto</h3>
+                        <p style="margin-bottom: 1.5rem; color: #7f8c8d;">¿Este apartamento es suyo o tiene poder para votar por él?</p>
+                        <button class="btn btn-large" onclick="selectPowerOption(false)" style="margin: 0.5rem;">
+                            Soy propietario
+                        </button>
+                        <button class="btn btn-large" onclick="selectPowerOption(true)" style="margin: 0.5rem; background: #f39c12;">
+                            Tengo poder
+                        </button>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                
+                window.selectPowerOption = (isPower) => {
+                    console.log("DEBUG FRONTEND: isPower =", isPower, "tipo:", typeof isPower);
+                    document.body.removeChild(modal);
+                    delete window.selectPowerOption;
+                    resolve(isPower);
+                };
+            });
+        }
+
+        async function validateAdmin() {
+            const username = document.getElementById('admin-username').value.trim();
+            const password = document.getElementById('admin-password').value.trim();
+            
+            if (!username || !password) {
+                showStatus('Complete usuario y contraseña', 'error');
+                return;
+            }
+
+            try {
+                showStatus('Verificando credenciales...', 'info');
+                
+                const formData = new URLSearchParams();
+                formData.append('username', username);
+                formData.append('password', password);
+
+                const response = await apiCall('/auth/login/admin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: formData
+                });
+
+                adminToken = response.access_token;
+                saveToken('admin', adminToken);
+                isAdmin = true;
+                
+                showAdminScreen();
+                showStatus('Acceso de administrador autorizado', 'success');
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Funciones del administrador
+        async function showAdminScreen() {
+            showScreen('admin-screen');
+            await loadAdminData();
+            await checkConjuntoName();
+            startAutoRefresh();
+            
+            // Configurar cambio de tipo de pregunta
+            document.getElementById('question-type').addEventListener('change', function() {
+                const candidatesList = document.getElementById('candidates-list');
+                candidatesList.style.display = this.value === 'multiple' ? 'block' : 'none';
+            });
+
+            // Configurar cambio de tipo de pregunta
+            document.getElementById('question-type').addEventListener('change', function() {
+                const candidatesList = document.getElementById('candidates-list');
+                const multipleOptions = document.getElementById('multiple-options');
+                
+                if (this.value === 'multiple') {
+                    candidatesList.style.display = 'block';
+                    multipleOptions.style.display = 'block';
+                } else {
+                    candidatesList.style.display = 'none';
+                    multipleOptions.style.display = 'none';
+                }
+            });
+        }
+
+        async function loadAdminData() {
+            await Promise.all([
+                loadAforoData(),
+                loadActiveQuestions(),
+                loadResultsConditionally()
+            ]);
+        }
+
+        async function uploadExcel() {
+            const fileInput = document.getElementById('excel-file');
+            const file = fileInput.files[0];
+            
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                showStatus('Subiendo archivo...', 'info');
+                
+                const response = await fetch(`${API_BASE}/participants/upload-xlsx`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Error al subir archivo');
+                }
+
+                const result = await response.json();
+                document.getElementById('upload-status').innerHTML = 
+                    `<div style="color: #27ae60; margin-top: 1rem;">✓ ${result.inserted} participantes cargados correctamente</div>`;
+                
+                showStatus(`Archivo cargado: ${result.inserted} participantes`, 'success');
+                await loadAforoData();
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+                document.getElementById('upload-status').innerHTML = 
+                    `<div style="color: #e74c3c; margin-top: 1rem;">✗ ${error.message}</div>`;
+            }
+        }
+
+        async function loadAforoData() {
+            try {
+                const data = await apiCall('/voting/aforo');
+                
+                // Actualizar contadores básicos
+                document.getElementById('total-participants').textContent = data.total_participants || 0;
+                document.getElementById('present-count').textContent = data.present_count || 0;
+                document.getElementById('own-votes-count').textContent = data.own_votes || 0;
+                document.getElementById('power-votes-count').textContent = data.power_votes || 0;
+                
+                // Actualizar porcentaje del coeficiente
+                const coefficientPercentage = data.coefficient_rate_percent || 0;
+                document.getElementById('coefficient-percentage').textContent = `${(coefficientPercentage).toFixed(2)}%`;
+
+                // NUEVO: Cambiar color del panel según quórum
+                const quorumRequired = 51;
+                const quorumMet = (coefficientPercentage) >= quorumRequired;
+                const panel = document.querySelector('.aforo-container > div:first-child'); // El panel grande
+
+                if (quorumMet) {
+                    panel.style.background = 'linear-gradient(135deg, #27ae60, #2ecc71)'; // Verde
+                } else {
+                    panel.style.background = 'linear-gradient(135deg, #e74c3c, #c0392b)'; // Rojo  
+                }
+                
+                const indicator = document.getElementById('quorum-indicator');
+                const text = document.getElementById('quorum-text');
+                
+                if (quorumMet) {
+                    indicator.textContent = '✅';
+                    indicator.style.color = '#27ae60';
+                    text.textContent = 'QUÓRUM ALCANZADO';
+                    text.style.color = '#27ae60';
+                } else {
+                    indicator.textContent = '❌';
+                    indicator.style.color = '#e74c3c';
+                    text.textContent = 'SIN QUÓRUM';
+                    text.style.color = '#e74c3c';
+                }
+
+            } catch (error) {
+                console.error('Error loading aforo:', error);
+                // Mostrar valores de error
+                document.getElementById('total-participants').textContent = 'Error';
+                document.getElementById('present-count').textContent = 'Error';
+                document.getElementById('own-votes-count').textContent = 'Error';
+                document.getElementById('power-votes-count').textContent = 'Error';
+                document.getElementById('volumetric-percentage').textContent = 'Error';
+                document.getElementById('coefficient-percentage').textContent = 'Error';
+            }
+        }
+
+        async function createQuestion() {
+            const type = document.getElementById('question-type').value;
+            const text = document.getElementById('question-text').value.trim();
+            
+            if (!text) {
+                showStatus('Ingrese el texto de la pregunta', 'error');
+                return;
+            }
+
+            const questionData = {
+                text: text,
+                type: type
+            };
+
+            if (type === 'multiple') {
+                const candidates = document.getElementById('candidates-list').value
+                    .split('\n')
+                    .map(c => c.trim())
+                    .filter(c => c.length > 0);
+                
+                if (candidates.length < 2) {
+                    showStatus('Ingrese al menos 2 candidatos para elección múltiple', 'error');
+                    return;
+                }
+                questionData.options = candidates;
+                
+                // Opciones de selección múltiple
+                const maxSelections = parseInt(document.getElementById('max-selections').value) || 1;
+                const allowMultiple = maxSelections > 1;
+
+                questionData.allow_multiple = allowMultiple;
+                questionData.max_selections = maxSelections;
+                
+                if (allowMultiple && maxSelections > candidates.length) {
+                    showStatus('El máximo de selecciones no puede ser mayor al número de candidatos', 'error');
+                    return;
+                }
+            }
+
+            try {
+                showStatus('Creando votación...', 'info');
+                
+                await apiCall('/voting/questions', {
+                    method: 'POST',
+                    body: JSON.stringify(questionData)
+                });
+
+                // Limpiar formulario
+                document.getElementById('question-text').value = '';
+                document.getElementById('candidates-list').value = '';
+                document.getElementById('max-selections').value = '1';
+
+                await loadActiveQuestions();
+                await loadResultsConditionally();
+                showStatus('Votación creada y activada', 'success');
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function deleteQuestion(questionId) {
+            if (!confirm('¿Eliminar esta encuesta? Se borrarán también todos los votos.')) return;
+            
+            try {
+                await apiCall(`/voting/questions/${questionId}`, { method: 'DELETE' });
+                await loadActiveQuestions();
+                await loadResultsConditionally();
+                showStatus('Encuesta eliminada', 'success');
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadActiveQuestions() {
+            try {
+                const questions = await apiCall('/voting/questions/active');
+                renderActiveQuestions(questions);
+            } catch (error) {
+                console.error('Error loading questions:', error);
+                document.getElementById('active-questions').innerHTML = 
+                    '<p style="color: #e74c3c; padding: 1rem;">Error cargando preguntas activas</p>';
+            }
+        }
+
+        function renderActiveQuestions(questions) {
+            const container = document.getElementById('active-questions');
+            
+            if (questions.length === 0) {
+                container.innerHTML = '<p style="color: #7f8c8d;">No hay votaciones creadas</p>';
+                return;
+            }
+
+            container.innerHTML = questions.map(q => `
+                <div class="voting-section" style="position: relative;">
+                    <!-- Botón de eliminar en esquina superior derecha -->
+                    <button onclick="deleteQuestion(${q.id})" 
+                            style="position: absolute; top: 10px; right: 10px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: all 0.2s ease;"
+                            onmouseover="this.style.background='#c0392b'; this.style.transform='scale(1.1)'"
+                            onmouseout="this.style.background='#e74c3c'; this.style.transform='scale(1)'"
+                            title="Eliminar votación">
+                        🗑️
+                    </button>
+                    
+                    <h4 style="margin-bottom: 0.8rem; color: #2c3e50; padding-right: 50px;">${q.text}</h4>
+                    <p><strong>Tipo:</strong> ${q.type === 'yesno' ? 'Sí/No' : 'Múltiple opción'}</p>
+                    <p><strong>Opciones:</strong> ${q.options ? q.options.map(opt => opt.text).join(', ') : 'Sí, No'}</p>
+                    <p><strong>Estado:</strong> ${q.closed ? '🔒 Cerrada' : '🟢 Abierta'}</p>
+                    <button class="btn ${q.closed ? 'btn-success' : 'btn-danger'}" onclick="toggleQuestion(${q.id})">
+                        ${q.closed ? 'Abrir' : 'Cerrar'}
+                    </button>
+                    <button class="btn btn-success" onclick="viewResults(${q.id})">Ver Resultados Detallados</button>
+                </div>
+            `).join('');
+        }
+
+        async function toggleQuestion(questionId) {
+            try {
+                await apiCall(`/voting/questions/${questionId}/toggle`, { method: 'PUT' });
+                await loadActiveQuestions();
+                await loadResultsConditionally();
+                showStatus('Estado de votación actualizado', 'success');
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkUserVotes() {
+            try {
+                // Nuevo endpoint que necesitaremos crear
+                const userVotes = await apiCall('/voting/my-votes');
+                return new Set(userVotes.map(vote => vote.question_id));
+            } catch (error) {
+                console.error('Error al comprobar los votos de los usuarios:', error);
+                return new Set();
+            }
+        }
+        
+        async function loadResultsConditionally() {
+            try {
+                const questions = await apiCall('/voting/questions/active');
+                const openQuestions = questions.filter(q => !q.closed);
+                
+                if (openQuestions.length === 0) {
+                    document.getElementById('results-container').innerHTML = 
+                        '<p style="color: #7f8c8d; font-style: italic; text-align: center; padding: 2rem;">📊 Los resultados se mostrarán solo para votaciones abiertas</p>';
+                    return;
+                }
+                
+                // Cargar resultados solo para votaciones abiertas
+                await loadResultsForOpenQuestions(openQuestions);
+            } catch (error) {
+                console.error('Error loading conditional results:', error);
+            }
+        }
+
+        async function loadResultsForOpenQuestions(openQuestions) {
+            try {
+                const resultsContainer = document.getElementById('results-container');
+                
+                const resultsHTML = await Promise.all(openQuestions.map(async (question) => {
+                    try {
+                        const results = await apiCall(`/voting/results/${question.id}`);
+                        return renderQuestionResults(question, results);
+                    } catch (error) {
+                        return `<div class="results-panel">
+                            <h4>${question.text}</h4>
+                            <p style="color: #e74c3c;">Error cargando resultados</p>
+                        </div>`;
+                    }
+                }));
+
+                resultsContainer.innerHTML = resultsHTML.join('');
+            } catch (error) {
+                console.error('Error loading results for open questions:', error);
+            }
+        }
+
+        function renderQuestionResults(question, results) {
+            const totalVotes = results.total_votes || 0;
+            const totalParticipants = results.total_participants || 0;
+            
+            return `
+                <div class="results-panel">
+                    <h4 style="margin-bottom: 1rem; color: #2c3e50;">${question.text}</h4>
+                    <div>
+                        ${results.results ? results.results.map(result => `
+                            <div class="result-item">
+                                <span><strong>${result.answer}:</strong></span>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: ${result.percentage}%; background: #3498db;"></div>
+                                </div>
+                                <span>${result.votes} votos (${result.percentage.toFixed(2)}%)</span>
+                            </div>
+                        `).join('') : '<p>Sin votos aún</p>'}
+                    </div>
+                    <p style="margin-top: 1rem; font-size: 0.9rem; color: #7f8c8d;">
+                        <strong>Participantes:</strong> ${totalParticipants} | 
+                        <strong>Total votos:</strong> ${totalVotes} |
+                        <strong>Participación:</strong> ${results.total_participant_coefficient.toFixed(2)}%
+                    </p>
+                </div>
+            `;
+        }
+
+        async function viewResults(questionId) {
+            try {
+                const results = await apiCall(`/voting/results/${questionId}`);
+                const aforo = await apiCall('/voting/aforo');
+                
+                // Calcular participación en esta pregunta específica
+                const participationPercent = aforo.present_count > 0 ? 
+                    ((results.total_participants / aforo.present_count) * 100).toFixed(2) : '0.00';
+                
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0,0,0,0.7); display: flex; align-items: center; 
+                    justify-content: center; z-index: 2000;
+                `;
+                
+                modal.innerHTML = `
+                    <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                        <h3 style="margin-bottom: 1.5rem; color: #2c3e50;">Resultados Detallados</h3>
+                        
+                        <div style="background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
+                            <p><strong>Pregunta:</strong> ${results.question_text}</p>
+                            <p><strong>Total presentes en asamblea:</strong> ${aforo.present_count}</p>
+                            <p><strong>Participaron en esta votación:</strong> ${results.total_participants}</p>
+                            <p><strong>Participación:</strong> ${results.total_participant_coefficient.toFixed(2)}%</p>
+                        </div>
+                        
+                        <div class="results-container">
+                            ${results.results ? results.results.map(result => `
+                                <div class="result-item">
+                                    <span><strong>${result.answer}:</strong></span>
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" style="width: ${result.percentage}%; background: #3498db;"></div>
+                                    </div>
+                                    <span>${result.votes} votos (${result.percentage.toFixed(2)}%)</span>
+                                </div>
+                            `).join('') : '<p>Sin votos registrados</p>'}
+                        </div>
+                        
+                        <button class="btn" onclick="document.body.removeChild(this.closest('div').parentNode)" style="margin-top: 1.5rem; width: 100%;">
+                            Cerrar
+                        </button>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function downloadPDF() {
+            await confirmDownloadPDF();
+        }
+
+        // Función para obtener/mostrar nombre del conjunto
+        async function checkConjuntoName() {
+            try {
+                const response = await apiCall('/participants/conjunto/nombre');
+                const nombreActual = response.nombre || '';
+                
+                if (!nombreActual) {
+                    await showConjuntoModal();
+                } else {
+                    updateConjuntoDisplay(nombreActual);
+                }
+            } catch (error) {
+                console.error('Error obteniendo nombre conjunto:', error);
+                await showConjuntoModal();
+            }
+        }
+
+        // Modal para pedir/cambiar nombre del conjunto
+        function showConjuntoModal() {
+            return new Promise((resolve) => {
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background: rgba(0,0,0,0.7); display: flex; align-items: center; 
+                    justify-content: center; z-index: 2000;
+                `;
+                
+                modal.innerHTML = `
+                    <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 400px; width: 90%;">
+                        <h3 style="margin-bottom: 1.5rem; color: #2c3e50; text-align: center;">Configurar Conjunto</h3>
+                        
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #2c3e50;">
+                            Nombre del Conjunto Residencial:
+                        </label>
+                        <input type="text" id="conjunto-name-input" placeholder="Ej: Conjunto Torres del Parque" 
+                            style="width: 100%; padding: 0.8rem; border: 2px solid #dee2e6; border-radius: 6px; font-size: 1rem; margin-bottom: 1.5rem;">
+                        
+                        <div style="text-align: center;">
+                            <button class="btn btn-success" onclick="saveConjuntoName()" style="width: 100%;">
+                                Guardar
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.appendChild(modal);
+                setTimeout(() => document.getElementById('conjunto-name-input').focus(), 100);
+                
+                window.saveConjuntoName = async () => {
+                    const nombre = document.getElementById('conjunto-name-input').value.trim();
+                    if (!nombre) {
+                        showStatus('Por favor ingrese el nombre del conjunto', 'error');
+                        return;
+                    }
+                    
+                    try {
+                        await apiCall('/participants/conjunto/nombre', {
+                            method: 'POST',
+                            body: JSON.stringify({ nombre: nombre })
+                        });
+                        
+                        updateConjuntoDisplay(nombre);
+                        document.body.removeChild(modal);
+                        delete window.saveConjuntoName;
+                        showStatus('Nombre del conjunto guardado', 'success');
+                        resolve(true);
+                    } catch (error) {
+                        showStatus(`Error: ${error.message}`, 'error');
+                    }
+                };
+            });
+        }
+
+        // Actualizar display del nombre en el título
+        function updateConjuntoDisplay(nombre) {
+            const header = document.querySelector('#admin-screen .header h1');
+            if (header) {
+                header.innerHTML = `Panel de Administrador`;
+            }
+            
+            // Buscar específicamente el panel de estado
+            const estadoPanels = document.querySelectorAll('.admin-panel h3');
+            estadoPanels.forEach(title => {
+                if (title.textContent.includes('Estado de la Asamblea')) {
+                    title.textContent = `Estado de la Asamblea - ${nombre}`;
+                }
+            });
+        }
+
+        // Función downloadPDF simplificada
+        async function confirmDownloadPDF() {
+            try {
+                showStatus('Generando archivos...', 'info');
+                
+                // Descargar PDF
+                const pdfResponse = await apiCall('/participants/asistencia/pdf', {
+                    method: 'POST'
+                });
+
+                if (!pdfResponse.ok) {
+                    throw new Error('Error generando PDF');
+                }
+
+                // Descargar Excel
+                const excelResponse = await apiCall('/participants/asistencia/xlsx', {
+                    method: 'POST'
+                });
+
+                if (!excelResponse.ok) {
+                    throw new Error('Error generando Excel');
+                }
+
+                // Obtener nombre para los archivos
+                const conjuntoData = await apiCall('/participants/conjunto/nombre');
+                const nombreArchivo = conjuntoData.nombre.replace(/\s+/g, '_') || 'conjunto';
+
+                // Descargar PDF
+                const pdfBlob = await pdfResponse.blob();
+                const pdfUrl = window.URL.createObjectURL(pdfBlob);
+                const pdfLink = document.createElement('a');
+                pdfLink.href = pdfUrl;
+                pdfLink.download = `reporte_completo_${nombreArchivo}.pdf`;
+                pdfLink.click();
+                window.URL.revokeObjectURL(pdfUrl);
+
+                // Descargar Excel
+                const excelBlob = await excelResponse.blob();
+                const excelUrl = window.URL.createObjectURL(excelBlob);
+                const excelLink = document.createElement('a');
+                excelLink.href = excelUrl;
+                excelLink.download = `asistencia_${nombreArchivo}.xlsx`;
+                excelLink.click();
+                window.URL.revokeObjectURL(excelUrl);
+
+                showStatus('Archivos descargados: PDF y Excel', 'success');
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function resetDatabase() {
+            if (!confirm('¿Está seguro de limpiar TODA la base de datos? Esta acción no se puede deshacer.')) {
+                return;
+            }
+
+            try {
+                showStatus('Limpiando base de datos...', 'info');
+                
+                await apiCall('/voting/admin/reset', {
+                    method: 'DELETE'
+                });
+
+                // Recargar datos
+                await loadAdminData();
+                showStatus('Base de datos limpiada completamente', 'success');
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Funciones del votante
+        async function showVoterScreen() {
+            showScreen('voter-screen');
+            
+            document.getElementById('voter-code').textContent = currentUser.code;
+            document.getElementById('voter-name').textContent = `Bienvenido/a, ${currentUser.name}`;
+            
+            await loadVotingQuestions();
+            startAutoRefresh();
+        }
+
+        async function loadVotingQuestions() {
+            try {
+                showStatus('Cargando votaciones...', 'info');
+                const questions = await apiCall('/voting/questions/active');
+                renderVotingQuestions(questions);
+                hideStatus();
+            } catch (error) {
+                console.error('Error loading voting questions:', error);
+                document.getElementById('voting-questions').innerHTML = 
+                    '<div class="voting-section"><p style="color: #e74c3c;">Error cargando votaciones. Intente refrescar la página.</p></div>';
+                showStatus('Error cargando votaciones', 'error');
+            }
+        }
+
+        async function renderVotingQuestions(questions) {
+            const container = document.getElementById('voting-questions');
+            
+            if (questions.length === 0) {
+                container.innerHTML = '<div class="voting-section"><p style="color: #7f8c8d;">No hay votaciones activas en este momento</p></div>';
+                return;
+            }
+
+            const votedQuestions = await checkUserVotes();
+
+            container.innerHTML = questions.map(question => {
+                const options = question.options || [{text: 'Sí'}, {text: 'No'}];
+                const hasVoted = votedQuestions.has(question.id);
+                const isClosed = question.closed;
+                const inputType = question.allow_multiple ? 'checkbox' : 'radio';
+                const inputName = `question-${question.id}`;
+                
+                return `
+                    <div class="voting-section">
+                        <h3 style="margin-bottom: 1rem; color: #2c3e50;">${question.text}</h3>
+                        ${question.allow_multiple ? 
+                            `<p style="color: #7f8c8d; font-size: 0.9rem; margin-bottom: 1rem;">
+                                Puede seleccionar hasta ${question.max_selections} opción${question.max_selections > 1 ? 'es' : ''}
+                            </p>` : ''
+                        }
+                        
+                        <!-- NUEVO: Mostrar estado de la votación -->
+                        <div id="question-${question.id}-status">
+                            ${hasVoted ? `<p style="color: #27ae60; font-weight: 500;">✅ Ya votaste en esta pregunta</p>` : ''}
+                            ${isClosed ? `<p style="color: #e74c3c; font-weight: 500; background: #ffeaa7; padding: 0.8rem; border-radius: 4px; border-left: 4px solid #e74c3c;">
+                                🔒 Esta votación ha sido cerrada. No se pueden registrar más votos.
+                            </p>` : ''}
+                        </div>
+                        
+                        <!-- Solo mostrar opciones si no ha votado Y no está cerrada -->
+                        <div style="${(hasVoted || isClosed) ? 'display: none;' : ''}" id="voting-options-${question.id}">
+                            ${question.allow_multiple ? 
+                                `<div style="text-align: left;">
+                                    ${options.map((option, index) => `
+                                        <label style="display: block; margin: 0.8rem 0; padding: 1rem; background: #f8f9fa; border: 2px solid #e9ecef; border-radius: 6px; cursor: pointer;">
+                                            <input type="checkbox" name="question-${question.id}" value="${option.text}" onchange="checkMaxSelections(${question.id}, ${question.max_selections})" style="margin-right: 0.8rem; transform: scale(1.2);">
+                                            ${option.text}
+                                        </label>
+                                    `).join('')}
+                                    <button class="btn" onclick="submitMultipleVote(${question.id})" style="margin-top: 1rem; width: 100%;">Confirmar Selección</button>
+                                </div>` :
+                                `<div style="text-align: center;">
+                                    ${options.map((option, index) => {
+                                        const isYesNo = options.length === 2 && (option.text === 'Sí' || option.text === 'No');
+                                        const buttonClass = isYesNo ? 
+                                            (option.text === 'Sí' ? 'vote-option yes-option' : 'vote-option no-option') : 
+                                            'vote-option';
+                                        
+                                        return `<div class="${buttonClass}" onclick="submitDirectVote(${question.id}, '${option.text}')">${option.text}</div>`;
+                                    }).join('')}
+                                </div>`
+                            }
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function submitDirectVote(questionId, answer) {
+            try {
+                showStatus('Registrando voto...', 'info');
+                
+                await apiCall('/voting/vote', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        question_id: questionId,
+                        answer: answer
+                    })
+                });
+
+                await loadVotingQuestions();
+                showStatus(`Voto registrado: ${answer}`, 'success');
+            } catch (error) {
+                if (error.message.includes('Ya has votado')) {
+                    showStatus('Ya has votado en esta pregunta', 'error');
+                } else {
+                    showStatus(`Error: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        // Auto-refresh para datos en tiempo real
+        function startAutoRefresh() {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+            }
+
+            // Solo auto-refresh para admins
+            if (isAdmin) {
+                updateInterval = setInterval(async () => {
+                    await loadAforoData();
+                    await loadActiveQuestions();
+                }, 4000);
+            }
+        }
+
+        function checkMaxSelections(questionId, maxSelections) {
+            const checkboxes = document.querySelectorAll(`input[name="question-${questionId}"]:checked`);
+            const allCheckboxes = document.querySelectorAll(`input[name="question-${questionId}"]`);
+            
+            if (checkboxes.length >= maxSelections) {
+                allCheckboxes.forEach(cb => {
+                    if (!cb.checked) {
+                        cb.disabled = true;
+                        cb.parentElement.style.opacity = '0.5';
+                    }
+                });
+            } else {
+                allCheckboxes.forEach(cb => {
+                    cb.disabled = false;
+                    cb.parentElement.style.opacity = '1';
+                });
+            }
+        }
+
+        async function submitMultipleVote(questionId) {
+            const checkboxes = document.querySelectorAll(`input[name="question-${questionId}"]:checked`);
+            const answers = Array.from(checkboxes).map(cb => cb.value);
+            
+            if (answers.length === 0) {
+                showStatus('Debe seleccionar al menos una opción', 'error');
+                return;
+            }
+            
+            try {
+                showStatus('Registrando votos...', 'info');
+                console.log('Enviando datos:', { question_id: questionId, answer: answers });
+                console.log('URL completa:', `${API_BASE}/voting/vote`);
+                console.log('API_BASE actual:', API_BASE);
+                await apiCall('/voting/vote', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        question_id: questionId,
+                        answer: answers
+                    })
+                });
+
+                await loadVotingQuestions();
+                showStatus(`Votos registrados: ${answers.join(', ')}`, 'success');
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Sistema de notificaciones
+        function showStatus(message, type = 'info') {
+            const panel = document.getElementById('status-panel');
+            const content = document.getElementById('status-content');
+            
+            const colors = {
+                success: 'rgba(39, 174, 96, 0.9)',
+                error: 'rgba(231, 76, 60, 0.9)',
+                info: 'rgba(52, 152, 219, 0.9)'
+            };
+
+            panel.style.background = colors[type] || colors.info;
+            content.textContent = message;
+            panel.classList.remove('hidden');
+
+            setTimeout(() => {
+                panel.classList.add('hidden');
+            }, 4000);
+        }
+
+        function hideStatus() {
+            document.getElementById('status-panel').classList.add('hidden');
+        }
+
+        // Event listeners
+        document.getElementById('access-code').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                validateAccess();
+            }
+        });
+
+        document.getElementById('admin-password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                validateAdmin();
+            }
+        });
+
+        // Inicialización automática
+        window.addEventListener('load', async () => {
+            // Intentar restaurar sesión admin
+            const savedAdminToken = getToken('admin');
+            if (savedAdminToken) {
+                adminToken = savedAdminToken;
+                isAdmin = true;
+                try {
+                    // Verificar si el token aún es válido
+                    await apiCall('/voting/aforo');
+                    showAdminScreen();
+                    showStatus('Sesión de administrador restaurada', 'success');
+                } catch (error) {
+                    // Token expirado
+                    clearTokens();
+                    adminToken = null;
+                    isAdmin = false;
+                    showStatus('Sesión expirada, ingrese nuevamente', 'info');
+                }
+            }
+
+            // Intentar restaurar sesión votante
+            const savedVoterToken = getToken('voter');
+            if (savedVoterToken && !isAdmin) {
+                voterToken = savedVoterToken;
+                try {
+                    // Verificar si el token aún es válido
+                    await apiCall('/voting/questions/active');
+                    // No podemos restaurar automáticamente sin el código
+                    clearTokens();
+                    voterToken = null;
+                    showStatus('Para votar, ingrese su código nuevamente', 'info');
+                } catch (error) {
+                    clearTokens();
+                    voterToken = null;
+                }
+            }
+
+            if (!isAdmin && !voterToken) {
+                showStatus('Sistema iniciado - Ingrese sus credenciales', 'success');
+            }
+
+            document.getElementById('access-code').addEventListener('input', function(e) {
+                // Convertir a mayúsculas automáticamente
+                e.target.value = e.target.value.toUpperCase();
+                
+                // Validar formato en tiempo real
+                const value = e.target.value;
+                const isValid = /^\d*-?\d*$/.test(value); // Permite escritura gradual
+                
+                if (value && !isValid) {
+                    e.target.style.borderColor = '#e74c3c';
+                } else {
+                    e.target.style.borderColor = '#dee2e6';
+                }
+            });
+        });
+
+        // Manejar cierre de ventana
+        window.addEventListener('beforeunload', () => {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+            }
+        });
+    </script>
+</body>
+</html>
