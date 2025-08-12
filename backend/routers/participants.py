@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from ..database import get_db
+from ..database import get_db, execute_query
 from ..auth.auth import admin_required
 import pandas as pd
 from typing import Dict
@@ -19,49 +19,79 @@ class ConjuntoRequest(BaseModel):
 # Listar participantes (solo admin)
 @router.get("/", dependencies=[Depends(admin_required)])
 def listar_participantes():
-    db = get_db()
-    cur = db.execute("SELECT * FROM participants")
-    rows = [dict(r) for r in cur.fetchall()]
-    return rows
+    conn = get_db()
+    try:
+        participants = execute_query(
+            conn,
+            "SELECT * FROM participants",
+            fetchall=True
+        )
+        return [dict(p) for p in participants]
+    finally:
+        conn.close()
 
 # Guardar nombre del conjunto
 @router.post("/conjunto/nombre", dependencies=[Depends(admin_required)])
 def guardar_nombre_conjunto(request: ConjuntoRequest):
-    db = get_db()
-    db.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", 
-                ("conjunto_nombre", request.nombre))
-    db.commit()
-    return {"status": "ok"}
+    conn = get_db()
+    try:
+        execute_query(
+            conn,
+            "INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+            ("conjunto_nombre", request.nombre),
+            commit=True
+        )
+        return {"status": "ok"}
+    finally:
+        conn.close()
 
 # Obtener nombre conjunto
 @router.get("/conjunto/nombre", dependencies=[Depends(admin_required)])
 def obtener_nombre_conjunto():
-    db = get_db()
-    cur = db.execute("SELECT value FROM config WHERE key = ?", ("conjunto_nombre",))
-    result = cur.fetchone()
-    return {"nombre": result["value"] if result else ""}
+    conn = get_db()
+    try:
+        result = execute_query(
+            conn,
+            "SELECT value FROM config WHERE key = ?",
+            ("conjunto_nombre",),
+            fetchone=True
+        )
+        return {"nombre": result["value"] if result else ""}
+    finally:
+        conn.close()
 
 # Carga masiva desde JSON (formato que genera tu script: { "ASM-101": {...}, ... })
 @router.post("/bulk", dependencies=[Depends(admin_required)])
 def agregar_participantes(data: Dict[str, dict]):
-    db = get_db()
+    conn = get_db()
     count = 0
-    for code, info in data.items():
-        name = info.get("nombre") or info.get("name")
-        coef = info.get("coeficiente") or info.get("coefficient") or 1.0
-        ha_votado = int(bool(info.get("ha_votado", False)))
-        if not code or not name:
-            continue
-        db.execute(
-            """
-            INSERT OR REPLACE INTO participants (code, name, coefficient, has_voted, present)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            (code.upper(), name, float(coef), ha_votado, 0)
-        )
-        count += 1
-    db.commit()
-    return {"status": "ok", "cantidad": count}
+    try:
+        for code, info in data.items():
+            name = info.get("nombre") or info.get("name")
+            coef = info.get("coeficiente") or info.get("coefficient") or 1.0
+            ha_votado = int(bool(info.get("ha_votado", False)))
+            if not code or not name:
+                continue
+            
+            execute_query(
+                conn,
+                """
+                INSERT INTO participants (code, name, coefficient, has_voted, present)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (code) DO UPDATE SET 
+                    name = EXCLUDED.name,
+                    coefficient = EXCLUDED.coefficient,
+                    has_voted = EXCLUDED.has_voted,
+                    present = EXCLUDED.present
+                """,
+                (code.upper(), name, float(coef), ha_votado, 0),
+                commit=True
+            )
+            count += 1
+        
+        return {"status": "ok", "cantidad": count}
+    finally:
+        conn.close()
 
 # Endpoint para subir un XLSX (archivo) desde admin -> procesado con misma lógica que el script
 @router.post("/upload-xlsx", dependencies=[Depends(admin_required)])
@@ -116,128 +146,170 @@ async def upload_xlsx(file: UploadFile = File(...)):
             except Exception:
                 continue
 
-    # Insertar en DB (resto igual)
-    db = get_db()
+    # Insertar en DB
+    conn = get_db()
     inserted = 0
-    for code, info in participantes.items():
-        db.execute(
-            """
-            INSERT OR REPLACE INTO participants (code, name, coefficient, has_voted, present)
-            VALUES (?, ?, ?, ?, 0)
-            """,
-            (code.upper(), info["nombre"], float(info["coeficiente"]), int(info.get("ha_votado", False)))
-        )
-        inserted += 1
-    db.commit()
-
-    return {"status": "ok", "inserted": inserted, "sheets_processed": len(xls.keys())}
+    try:
+        for code, info in participantes.items():
+            execute_query(
+                conn,
+                """
+                INSERT INTO participants (code, name, coefficient, has_voted, present)
+                VALUES (?, ?, ?, ?, 0)
+                ON CONFLICT (code) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    coefficient = EXCLUDED.coefficient,
+                    has_voted = EXCLUDED.has_voted
+                """,
+                (code.upper(), info["nombre"], float(info["coeficiente"]), int(info.get("ha_votado", False))),
+                commit=True
+            )
+            inserted += 1
+        
+        return {"status": "ok", "inserted": inserted, "sheets_processed": len(xls.keys())}
+    finally:
+        conn.close()
 
 # genera PDF de asistencia
 @router.post("/asistencia/pdf")
 async def generar_pdf_asistencia(user=Depends(admin_required)):
     conn = get_db()
-    cur = conn.cursor()
-
-    # Obtener nombre del conjunto guardado
-    cur.execute("SELECT value FROM config WHERE key = ?", ("conjunto_nombre",))
-    conjunto_result = cur.fetchone()
-    conjunto_name = conjunto_result["value"] if conjunto_result else "Conjunto Residencial"
     
-    # Obtener participantes
-    cur.execute("""
-        SELECT 
-            code, 
-            name, 
-            coefficient, 
-            present,
-            is_power,
-            login_time
-        FROM participants 
-        ORDER BY code
-    """)
-    participantes = cur.fetchall()
-    
-    # Obtener estadísticas de aforo
-    cur.execute("""
-        SELECT 
-            COUNT(*) as total_participants,
-            COUNT(CASE WHEN present = 1 THEN 1 END) as present_count,
-            COUNT(CASE WHEN present = 1 AND is_power = 0 THEN 1 END) as own_votes,
-            COUNT(CASE WHEN present = 1 AND is_power = 1 THEN 1 END) as power_votes,
-            SUM(CASE WHEN present = 1 THEN coefficient ELSE 0 END) as present_coefficient,
-            SUM(coefficient) as total_coefficient
-        FROM participants
-    """)
-    stats = dict(cur.fetchone())
-    
-    # Calcular porcentajes
-    coefficient_percentage = stats['present_coefficient'] if stats['present_coefficient'] else 0  # Ya es porcentaje
-    participation_percentage = (stats['present_count'] / stats['total_participants'] * 100) if stats['total_participants'] > 0 else 0
-    quorum_met = coefficient_percentage >= 51
-    
-    # Obtener preguntas y resultados
-    cur.execute("""
-        SELECT DISTINCT q.id, q.text, q.type
-        FROM questions q
-        ORDER BY q.id
-    """)
-    preguntas = cur.fetchall()
-    
-    resultados_preguntas = []
-    for pregunta in preguntas:
-        # Obtener opciones disponibles
-        cur.execute("SELECT option_text FROM options WHERE question_id = ? ORDER BY option_text", (pregunta['id'],))
-        opciones = [r["option_text"] for r in cur.fetchall()]
+    try:
+        # Obtener nombre del conjunto guardado
+        conjunto_result = execute_query(
+            conn,
+            "SELECT value FROM config WHERE key = ?",
+            ("conjunto_nombre",),
+            fetchone=True
+        )
+        conjunto_name = conjunto_result["value"] if conjunto_result else "Conjunto Residencial"
         
-        # Obtener participantes únicos que votaron
-        cur.execute("SELECT COUNT(DISTINCT participant_code) as total_participants FROM votes WHERE question_id = ?", (pregunta['id'],))
-        total_participants_pregunta = cur.fetchone()['total_participants']
-        
-        # Obtener coeficiente total de participantes únicos
-        cur.execute("""
-            SELECT SUM(p.coefficient) as total_participant_coefficient 
-            FROM (SELECT DISTINCT participant_code FROM votes WHERE question_id = ?) v
-            JOIN participants p ON v.participant_code = p.code
-        """, (pregunta['id'],))
-        total_participant_coefficient = float(cur.fetchone()["total_participant_coefficient"] or 0.0)
-        
-        # Calcular resultados por opción
-        resultados = []
-        for opcion in opciones:
-            cur.execute("""
+        # Obtener participantes
+        participantes = execute_query(
+            conn,
+            """
             SELECT 
-                COUNT(v.participant_code) as votes,
-                SUM(p.coefficient) as coefficient_sum
-            FROM options o
-            LEFT JOIN votes v ON v.question_id = o.question_id AND (
-                v.answer = o.option_text OR 
-                v.answer LIKE '%' || o.option_text || '%'
+                code, 
+                name, 
+                coefficient, 
+                present,
+                is_power,
+                login_time
+            FROM participants 
+            ORDER BY code
+            """,
+            fetchall=True
+        )
+        
+        # Obtener estadísticas de aforo
+        stats = execute_query(
+            conn,
+            """
+            SELECT 
+                COUNT(*) as total_participants,
+                COUNT(CASE WHEN present = 1 THEN 1 END) as present_count,
+                COUNT(CASE WHEN present = 1 AND is_power = 0 THEN 1 END) as own_votes,
+                COUNT(CASE WHEN present = 1 AND is_power = 1 THEN 1 END) as power_votes,
+                SUM(CASE WHEN present = 1 THEN coefficient ELSE 0 END) as present_coefficient,
+                SUM(coefficient) as total_coefficient
+            FROM participants
+            """,
+            fetchone=True
+        )
+        stats = dict(stats)
+        
+        # Calcular porcentajes
+        coefficient_percentage = stats['present_coefficient'] if stats['present_coefficient'] else 0  # Ya es porcentaje
+        participation_percentage = (stats['present_count'] / stats['total_participants'] * 100) if stats['total_participants'] > 0 else 0
+        quorum_met = coefficient_percentage >= 51
+        
+        # Obtener preguntas y resultados
+        preguntas = execute_query(
+            conn,
+            """
+            SELECT DISTINCT q.id, q.text, q.type
+            FROM questions q
+            ORDER BY q.id
+            """,
+            fetchall=True
+        )
+        
+        resultados_preguntas = []
+        for pregunta in preguntas:
+            # Obtener opciones disponibles
+            opciones_result = execute_query(
+                conn,
+                "SELECT option_text FROM options WHERE question_id = ? ORDER BY option_text",
+                (pregunta['id'],),
+                fetchall=True
             )
-            LEFT JOIN participants p ON v.participant_code = p.code
-            WHERE o.question_id = ? AND o.option_text = ?
-            """, (pregunta['id'], opcion))
+            opciones = [r["option_text"] for r in opciones_result]
             
-            result = cur.fetchone()
-            votes = result['votes'] or 0
-            coefficient_sum = float(result['coefficient_sum'] or 0.0)
+            # Obtener participantes únicos que votaron
+            total_participants_result = execute_query(
+                conn,
+                "SELECT COUNT(DISTINCT participant_code) as total_participants FROM votes WHERE question_id = ?",
+                (pregunta['id'],),
+                fetchone=True
+            )
+            total_participants_pregunta = total_participants_result['total_participants']
             
-            resultados.append({
-                'answer': opcion,
-                'votes': votes,
-                'percentage': coefficient_sum  # Ya es el porcentaje correcto
+            # Obtener coeficiente total de participantes únicos
+            total_coef_result = execute_query(
+                conn,
+                """
+                SELECT SUM(p.coefficient) as total_participant_coefficient 
+                FROM (SELECT DISTINCT participant_code FROM votes WHERE question_id = ?) v
+                JOIN participants p ON v.participant_code = p.code
+                """,
+                (pregunta['id'],),
+                fetchone=True
+            )
+            total_participant_coefficient = float(total_coef_result["total_participant_coefficient"] or 0.0)
+            
+            # Calcular resultados por opción
+            resultados = []
+            for opcion in opciones:
+                result = execute_query(
+                    conn,
+                    """
+                    SELECT 
+                        COUNT(v.participant_code) as votes,
+                        SUM(p.coefficient) as coefficient_sum
+                    FROM options o
+                    LEFT JOIN votes v ON v.question_id = o.question_id AND (
+                        v.answer = o.option_text OR 
+                        v.answer LIKE '%' || o.option_text || '%'
+                    )
+                    LEFT JOIN participants p ON v.participant_code = p.code
+                    WHERE o.question_id = ? AND o.option_text = ?
+                    """,
+                    (pregunta['id'], opcion),
+                    fetchone=True
+                )
+                
+                votes = result['votes'] or 0
+                coefficient_sum = float(result['coefficient_sum'] or 0.0)
+                
+                resultados.append({
+                    'answer': opcion,
+                    'votes': votes,
+                    'percentage': coefficient_sum  # Ya es el porcentaje correcto
+                })
+            
+            # Ordenar por porcentaje (coeficiente) descendente
+            resultados.sort(key=lambda x: x['percentage'], reverse=True)
+            
+            resultados_preguntas.append({
+                'pregunta': pregunta,
+                'resultados': resultados,
+                'total_participants': total_participants_pregunta,
+                'total_participant_coefficient': total_participant_coefficient
             })
-        
-        # Ordenar por porcentaje (coeficiente) descendente
-        resultados.sort(key=lambda x: x['percentage'], reverse=True)
-        
-        resultados_preguntas.append({
-            'pregunta': pregunta,
-            'resultados': resultados,
-            'total_participants': total_participants_pregunta,
-            'total_participant_coefficient': total_participant_coefficient
-        })
-    
-    conn.close()
+
+    finally:
+        conn.close()
 
     # Crear PDF
     pdf = FPDF()
@@ -367,26 +439,34 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
 @router.post("/asistencia/xlsx")
 async def generar_xlsx_asistencia(user=Depends(admin_required)):
     conn = get_db()
-    cur = conn.cursor()
+    
+    try:
+        # Obtener nombre del conjunto guardado
+        conjunto_result = execute_query(
+            conn,
+            "SELECT value FROM config WHERE key = ?",
+            ("conjunto_nombre",),
+            fetchone=True
+        )
+        conjunto_name = conjunto_result["value"] if conjunto_result else "Conjunto Residencial"
 
-    # Obtener nombre del conjunto guardado
-    cur.execute("SELECT value FROM config WHERE key = ?", ("conjunto_nombre",))
-    conjunto_result = cur.fetchone()
-    conjunto_name = conjunto_result["value"] if conjunto_result else "Conjunto Residencial"
-
-    cur.execute("""
-        SELECT 
-            code, 
-            name, 
-            coefficient, 
-            present,
-            is_power,
-            login_time
-        FROM participants 
-        ORDER BY code
-    """)
-    participantes = cur.fetchall()
-    conn.close()
+        participantes = execute_query(
+            conn,
+            """
+            SELECT 
+                code, 
+                name, 
+                coefficient, 
+                present,
+                is_power,
+                login_time
+            FROM participants 
+            ORDER BY code
+            """,
+            fetchall=True
+        )
+    finally:
+        conn.close()
 
     wb = Workbook()
     ws = wb.active

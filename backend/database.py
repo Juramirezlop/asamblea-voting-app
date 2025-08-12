@@ -14,22 +14,58 @@ def get_db():
             database_url = database_url.replace("postgresql://", "postgres://", 1)
 
         conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
-        conn.autocommit = True  # Para que los cambios se guarden automáticamente
-        return conn
+        return conn  # NO usar autocommit=True aquí
     else:
         # SQLite en desarrollo local
         conn = sqlite3.connect(DB_NAME)
         conn.row_factory = sqlite3.Row
         return conn
+    
+def execute_query(conn, query, params=(), fetchone=False, fetchall=False, commit=False):
+    # Detectar si es Postgres
+    is_postgres = 'psycopg2' in str(type(conn))
+    
+    if is_postgres:
+        # Reemplazar placeholders de SQLite (?) por %s
+        query = query.replace("?", "%s")
+        cur = conn.cursor()
+        cur.execute(query, params)
+        
+        result = None
+        if fetchone:
+            result = cur.fetchone()
+        elif fetchall:
+            result = cur.fetchall()
+        
+        if commit:
+            conn.commit()
+        
+        cur.close()
+        return result
+    else:
+        # SQLite
+        cur = conn.cursor()
+        cur.execute(query, params)
+        
+        result = None
+        if fetchone:
+            result = cur.fetchone()
+        elif fetchall:
+            result = cur.fetchall()
+        
+        if commit:
+            conn.commit()
+        
+        return result
 
 def init_db():
     db = get_db()
-    cursor = db.cursor()
     
     # Detectar tipo de base de datos
-    is_postgres = hasattr(db, 'cursor') and 'psycopg2' in str(type(db))
+    is_postgres = 'psycopg2' in str(type(db))
     
     if is_postgres:
+        cursor = db.cursor()
         # Sintaxis PostgreSQL
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS participants (
@@ -91,7 +127,11 @@ def init_db():
             )
         """)
         
+        db.commit()
+        cursor.close()
+        
     else:
+        cursor = db.cursor()
         # Sintaxis SQLite (tu código original)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS participants (
@@ -154,5 +194,6 @@ def init_db():
         """)
         
         db.commit()
+        cursor.close()
     
-    cursor.close()
+    db.close()

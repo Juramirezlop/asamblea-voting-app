@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from datetime import datetime
-import sqlite3
-from ..database import get_db
+from psycopg2 import IntegrityError
+from ..database import get_db, execute_query
 from ..auth.auth import (
     create_access_token,
     verify_password,
@@ -34,12 +34,13 @@ def register_user(payload: RegisterUser):
 
     conn = get_db()
     try:
-        conn.execute(
+        execute_query(
+            conn,
             "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
             (payload.username, get_password_hash(payload.password), payload.role),
+            commit=True
         )
-        conn.commit()
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         raise HTTPException(status_code=400, detail="Usuario ya existe")
     finally:
         conn.close()
@@ -59,39 +60,49 @@ def login_admin(form_data: OAuth2PasswordRequestForm = Depends()):
 @router.post("/login/voter")
 def login_voter(data: VoterLoginRequest):
     conn = get_db()
-    cur = conn.cursor()
-
-    # Validar si el votante existe y obtener sus datos
-    cur.execute("SELECT code, name, is_power, login_time FROM participants WHERE code = ?", (data.code,))
-    participant = cur.fetchone()
     
+    # 1. Validar participante
+    participant = execute_query(
+        conn,
+        "SELECT code, name, is_power, login_time FROM participants WHERE code = ?",
+        (data.code,),
+        fetchone=True
+    )
     if not participant:
         conn.close()
         raise HTTPException(status_code=404, detail="Código no encontrado")
 
+    # 2. Actualizar datos (primera vez o no)
     login_timestamp = datetime.now().isoformat()
     is_first_time = participant["login_time"] is None
-    
-    if not is_first_time:
-        # Ya logueado antes - actualizar presente y is_power por si viene en el request
-        cur.execute("UPDATE participants SET present = 1, is_power = ? WHERE code = ?", (data.is_power, data.code))
-    
-    elif is_first_time:
-        # Primera vez - registrar todo (tanto propietario como poder)
-        cur.execute("""
-            UPDATE participants 
-            SET present = 1, is_power = ?, login_time = ? 
-            WHERE code = ?
-        """, (data.is_power, login_timestamp, data.code))
-    
-    conn.commit()
-    
-    # Obtener datos actualizados
-    cur.execute("SELECT code, name, is_power FROM participants WHERE code = ?", (data.code,))
-    updated_participant = cur.fetchone()
+
+    if is_first_time:
+        execute_query(
+            conn,
+            """UPDATE participants 
+                SET present = 1, is_power = ?, login_time = ? 
+                WHERE code = ?""",
+            (data.is_power, login_timestamp, data.code),
+            commit=True
+        )
+    else:
+        execute_query(
+            conn,
+            "UPDATE participants SET present = 1, is_power = ? WHERE code = ?",
+            (data.is_power, data.code),
+            commit=True
+        )
+
+    # 3. Obtener datos actualizados
+    updated_participant = execute_query(
+        conn,
+        "SELECT code, name, is_power FROM participants WHERE code = ?",
+        (data.code,),
+        fetchone=True
+    )
     conn.close()
 
-    # Generar token
+    # Generar token (sin cambios)
     token = create_access_token({"sub": data.code, "role": "votante", "code": data.code})
     
     return {
