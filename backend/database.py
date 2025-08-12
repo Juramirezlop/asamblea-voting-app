@@ -10,7 +10,9 @@ def get_db():
     database_url = os.getenv("DATABASE_URL")
     
     if database_url:
-        # PostgreSQL en Railway
+        if database_url.startswith("postgresql://"):
+            database_url = database_url.replace("postgresql://", "postgres://", 1)
+
         conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
         conn.autocommit = True  # Para que los cambios se guarden automáticamente
         return conn
