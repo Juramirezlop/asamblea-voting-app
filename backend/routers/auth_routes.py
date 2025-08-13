@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from datetime import datetime
 from psycopg2 import IntegrityError
-from ..database import get_db, execute_query
+from ..database import get_db, execute_query, close_db
 from ..auth.auth import (
     create_access_token,
     verify_password,
@@ -43,7 +43,7 @@ def register_user(payload: RegisterUser):
     except IntegrityError:
         raise HTTPException(status_code=400, detail="Usuario ya existe")
     finally:
-        conn.close()
+        close_db(conn)
 
     return {"msg": f"Usuario '{payload.username}' creado con rol '{payload.role}'"}
 
@@ -69,7 +69,7 @@ def login_voter(data: VoterLoginRequest):
         fetchone=True
     )
     if not participant:
-        conn.close()
+        close_db(conn)
         raise HTTPException(status_code=404, detail="Código no encontrado")
 
     # 2. Actualizar datos (primera vez o no)
@@ -100,7 +100,7 @@ def login_voter(data: VoterLoginRequest):
         (data.code,),
         fetchone=True
     )
-    conn.close()
+    close_db(conn)
 
     # Generar token (sin cambios)
     token = create_access_token({"sub": data.code, "role": "votante", "code": data.code})

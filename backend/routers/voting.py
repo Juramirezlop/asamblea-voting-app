@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List
-from ..database import get_db, execute_query
+from ..database import get_db, execute_query, close_db
 from ..auth.auth import admin_required, voter_required, admin_or_voter_required
 from datetime import datetime
 
@@ -59,7 +59,7 @@ def crear_pregunta(payload: QuestionCreate):
         
         return {"status": "ok", "id": qid}
     finally:
-        conn.close()
+        close_db(conn)
 
 # --- Obtener preguntas activas (votante) ---
 @router.get("/questions/active", dependencies=[Depends(admin_or_voter_required)])
@@ -91,7 +91,7 @@ def preguntas_activas():
             })
         return out
     finally:
-        conn.close()
+        close_db(conn)
 
 # --- Votar (votante) ---
 @router.post("/vote", dependencies=[Depends(voter_required)])
@@ -183,7 +183,7 @@ def votar(vote: VoteIn, user=Depends(voter_required)):
 
         return {"status": "voto registrado", "answers": answers}
     finally:
-        conn.close()
+        close_db(conn)
 
 # --- Votos individuales por persona ---
 @router.get("/my-votes", dependencies=[Depends(voter_required)])
@@ -199,7 +199,7 @@ def mis_votos(user=Depends(voter_required)):
         )
         return [{"question_id": vote["question_id"], "answer": vote["answer"]} for vote in votes]
     finally:
-        conn.close()
+        close_db(conn)
 
 # --- Pausar encuestas creadas ---
 @router.put("/questions/{question_id}/toggle", dependencies=[Depends(admin_required)])
@@ -222,7 +222,7 @@ def toggle_question_status(question_id: int):
         )
         return {"closed": bool(status["closed"]) if status else False}
     finally:
-        conn.close()
+        close_db(conn)
 
 # --- Borrar encuestas ---
 @router.delete("/questions/{question_id}", dependencies=[Depends(admin_required)])
@@ -246,7 +246,7 @@ def delete_question(question_id: int):
         
         return {"status": "pregunta eliminada"}
     finally:
-        conn.close()
+        close_db(conn)
 
 # --- Resultados (admin) ---
 @router.get("/results/{question_id}", dependencies=[Depends(admin_required)])
@@ -351,7 +351,7 @@ def resultados(question_id: int):
             "results": results_list
         }
     finally:
-        conn.close()
+        close_db(conn)
 
 # --- Endpoint para calcular aforo/quorum ---
 @router.get("/aforo")
@@ -413,7 +413,7 @@ def get_aforo(user=Depends(admin_required)):
             "coefficient_rate_percent": round(coefficient_rate, 2),
         }
     finally:
-        conn.close()
+        close_db(conn)
 
 # --- Reset DB (solo admin): borra preguntas, opciones, votos y resetea participantes ---
 @router.delete("/admin/reset", dependencies=[Depends(admin_required)])
@@ -428,4 +428,4 @@ def reset_db():
         # No borrar sqlite_sequence en PostgreSQL
         return {"status": "borrado realizado"}
     finally:
-        conn.close()
+        close_db(conn)

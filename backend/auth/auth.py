@@ -6,7 +6,7 @@ from passlib.context import CryptContext
 from dotenv import load_dotenv
 from fastapi import HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer
-from ..database import get_db, execute_query
+from ..database import get_db, execute_query, close_db
 
 load_dotenv()
 
@@ -55,7 +55,7 @@ def get_user_by_username(username: str) -> Optional[dict]:
         row = execute_query(conn, query, (username,), fetchone=True)
         return dict(row) if row else None
     finally:
-        conn.close()
+        close_db(conn)
 
 def create_default_admin_from_env():
     """
@@ -75,7 +75,7 @@ def create_default_admin_from_env():
         hashed = get_password_hash(admin_pass)
         query_insert = "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)"
         execute_query(conn, query_insert, (admin_user, hashed, "admin"), commit=True)
-    conn.close()
+    close_db(conn)
 
 # ----------------------
 # Dependencies (roles)

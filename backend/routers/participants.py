@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from ..database import get_db, execute_query
+from ..database import get_db, execute_query, close_db
 from ..auth.auth import admin_required
 import pandas as pd
 from typing import Dict
@@ -28,7 +28,7 @@ def listar_participantes():
         )
         return [dict(p) for p in participants]
     finally:
-        conn.close()
+        close_db(conn)
 
 # Guardar nombre del conjunto
 @router.post("/conjunto/nombre", dependencies=[Depends(admin_required)])
@@ -43,7 +43,7 @@ def guardar_nombre_conjunto(request: ConjuntoRequest):
         )
         return {"status": "ok"}
     finally:
-        conn.close()
+        close_db(conn)
 
 # Obtener nombre conjunto
 @router.get("/conjunto/nombre", dependencies=[Depends(admin_required)])
@@ -58,7 +58,7 @@ def obtener_nombre_conjunto():
         )
         return {"nombre": result["value"] if result else ""}
     finally:
-        conn.close()
+        close_db(conn)
 
 # Carga masiva desde JSON (formato que genera tu script: { "ASM-101": {...}, ... })
 @router.post("/bulk", dependencies=[Depends(admin_required)])
@@ -91,7 +91,7 @@ def agregar_participantes(data: Dict[str, dict]):
         
         return {"status": "ok", "cantidad": count}
     finally:
-        conn.close()
+        close_db(conn)
 
 # Endpoint para subir un XLSX (archivo) desde admin -> procesado con misma lógica que el script
 @router.post("/upload-xlsx", dependencies=[Depends(admin_required)])
@@ -168,7 +168,7 @@ async def upload_xlsx(file: UploadFile = File(...)):
         
         return {"status": "ok", "inserted": inserted, "sheets_processed": len(xls.keys())}
     finally:
-        conn.close()
+        close_db(conn)
 
 # genera PDF de asistencia
 @router.post("/asistencia/pdf")
@@ -309,7 +309,7 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
             })
 
     finally:
-        conn.close()
+        close_db(conn)
 
     # Crear PDF
     pdf = FPDF()
@@ -466,7 +466,7 @@ async def generar_xlsx_asistencia(user=Depends(admin_required)):
             fetchall=True
         )
     finally:
-        conn.close()
+        close_db(conn)
 
     wb = Workbook()
     ws = wb.active
