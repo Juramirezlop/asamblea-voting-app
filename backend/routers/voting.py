@@ -367,7 +367,7 @@ def get_aforo(user=Depends(admin_required)):
         total_participants = totals["total_participants"] or 0
         total_coefficient = totals["total_coefficient"] or 0.0
 
-        # Presentes (AGREGAR coeficiente presente)
+        # Presentes (AGREGAR coeficiente presente) - FIX: usar TRUE/FALSE
         present_data = execute_query(
             conn,
             "SELECT COUNT(*) as present_count, SUM(coefficient) as present_coefficient FROM participants WHERE present = 1",
@@ -376,20 +376,22 @@ def get_aforo(user=Depends(admin_required)):
         present_count = present_data["present_count"] or 0
         present_coefficient = present_data["present_coefficient"] or 0.0
 
+        # FIX: Cambiar 1 y 0 por TRUE y FALSE
         own_votes_result = execute_query(
             conn,
-            "SELECT COUNT(*) as own_count FROM participants WHERE present = 1 AND is_power = 0",
+            "SELECT COUNT(*) as own_count FROM participants WHERE present = 1 AND is_power = FALSE",
             fetchone=True
         )
         own_votes = own_votes_result["own_count"] or 0
 
         power_votes_result = execute_query(
             conn,
-            "SELECT COUNT(*) as power_count FROM participants WHERE present = 1 AND is_power = 1",
+            "SELECT COUNT(*) as power_count FROM participants WHERE present = 1 AND is_power = TRUE",
             fetchone=True
         )
         power_votes = power_votes_result["power_count"] or 0
 
+        # FIX: usar TRUE para present
         voted_data = execute_query(
             conn,
             "SELECT COUNT(*) as voted_count FROM participants WHERE present = 1 AND has_voted = 1",

@@ -77,6 +77,7 @@ def login_voter(data: VoterLoginRequest):
     is_first_time = participant["login_time"] is None
 
     if is_first_time:
+        # FIX: usar TRUE en lugar de 1 para present
         execute_query(
             conn,
             """UPDATE participants 
@@ -86,6 +87,7 @@ def login_voter(data: VoterLoginRequest):
             commit=True
         )
     else:
+        # FIX: usar TRUE en lugar de 1 para present
         execute_query(
             conn,
             "UPDATE participants SET present = 1, is_power = ? WHERE code = ?",
