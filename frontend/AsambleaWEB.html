@@ -1634,6 +1634,7 @@
                 updateInterval = setInterval(async () => {
                     await loadAforoData();
                     await loadActiveQuestions();
+                    await loadResultsConditionally();
                 }, 4000);
             }
         }
