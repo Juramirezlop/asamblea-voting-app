@@ -304,17 +304,16 @@ def resultados(question_id: int):
                 conn,
                 """
                 SELECT 
-                    COUNT(CASE WHEN v.participant_code IS NOT NULL THEN 1 END) as participants,
-                    COALESCE(SUM(CASE WHEN v.participant_code IS NOT NULL THEN p.coefficient ELSE 0 END), 0) as weight
-                FROM options o
-                LEFT JOIN votes v ON v.question_id = o.question_id AND (
-                    v.answer = o.option_text OR 
-                    v.answer LIKE '%' || o.option_text || '%'
+                    COUNT(v.participant_code) as participants,
+                    COALESCE(SUM(p.coefficient), 0) as weight
+                FROM votes v
+                JOIN participants p ON v.participant_code = p.code
+                WHERE v.question_id = ? AND (
+                    v.answer = ? OR 
+                    v.answer LIKE '%' || ? || '%'
                 )
-                LEFT JOIN participants p ON v.participant_code = p.code
-                WHERE o.question_id = ? AND o.option_text = ?
                 """,
-                (question_id, opt),
+                (question_id, opt, opt),
                 fetchone=True
             )
             
