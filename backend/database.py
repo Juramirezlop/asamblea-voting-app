@@ -135,19 +135,34 @@ def execute_query(conn, query, params=(), fetchone=False, fetchall=False, commit
     try:
         if is_postgres:
             # Reemplazar placeholders de SQLite (?) por %s
-            query = query.replace("?", "%s")
+            postgres_query = query.replace("?", "%s")
+            # Fix para CONCAT en PostgreSQL
+            postgres_query = postgres_query.replace("CONCAT('%', ", "'%' || ").replace(", '%')", " || '%'")
+            # Fix para || concatenation que puede fallar
+            postgres_query = postgres_query.replace("'%' || o.option_text || '%'", "'%' || CAST(o.option_text AS TEXT) || '%'")
+            
             cur = conn.cursor()
-            cur.execute(query, params)
+            logger.debug(f"PostgreSQL Query: {postgres_query}")
+            logger.debug(f"PostgreSQL Params: {params}")
+            cur.execute(postgres_query, params)
         else:
             # SQLite
             cur = conn.cursor()
+            logger.debug(f"SQLite Query: {query}")
+            logger.debug(f"SQLite Params: {params}")
             cur.execute(query, params)
         
         result = None
         if fetchone:
             result = cur.fetchone()
+            # Convertir a dict si es necesario
+            if result and hasattr(result, '_asdict'):
+                result = dict(result)
         elif fetchall:
             result = cur.fetchall()
+            # Convertir a lista de dicts si es necesario
+            if result and hasattr(result[0], '_asdict'):
+                result = [dict(row) for row in result]
         
         if commit:
             conn.commit()
@@ -156,7 +171,7 @@ def execute_query(conn, query, params=(), fetchone=False, fetchall=False, commit
         
     except Exception as e:
         logger.error(f"Error ejecutando query: {e}")
-        logger.error(f"Query: {query}")
+        logger.error(f"Query original: {query}")
         logger.error(f"Params: {params}")
         
         # Rollback en caso de error

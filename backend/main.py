@@ -4,16 +4,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
-import os
 from .database import init_db
 from .routers import participants, voting, auth_routes
 from .auth.auth import create_default_admin_from_env
+import os
+import logging
 
 # Cargar variables de entorno
 env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
 app = FastAPI(title="Asambleas API")
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # CORS
 if os.getenv("RAILWAY_ENVIRONMENT"):

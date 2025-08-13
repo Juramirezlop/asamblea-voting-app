@@ -1,7 +1,8 @@
+import logging
+import pandas as pd
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from ..database import get_db, execute_query, close_db
 from ..auth.auth import admin_required
-import pandas as pd
 from typing import Dict
 from fastapi.responses import StreamingResponse
 from fpdf import FPDF
@@ -12,6 +13,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
 
 router = APIRouter(prefix="/participants", tags=["Participants"])
+logger = logging.getLogger(__name__)
 
 class ConjuntoRequest(BaseModel):
     nombre: str
@@ -183,7 +185,7 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
             ("conjunto_nombre",),
             fetchone=True
         )
-        conjunto_name = conjunto_result["value"] if conjunto_result else "Conjunto Residencial"
+        conjunto_name = conjunto_result["value"] if conjunto_result and conjunto_result.get("value") else "Conjunto Residencial"
         
         # Obtener participantes
         participantes = execute_query(
@@ -202,29 +204,31 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
             fetchall=True
         )
         
-        # Obtener estadísticas de aforo
+        # Obtener estadísticas de aforo con manejo seguro de NULLs
         stats = execute_query(
             conn,
             """
             SELECT 
                 COUNT(*) as total_participants,
                 COUNT(CASE WHEN present = 1 THEN 1 END) as present_count,
-                COUNT(CASE WHEN present = 1 AND is_power = FALSE THEN 1 END) as own_votes,
-                COUNT(CASE WHEN present = 1 AND is_power = TRUE THEN 1 END) as power_votes,
-                SUM(CASE WHEN present = 1 THEN coefficient ELSE 0 END) as present_coefficient,
-                SUM(coefficient) as total_coefficient
+                COUNT(CASE WHEN present = 1 AND (is_power = 0 OR is_power = FALSE) THEN 1 END) as own_votes,
+                COUNT(CASE WHEN present = 1 AND (is_power = 1 OR is_power = TRUE) THEN 1 END) as power_votes,
+                COALESCE(SUM(CASE WHEN present = 1 THEN coefficient ELSE 0 END), 0) as present_coefficient,
+                COALESCE(SUM(coefficient), 0) as total_coefficient
             FROM participants
             """,
             fetchone=True
         )
-        stats = dict(stats)
         
-        # Calcular porcentajes
-        coefficient_percentage = stats['present_coefficient'] if stats['present_coefficient'] else 0  # Ya es porcentaje
-        participation_percentage = (stats['present_count'] / stats['total_participants'] * 100) if stats['total_participants'] > 0 else 0
+        if not stats:
+            raise HTTPException(status_code=500, detail="Error obteniendo estadísticas")
+        
+        # Calcular porcentajes de manera segura
+        coefficient_percentage = float(stats['present_coefficient']) if stats['present_coefficient'] else 0.0
+        participation_percentage = (int(stats['present_count']) / int(stats['total_participants']) * 100) if int(stats['total_participants']) > 0 else 0.0
         quorum_met = coefficient_percentage >= 51
         
-        # Obtener preguntas y resultados
+        # Obtener preguntas y resultados de manera más segura
         preguntas = execute_query(
             conn,
             """
@@ -236,208 +240,223 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
         )
         
         resultados_preguntas = []
-        for pregunta in preguntas:
-            # Obtener opciones disponibles
-            opciones_result = execute_query(
-                conn,
-                "SELECT option_text FROM options WHERE question_id = ? ORDER BY option_text",
-                (pregunta['id'],),
-                fetchall=True
-            )
-            opciones = [r["option_text"] for r in opciones_result]
-            
-            # Obtener participantes únicos que votaron
-            total_participants_result = execute_query(
-                conn,
-                "SELECT COUNT(DISTINCT participant_code) as total_participants FROM votes WHERE question_id = ?",
-                (pregunta['id'],),
-                fetchone=True
-            )
-            total_participants_pregunta = total_participants_result['total_participants']
-            
-            # Obtener coeficiente total de participantes únicos
-            total_coef_result = execute_query(
-                conn,
-                """
-                SELECT SUM(p.coefficient) as total_participant_coefficient 
-                FROM (SELECT DISTINCT participant_code FROM votes WHERE question_id = ?) v
-                JOIN participants p ON v.participant_code = p.code
-                """,
-                (pregunta['id'],),
-                fetchone=True
-            )
-            total_participant_coefficient = float(total_coef_result["total_participant_coefficient"] or 0.0)
-            
-            # Calcular resultados por opción
-            resultados = []
-            for opcion in opciones:
-                result = execute_query(
-                    conn,
-                    """
-                    SELECT 
-                        COUNT(v.participant_code) as votes,
-                        SUM(p.coefficient) as coefficient_sum
-                    FROM options o
-                    LEFT JOIN votes v ON v.question_id = o.question_id AND (
-                        v.answer = o.option_text OR 
-                        v.answer LIKE '%' || o.option_text || '%'
+        if preguntas:
+            for pregunta in preguntas:
+                try:
+                    # Obtener opciones disponibles
+                    opciones_result = execute_query(
+                        conn,
+                        "SELECT option_text FROM options WHERE question_id = ? ORDER BY option_text",
+                        (pregunta['id'],),
+                        fetchall=True
                     )
-                    LEFT JOIN participants p ON v.participant_code = p.code
-                    WHERE o.question_id = ? AND o.option_text = ?
-                    """,
-                    (pregunta['id'], opcion),
-                    fetchone=True
-                )
+                    opciones = [r["option_text"] for r in opciones_result] if opciones_result else []
+                    
+                    # Obtener participantes únicos que votaron
+                    total_participants_result = execute_query(
+                        conn,
+                        "SELECT COUNT(DISTINCT participant_code) as total_participants FROM votes WHERE question_id = ?",
+                        (pregunta['id'],),
+                        fetchone=True
+                    )
+                    total_participants_pregunta = int(total_participants_result['total_participants']) if total_participants_result and total_participants_result['total_participants'] else 0
+                    
+                    # Obtener coeficiente total de participantes únicos
+                    total_coef_result = execute_query(
+                        conn,
+                        """
+                        SELECT COALESCE(SUM(p.coefficient), 0) as total_participant_coefficient 
+                        FROM (SELECT DISTINCT participant_code FROM votes WHERE question_id = ?) v
+                        JOIN participants p ON v.participant_code = p.code
+                        """,
+                        (pregunta['id'],),
+                        fetchone=True
+                    )
+                    total_participant_coefficient = float(total_coef_result["total_participant_coefficient"]) if total_coef_result else 0.0
+                    
+                    # Calcular resultados por opción de manera más segura
+                    resultados = []
+                    for opcion in opciones:
+                        result = execute_query(
+                            conn,
+                            """
+                            SELECT 
+                                COUNT(CASE WHEN v.participant_code IS NOT NULL THEN 1 END) as votes,
+                                COALESCE(SUM(CASE WHEN v.participant_code IS NOT NULL THEN p.coefficient ELSE 0 END), 0) as coefficient_sum
+                            FROM options o
+                            LEFT JOIN votes v ON v.question_id = o.question_id AND (
+                                v.answer = o.option_text OR 
+                                v.answer LIKE '%' || CAST(o.option_text AS TEXT) || '%'
+                            )
+                            LEFT JOIN participants p ON v.participant_code = p.code
+                            WHERE o.question_id = ? AND o.option_text = ?
+                            """,
+                            (pregunta['id'], opcion),
+                            fetchone=True
+                        )
+                        
+                        votes = int(result['votes']) if result and result['votes'] else 0
+                        coefficient_sum = float(result['coefficient_sum']) if result and result['coefficient_sum'] else 0.0
+                        
+                        resultados.append({
+                            'answer': opcion,
+                            'votes': votes,
+                            'percentage': coefficient_sum
+                        })
+                    
+                    # Ordenar por porcentaje (coeficiente) descendente
+                    resultados.sort(key=lambda x: x['percentage'], reverse=True)
+                    
+                    resultados_preguntas.append({
+                        'pregunta': pregunta,
+                        'resultados': resultados,
+                        'total_participants': total_participants_pregunta,
+                        'total_participant_coefficient': total_participant_coefficient
+                    })
                 
-                votes = result['votes'] or 0
-                coefficient_sum = float(result['coefficient_sum'] or 0.0)
-                
-                resultados.append({
-                    'answer': opcion,
-                    'votes': votes,
-                    'percentage': coefficient_sum  # Ya es el porcentaje correcto
-                })
-            
-            # Ordenar por porcentaje (coeficiente) descendente
-            resultados.sort(key=lambda x: x['percentage'], reverse=True)
-            
-            resultados_preguntas.append({
-                'pregunta': pregunta,
-                'resultados': resultados,
-                'total_participants': total_participants_pregunta,
-                'total_participant_coefficient': total_participant_coefficient
-            })
+                except Exception as e:
+                    logger.error(f"Error procesando pregunta {pregunta['id']}: {e}")
+                    continue
 
+    except Exception as e:
+        logger.error(f"Error en generar_pdf_asistencia: {e}")
+        raise HTTPException(status_code=500, detail=f"Error generando PDF: {str(e)}")
     finally:
         close_db(conn)
 
-    # Crear PDF
-    pdf = FPDF()
-    pdf.add_page()
-    
-    # Encabezado principal
-    pdf.set_font("Helvetica", 'B', 18)
-    pdf.cell(0, 12, f"REPORTE COMPLETO DE ASAMBLEA", ln=True, align="C")
-    pdf.set_font("Helvetica", 'B', 14)
-    pdf.cell(0, 8, f"{conjunto_name}", ln=True, align="C")
-    
-    pdf.set_font("Helvetica", size=10)
-    pdf.cell(0, 6, f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align="C")
-    pdf.ln(8)
-
-    # SECCIÓN 1: LISTA DE ASISTENCIA DETALLADA
-    pdf.set_font("Helvetica", 'B', 12)
-    pdf.cell(0, 8, "1. LISTA DE ASISTENCIA DETALLADA", ln=True)
-    pdf.ln(5)
-
-    # Encabezados de tabla
-    pdf.set_font("Helvetica", 'B', 8)
-    pdf.cell(15, 8, "No.", border=1, align="C")
-    pdf.cell(25, 8, "Apartamento", border=1, align="C")
-    pdf.cell(50, 8, "Nombre", border=1, align="C") 
-    pdf.cell(20, 8, "Coeficiente", border=1, align="C")
-    pdf.cell(30, 8, "Fecha Ingreso", border=1, align="C")
-    pdf.cell(20, 8, "Asistencia", border=1, align="C")
-    pdf.cell(20, 8, "Poder", border=1, align="C", ln=True)
-
-    # Datos de asistencia
-    pdf.set_font("Helvetica", size=8)
-    id_counter = 1
-    
-    for p in participantes:
-        fecha_ingreso = "-"
-        if p["login_time"] and p["present"]:
-            try:
-                dt = datetime.fromisoformat(p["login_time"])
-                fecha_ingreso = dt.strftime('%d/%m %H:%M')
-            except:
-                fecha_ingreso = "Error"
+    try:
+        # Crear PDF (resto del código permanece igual...)
+        pdf = FPDF()
+        pdf.add_page()
         
-        asistencia = "SÍ" if p["present"] else "NO"
-        poder = "SÍ" if p["is_power"] else "NO"
+        # Encabezado principal
+        pdf.set_font("Helvetica", 'B', 18)
+        pdf.cell(0, 12, f"REPORTE COMPLETO DE ASAMBLEA", ln=True, align="C")
+        pdf.set_font("Helvetica", 'B', 14)
+        pdf.cell(0, 8, f"{conjunto_name}", ln=True, align="C")
+        
+        pdf.set_font("Helvetica", size=10)
+        pdf.cell(0, 6, f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align="C")
+        pdf.ln(8)
 
-        pdf.cell(15, 6, str(id_counter), border=1, align="C")
-        pdf.cell(25, 6, p["code"], border=1, align="C")
-        pdf.cell(50, 6, p["name"][:25], border=1)
-        pdf.cell(20, 6, f"{p['coefficient']:.2f}", border=1, align="C")
-        pdf.cell(30, 6, fecha_ingreso, border=1, align="C")
-        pdf.cell(20, 6, asistencia, border=1, align="C")
-        pdf.cell(20, 6, poder if p["present"] else "-", border=1, align="C", ln=True)
-
-        id_counter += 1
-
-    # SECCIÓN 2: ESTADÍSTICAS GENERALES
-    pdf.add_page()
-    pdf.set_font("Helvetica", 'B', 12)
-    pdf.cell(0, 8, "2. ESTADÍSTICAS GENERALES", ln=True)
-    pdf.ln(2)
-    
-    pdf.set_font("Helvetica", size=9)
-    stats_data = [
-        f"Total participantes registrados: {stats['total_participants']}",
-        f"Participantes presentes: {stats['present_count']}",
-        f"Votos por cuenta propia: {stats['own_votes']}",
-        f"Votos por poder: {stats['power_votes']}",
-        f"Participación por coeficiente: {coefficient_percentage:.2f}%"
-    ]
-    
-    for stat in stats_data:
-        pdf.cell(0, 6, stat, ln=True)
-    pdf.ln(3)
-
-    # SECCIÓN 3: ESTADO DEL QUÓRUM
-    pdf.set_font("Helvetica", 'B', 12)
-    pdf.cell(0, 8, "3. ESTADO DEL QUÓRUM", ln=True)
-    pdf.ln(2)
-    
-    if quorum_met:
-        pdf.set_text_color(0, 128, 0)  # Verde
-        pdf.set_font("Helvetica", 'B', 11)
-        pdf.cell(0, 8, f"QUÓRUM ALCANZADO ({coefficient_percentage:.2f}% >= 51%)", ln=True)
-    else:
-        pdf.set_text_color(255, 0, 0)  # Rojo
-        pdf.set_font("Helvetica", 'B', 11)
-        pdf.cell(0, 8, f"SIN QUÓRUM ({coefficient_percentage:.2f}% < 51%)", ln=True)
-    
-    pdf.set_text_color(0, 0, 0)  # Volver a negro
-    pdf.ln(5)
-
-    # SECCIÓN 4: RESULTADOS DE VOTACIONES
-    if resultados_preguntas:
+        # SECCIÓN 1: LISTA DE ASISTENCIA DETALLADA
         pdf.set_font("Helvetica", 'B', 12)
-        pdf.cell(0, 8, "4. RESULTADOS DE VOTACIONES", ln=True)
+        pdf.cell(0, 8, "1. LISTA DE ASISTENCIA DETALLADA", ln=True)
+        pdf.ln(5)
+
+        # Encabezados de tabla
+        pdf.set_font("Helvetica", 'B', 8)
+        pdf.cell(15, 8, "No.", border=1, align="C")
+        pdf.cell(25, 8, "Apartamento", border=1, align="C")
+        pdf.cell(50, 8, "Nombre", border=1, align="C") 
+        pdf.cell(20, 8, "Coeficiente", border=1, align="C")
+        pdf.cell(30, 8, "Fecha Ingreso", border=1, align="C")
+        pdf.cell(20, 8, "Asistencia", border=1, align="C")
+        pdf.cell(20, 8, "Poder", border=1, align="C", ln=True)
+
+        # Datos de asistencia
+        pdf.set_font("Helvetica", size=8)
+        id_counter = 1
+        
+        for p in participantes:
+            fecha_ingreso = "-"
+            if p.get("login_time") and p.get("present"):
+                try:
+                    dt = datetime.fromisoformat(str(p["login_time"]))
+                    fecha_ingreso = dt.strftime('%d/%m %H:%M')
+                except:
+                    fecha_ingreso = "Error"
+            
+            asistencia = "SÍ" if p.get("present") else "NO"
+            poder = "SÍ" if p.get("is_power") else "NO"
+
+            pdf.cell(15, 6, str(id_counter), border=1, align="C")
+            pdf.cell(25, 6, str(p.get("code", "")), border=1, align="C")
+            pdf.cell(50, 6, str(p.get("name", ""))[:25], border=1)
+            pdf.cell(20, 6, f"{float(p.get('coefficient', 0)):.2f}", border=1, align="C")
+            pdf.cell(30, 6, fecha_ingreso, border=1, align="C")
+            pdf.cell(20, 6, asistencia, border=1, align="C")
+            pdf.cell(20, 6, poder if p.get("present") else "-", border=1, align="C", ln=True)
+
+            id_counter += 1
+
+        # SECCIÓN 2: ESTADÍSTICAS GENERALES
+        pdf.add_page()
+        pdf.set_font("Helvetica", 'B', 12)
+        pdf.cell(0, 8, "2. ESTADÍSTICAS GENERALES", ln=True)
         pdf.ln(2)
         
-        for i, resultado in enumerate(resultados_preguntas, 1):
-            pregunta = resultado['pregunta']
-            resultados = resultado['resultados']
-            
-            pdf.set_font("Helvetica", 'B', 10)
-            pdf.cell(0, 7, f"Pregunta {i}: {pregunta['text'][:80]}...", ln=True)
-            
-            pdf.set_font("Helvetica", size=9)
-            pdf.cell(0, 5, f"Total presentes en asamblea: {stats['present_count']}", ln=True)
-            pdf.cell(0, 5, f"Participaron en esta votación: {resultado['total_participants']}", ln=True)
-            pdf.cell(0, 5, f"Participación: {resultado['total_participant_coefficient']:.2f}%", ln=True)
+        pdf.set_font("Helvetica", size=9)
+        stats_data = [
+            f"Total participantes registrados: {stats['total_participants']}",
+            f"Participantes presentes: {stats['present_count']}",
+            f"Votos por cuenta propia: {stats['own_votes']}",
+            f"Votos por poder: {stats['power_votes']}",
+            f"Participación por coeficiente: {coefficient_percentage:.2f}%"
+        ]
+        
+        for stat in stats_data:
+            pdf.cell(0, 6, stat, ln=True)
+        pdf.ln(3)
+
+        # SECCIÓN 3: ESTADO DEL QUÓRUM
+        pdf.set_font("Helvetica", 'B', 12)
+        pdf.cell(0, 8, "3. ESTADO DEL QUÓRUM", ln=True)
+        pdf.ln(2)
+        
+        if quorum_met:
+            pdf.set_text_color(0, 128, 0)  # Verde
+            pdf.set_font("Helvetica", 'B', 11)
+            pdf.cell(0, 8, f"QUÓRUM ALCANZADO ({coefficient_percentage:.2f}% >= 51%)", ln=True)
+        else:
+            pdf.set_text_color(255, 0, 0)  # Rojo
+            pdf.set_font("Helvetica", 'B', 11)
+            pdf.cell(0, 8, f"SIN QUÓRUM ({coefficient_percentage:.2f}% < 51%)", ln=True)
+        
+        pdf.set_text_color(0, 0, 0)  # Volver a negro
+        pdf.ln(5)
+
+        # SECCIÓN 4: RESULTADOS DE VOTACIONES
+        if resultados_preguntas:
+            pdf.set_font("Helvetica", 'B', 12)
+            pdf.cell(0, 8, "4. RESULTADOS DE VOTACIONES", ln=True)
             pdf.ln(2)
             
-            if resultados:
-                for res in resultados:
-                    pdf.cell(0, 5, f"  - {res['answer']}: {res['votes']} votos ({res['percentage']:.2f}%)", ln=True)
-            else:
-                pdf.cell(0, 5, "Sin votos registrados", ln=True)
-            pdf.ln(3)
+            for i, resultado in enumerate(resultados_preguntas, 1):
+                pregunta = resultado['pregunta']
+                resultados = resultado['resultados']
+                
+                pdf.set_font("Helvetica", 'B', 10)
+                pdf.cell(0, 7, f"Pregunta {i}: {str(pregunta['text'])[:80]}...", ln=True)
+                
+                pdf.set_font("Helvetica", size=9)
+                pdf.cell(0, 5, f"Total presentes en asamblea: {stats['present_count']}", ln=True)
+                pdf.cell(0, 5, f"Participaron en esta votación: {resultado['total_participants']}", ln=True)
+                pdf.cell(0, 5, f"Participación: {resultado['total_participant_coefficient']:.2f}%", ln=True)
+                pdf.ln(2)
+                
+                if resultados:
+                    for res in resultados:
+                        pdf.cell(0, 5, f"  - {res['answer']}: {res['votes']} votos ({res['percentage']:.2f}%)", ln=True)
+                else:
+                    pdf.cell(0, 5, "Sin votos registrados", ln=True)
+                pdf.ln(3)
 
-    pdf_bytes = pdf.output(dest="S")
-    if isinstance(pdf_bytes, str):
-        pdf_bytes = pdf_bytes.encode('latin-1')
+        pdf_bytes = pdf.output(dest="S")
+        if isinstance(pdf_bytes, str):
+            pdf_bytes = pdf_bytes.encode('latin-1')
 
-    buffer = BytesIO(pdf_bytes)
-    buffer.seek(0)
+        buffer = BytesIO(pdf_bytes)
+        buffer.seek(0)
 
-    return StreamingResponse(buffer, media_type="application/pdf", headers={
-        "Content-Disposition": f"attachment; filename=reporte_completo_{conjunto_name.replace(' ', '_')}.pdf"
-    })
+        return StreamingResponse(buffer, media_type="application/pdf", headers={
+            "Content-Disposition": f"attachment; filename=reporte_completo_{conjunto_name.replace(' ', '_')}.pdf"
+        })
+
+    except Exception as e:
+        logger.error(f"Error creando PDF: {e}")
+        raise HTTPException(status_code=500, detail=f"Error creando PDF: {str(e)}")
+
 
 @router.post("/asistencia/xlsx")
 async def generar_xlsx_asistencia(user=Depends(admin_required)):
@@ -451,7 +470,7 @@ async def generar_xlsx_asistencia(user=Depends(admin_required)):
             ("conjunto_nombre",),
             fetchone=True
         )
-        conjunto_name = conjunto_result["value"] if conjunto_result else "Conjunto Residencial"
+        conjunto_name = conjunto_result["value"] if conjunto_result and conjunto_result.get("value") else "Conjunto Residencial"
 
         participantes = execute_query(
             conn,
@@ -468,56 +487,64 @@ async def generar_xlsx_asistencia(user=Depends(admin_required)):
             """,
             fetchall=True
         )
+    except Exception as e:
+        logger.error(f"Error en generar_xlsx_asistencia: {e}")
+        raise HTTPException(status_code=500, detail=f"Error obteniendo datos: {str(e)}")
     finally:
         close_db(conn)
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Asistencia"
-    
-    # Encabezados
-    ws['A1'] = f"LISTA DE ASISTENCIA - {conjunto_name}"
-    ws['A2'] = f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
-    
-    headers = ["Apartamento", "Nombre", "Coeficiente", "Fecha Ingreso", "Asistencia", "Poder"]
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=4, column=col, value=header)
-        cell.font = Font(bold=True)
-        cell.alignment = Alignment(horizontal='center')
+    try:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Asistencia"
+        
+        # Encabezados
+        ws['A1'] = f"LISTA DE ASISTENCIA - {conjunto_name}"
+        ws['A2'] = f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        
+        headers = ["Apartamento", "Nombre", "Coeficiente", "Fecha Ingreso", "Asistencia", "Poder"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=4, column=col, value=header)
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal='center')
 
-    # Datos
-    total_presentes = 0
-    coef_presentes = 0.0
-    row_num = 5
-    
-    for p in participantes:
-        fecha_ingreso = "-"
-        if p["login_time"] and p["present"]:
-            try:
-                dt = datetime.fromisoformat(p["login_time"])
-                fecha_ingreso = dt.strftime('%d/%m %H:%M')
-            except:
-                fecha_ingreso = "Error"
+        # Datos
+        total_presentes = 0
+        coef_presentes = 0.0
+        row_num = 5
         
-        asistencia = "SI" if p["present"] else "NO"
-        poder = "Si" if p["is_power"] else "No"
-        
-        if p["present"]:
-            total_presentes += 1
-            coef_presentes += p["coefficient"]
-        
-        ws.cell(row=row_num, column=1, value=p["code"])
-        ws.cell(row=row_num, column=2, value=p["name"])
-        ws.cell(row=row_num, column=3, value=p["coefficient"])
-        ws.cell(row=row_num, column=4, value=fecha_ingreso)
-        ws.cell(row=row_num, column=5, value=asistencia)
-        ws.cell(row=row_num, column=6, value=poder if p["present"] else "-")
-        row_num += 1
+        for p in participantes:
+            fecha_ingreso = "-"
+            if p.get("login_time") and p.get("present"):
+                try:
+                    dt = datetime.fromisoformat(str(p["login_time"]))
+                    fecha_ingreso = dt.strftime('%d/%m %H:%M')
+                except:
+                    fecha_ingreso = "Error"
+            
+            asistencia = "SI" if p.get("present") else "NO"
+            poder = "Si" if p.get("is_power") else "No"
+            
+            if p.get("present"):
+                total_presentes += 1
+                coef_presentes += float(p.get("coefficient", 0))
+            
+            ws.cell(row=row_num, column=1, value=str(p.get("code", "")))
+            ws.cell(row=row_num, column=2, value=str(p.get("name", "")))
+            ws.cell(row=row_num, column=3, value=float(p.get("coefficient", 0)))
+            ws.cell(row=row_num, column=4, value=fecha_ingreso)
+            ws.cell(row=row_num, column=5, value=asistencia)
+            ws.cell(row=row_num, column=6, value=poder if p.get("present") else "-")
+            row_num += 1
 
-    buffer = BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
+        buffer = BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        
+        return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={
+            "Content-Disposition": f"attachment; filename=asistencia_{conjunto_name.replace(' ', '_')}.xlsx"
+        })
     
-    return StreamingResponse(buffer, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={
-        "Content-Disposition": f"attachment; filename=asistencia_{conjunto_name.replace(' ', '_')}.xlsx"
-    })
+    except Exception as e:
+        logger.error(f"Error creando Excel: {e}")
+        raise HTTPException(status_code=500, detail=f"Error creando Excel: {str(e)}")

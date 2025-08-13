@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List
@@ -6,6 +7,7 @@ from ..auth.auth import admin_required, voter_required, admin_or_voter_required
 from datetime import datetime
 
 router = APIRouter(prefix="/voting", tags=["Voting"])
+logger = logging.getLogger(__name__)
 
 # --- Schemas ---
 class QuestionCreate(BaseModel):
@@ -279,34 +281,35 @@ def resultados(question_id: int):
             (question_id,),
             fetchone=True
         )
-        unique_voters = unique_voters_result["unique_voters"] or 0
+        unique_voters = unique_voters_result["unique_voters"] if unique_voters_result else 0
 
         # Obtener coeficiente total de participantes únicos
         total_weight_result = execute_query(
             conn,
             """
-            SELECT SUM(p.coefficient) as total_participant_weight 
+            SELECT COALESCE(SUM(p.coefficient), 0) as total_participant_weight 
             FROM (SELECT DISTINCT participant_code FROM votes WHERE question_id = ?) v
             JOIN participants p ON v.participant_code = p.code
             """,
             (question_id,),
             fetchone=True
         )
-        total_participant_weight = float(total_weight_result["total_participant_weight"] or 0.0)
+        total_participant_weight = float(total_weight_result["total_participant_weight"]) if total_weight_result else 0.0
 
         # Para cada opción, buscar si está en el string de respuestas
         rows = []
         for opt in opts:
+            # Query más segura con manejo de NULLs
             result = execute_query(
                 conn,
                 """
                 SELECT 
-                    COUNT(v.participant_code) as participants,
-                    SUM(p.coefficient) as weight
+                    COUNT(CASE WHEN v.participant_code IS NOT NULL THEN 1 END) as participants,
+                    COALESCE(SUM(CASE WHEN v.participant_code IS NOT NULL THEN p.coefficient ELSE 0 END), 0) as weight
                 FROM options o
                 LEFT JOIN votes v ON v.question_id = o.question_id AND (
                     v.answer = o.option_text OR 
-                    v.answer LIKE '%' || o.option_text || '%'
+                    v.answer LIKE CONCAT('%', o.option_text, '%')
                 )
                 LEFT JOIN participants p ON v.participant_code = p.code
                 WHERE o.question_id = ? AND o.option_text = ?
@@ -314,28 +317,23 @@ def resultados(question_id: int):
                 (question_id, opt),
                 fetchone=True
             )
-            participants = result["participants"] or 0
-            weight = float(result["weight"] or 0.0)
+            
+            if result:
+                participants = int(result["participants"]) if result["participants"] else 0
+                weight = float(result["weight"]) if result["weight"] else 0.0
+            else:
+                participants = 0
+                weight = 0.0
+                
             rows.append({"option": opt, "participants": participants, "weight": weight})
 
-        # Simplemente mostrar la suma de coeficientes como "porcentaje"
-        results = {}
-        total_participants = sum(r["participants"] for r in rows)
-        for r in rows:
-            # El "porcentaje" es simplemente la suma de coeficientes
-            coefficient_sum = r["weight"]  # Suma de coeficientes
-            results[r["option"]] = {
-                "participants": r["participants"],
-                "percent": round(coefficient_sum, 2)  # Mostrar con 1 decimal
-            }
-
-        # Convertir results dict a lista para el frontend
+        # Convertir results a lista para el frontend
         results_list = []
-        for option, data in results.items():
+        for r in rows:
             results_list.append({
-                "answer": option,
-                "votes": data["participants"], 
-                "percentage": data["percent"]
+                "answer": r["option"],
+                "votes": r["participants"], 
+                "percentage": round(r["weight"], 2)
             })
         
         # Ordenar de mayor a menor por porcentaje (coeficiente)
@@ -346,10 +344,13 @@ def resultados(question_id: int):
             "question_text": q["text"],
             "type": q["type"],
             "total_participants": unique_voters,
-            "total_votes": total_participants,
+            "total_votes": sum(r["participants"] for r in rows),
             "total_participant_coefficient": round(total_participant_weight, 2),
             "results": results_list
         }
+    except Exception as e:
+        logger.error(f"Error en resultados: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
     finally:
         close_db(conn)
 
