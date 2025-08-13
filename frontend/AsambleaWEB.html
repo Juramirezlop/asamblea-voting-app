@@ -930,11 +930,24 @@
                     `<div style="color: #27ae60; margin-top: 1rem;">✓ ${result.inserted} participantes cargados correctamente</div>`;
                 
                 showStatus(`Archivo cargado: ${result.inserted} participantes`, 'success');
+                
+                // Actualizar automáticamente el estado
+                if (result.inserted > 0) {
+                    document.getElementById('status-circle').style.background = '#28a745';
+                    document.getElementById('status-text').textContent = `${result.inserted} participantes registrados`;
+                    document.getElementById('status-text').style.color = '#28a745';
+                }
+                
                 await loadAforoData();
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
                 document.getElementById('upload-status').innerHTML = 
                     `<div style="color: #e74c3c; margin-top: 1rem;">✗ ${error.message}</div>`;
+                
+                // Estado de error
+                document.getElementById('status-circle').style.background = '#dc3545';
+                document.getElementById('status-text').textContent = 'Error cargando archivo';
+                document.getElementById('status-text').style.color = '#dc3545';
             }
         }
 
@@ -943,7 +956,7 @@
                 showStatus('Verificando participantes...', 'info');
                 
                 // Llamar al endpoint que ya tienes
-                const response = await apiCall('/participants');
+                const response = await apiCall('/participants/');
                 
                 if (response.length === 0) {
                     // Sin participantes
@@ -1014,7 +1027,7 @@
 
         async function autoCheckOnLoad() {
             try {
-                const response = await apiCall('/participants');
+                const response = await apiCall('/participants/');
                 const count = response.length;
                 
                 if (count > 0) {
