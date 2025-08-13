@@ -299,7 +299,6 @@ def resultados(question_id: int):
         # Para cada opción, buscar si está en el string de respuestas
         rows = []
         for opt in opts:
-            # Query más segura con manejo de NULLs
             result = execute_query(
                 conn,
                 """
@@ -308,9 +307,10 @@ def resultados(question_id: int):
                     COALESCE(SUM(p.coefficient), 0) as weight
                 FROM votes v
                 JOIN participants p ON v.participant_code = p.code
-                WHERE v.question_id = ? AND v.answer = ?
+                WHERE v.question_id = ? 
+                AND (v.answer = ? OR v.answer LIKE ? OR v.answer LIKE ? OR v.answer LIKE ?)
                 """,
-                (question_id, opt),
+                (question_id, opt, f"{opt},%", f"%, {opt},%", f"%, {opt}"),
                 fetchone=True
             )
             
