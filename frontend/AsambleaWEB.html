@@ -507,19 +507,24 @@
                 <div id="upload-status"></div>
             </div>
 
-            <!-- Botón de verificación -->
-            <div style="text-align: center; margin-top: 1rem;">
-                <button class="btn btn-success" onclick="checkParticipants()" style="background: #17a2b8;">
-                    📋 Verificar Participantes Cargados
-                </button>
+            <!-- Verificación de Participantes -->
+            <div class="admin-panel">
+                <h3>Verificación de Participantes</h3>
+                <div style="display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
+                    <!-- Botón a la izquierda -->
+                    <div style="flex: 0 0 auto;">
+                        <button class="btn btn-success" onclick="checkParticipants()" style="background: #17a2b8; padding: 0.8rem 1.5rem;">
+                            📋 Verificar Participantes
+                        </button>
+                    </div>
+                    
+                    <!-- Estado a la derecha -->
+                    <div id="participants-indicator" style="flex: 1; display: flex; align-items: center; gap: 0.8rem; min-height: 45px; padding: 0.8rem; background: #f8f9fa; border-radius: 6px; border: 1px solid #dee2e6;">
+                        <div id="status-circle" style="width: 16px; height: 16px; border-radius: 50%; background: #6c757d; flex-shrink: 0;"></div>
+                        <span id="status-text" style="color: #6c757d; font-weight: 500; font-size: 0.9rem;">Estado: Sin verificar</span>
+                    </div>
+                </div>
             </div>
-
-            <!-- Indicador visual -->
-            <div id="participants-indicator" style="text-align: center; margin: 1rem 0;">
-                <div id="status-circle" style="width: 20px; height: 20px; border-radius: 50%; background: #6c757d; display: inline-block; margin-right: 0.5rem;"></div>
-                <span id="status-text" style="color: #6c757d; font-weight: 500;">Estado: Sin verificar</span>
-            </div>
-        </div>
 
             <!-- Estado de la Asamblea -->
             <div class="admin-panel">
