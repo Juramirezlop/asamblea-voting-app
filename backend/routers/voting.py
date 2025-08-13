@@ -420,6 +420,7 @@ def reset_db():
     conn = get_db()
     try:
         # Borrar preguntas, opciones, votos
+        execute_query(conn, "DELETE FROM config", commit=True)
         execute_query(conn, "DELETE FROM votes", commit=True)
         execute_query(conn, "DELETE FROM options", commit=True) 
         execute_query(conn, "DELETE FROM questions", commit=True)
