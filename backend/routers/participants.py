@@ -211,8 +211,8 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
             SELECT 
                 COUNT(*) as total_participants,
                 COUNT(CASE WHEN present = 1 THEN 1 END) as present_count,
-                COUNT(CASE WHEN present = 1 AND (is_power = 0 OR is_power = FALSE) THEN 1 END) as own_votes,
-                COUNT(CASE WHEN present = 1 AND (is_power = 1 OR is_power = TRUE) THEN 1 END) as power_votes,
+                COUNT(CASE WHEN present = 1 AND is_power = FALSE THEN 1 END) as own_votes,
+                COUNT(CASE WHEN present = 1 AND is_power = TRUE THEN 1 END) as power_votes,
                 COALESCE(SUM(CASE WHEN present = 1 THEN coefficient ELSE 0 END), 0) as present_coefficient,
                 COALESCE(SUM(coefficient), 0) as total_coefficient
             FROM participants

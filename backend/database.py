@@ -134,12 +134,8 @@ def execute_query(conn, query, params=(), fetchone=False, fetchall=False, commit
     cur = None
     try:
         if is_postgres:
-            # Reemplazar placeholders de SQLite (?) por %s
             postgres_query = query.replace("?", "%s")
-            # Fix para CONCAT en PostgreSQL
-            postgres_query = postgres_query.replace("CONCAT('%', ", "'%' || ").replace(", '%')", " || '%'")
-            # Fix para || concatenation que puede fallar
-            postgres_query = postgres_query.replace("'%' || o.option_text || '%'", "'%' || CAST(o.option_text AS TEXT) || '%'")
+            postgres_query = postgres_query.replace("CONCAT('%', o.option_text, '%')", "'%' || o.option_text || '%'")
             
             cur = conn.cursor()
             logger.debug(f"PostgreSQL Query: {postgres_query}")
