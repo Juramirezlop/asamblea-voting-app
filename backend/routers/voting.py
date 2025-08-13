@@ -308,12 +308,9 @@ def resultados(question_id: int):
                     COALESCE(SUM(p.coefficient), 0) as weight
                 FROM votes v
                 JOIN participants p ON v.participant_code = p.code
-                WHERE v.question_id = ? AND (
-                    v.answer = ? OR 
-                    v.answer LIKE '%' || ? || '%'
-                )
+                WHERE v.question_id = ? AND v.answer = ?
                 """,
-                (question_id, opt, opt),
+                (question_id, opt),
                 fetchone=True
             )
             
