@@ -309,7 +309,7 @@ def resultados(question_id: int):
                 FROM options o
                 LEFT JOIN votes v ON v.question_id = o.question_id AND (
                     v.answer = o.option_text OR 
-                    v.answer LIKE '%' + o.option_text + '%'
+                    v.answer LIKE '%' || o.option_text || '%'
                 )
                 LEFT JOIN participants p ON v.participant_code = p.code
                 WHERE o.question_id = ? AND o.option_text = ?
