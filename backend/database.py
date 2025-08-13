@@ -136,7 +136,7 @@ def execute_query(conn, query, params=(), fetchone=False, fetchall=False, commit
         if is_postgres:
             postgres_query = query.replace("?", "%s")
             postgres_query = postgres_query.replace("CONCAT('%', o.option_text, '%')", "'%' || o.option_text || '%'")
-            
+            logger.debug(f"Query DESPUÉS del replace: {postgres_query}")
             cur = conn.cursor()
             logger.debug(f"PostgreSQL Query: {postgres_query}")
             logger.debug(f"PostgreSQL Params: {params}")

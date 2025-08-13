@@ -8,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from fpdf import FPDF
 from io import BytesIO
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
 
@@ -175,6 +175,8 @@ async def upload_xlsx(file: UploadFile = File(...)):
 # genera PDF de asistencia
 @router.post("/asistencia/pdf")
 async def generar_pdf_asistencia(user=Depends(admin_required)):
+    colombia_tz = timezone(timedelta(hours=-5))
+    fecha_actual = datetime.now(colombia_tz)
     conn = get_db()
     
     try:
@@ -225,7 +227,6 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
         
         # Calcular porcentajes de manera segura
         coefficient_percentage = float(stats['present_coefficient']) if stats['present_coefficient'] else 0.0
-        participation_percentage = (int(stats['present_count']) / int(stats['total_participants']) * 100) if int(stats['total_participants']) > 0 else 0.0
         quorum_met = coefficient_percentage >= 51
         
         # Obtener preguntas y resultados de manera más segura
@@ -336,7 +337,7 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
         pdf.cell(0, 8, f"{conjunto_name}", ln=True, align="C")
         
         pdf.set_font("Helvetica", size=10)
-        pdf.cell(0, 6, f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align="C")
+        pdf.cell(0, 6, f"Fecha: {fecha_actual.strftime('%d/%m/%Y %H:%M')}", ln=True, align="C")
         pdf.ln(8)
 
         # SECCIÓN 1: LISTA DE ASISTENCIA DETALLADA
@@ -460,6 +461,8 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
 
 @router.post("/asistencia/xlsx")
 async def generar_xlsx_asistencia(user=Depends(admin_required)):
+    colombia_tz = timezone(timedelta(hours=-5))
+    fecha_actual = datetime.now(colombia_tz)
     conn = get_db()
     
     try:
@@ -500,7 +503,7 @@ async def generar_xlsx_asistencia(user=Depends(admin_required)):
         
         # Encabezados
         ws['A1'] = f"LISTA DE ASISTENCIA - {conjunto_name}"
-        ws['A2'] = f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        ws['A2'] = f"Fecha: {fecha_actual.strftime('%d/%m/%Y %H:%M')}"
         
         headers = ["Apartamento", "Nombre", "Coeficiente", "Fecha Ingreso", "Asistencia", "Poder"]
         for col, header in enumerate(headers, 1):
