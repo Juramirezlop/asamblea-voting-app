@@ -43,7 +43,7 @@ def crear_pregunta(payload: QuestionCreate):
         question = execute_query(
             conn,
             "INSERT INTO questions (text, type, active, allow_multiple, max_selections) VALUES (?, ?, 1, ?, ?) RETURNING id",
-            (payload.text, typ, allow_multiple, max_selections),
+            (payload.text, typ, int(allow_multiple), max_selections),
             fetchone=True
         )
         qid = question["id"]

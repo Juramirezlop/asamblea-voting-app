@@ -316,22 +316,22 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
     pdf.add_page()
     
     # Encabezado principal
-    pdf.set_font("Arial", 'B', 18)
+    pdf.set_font("Helvetica", 'B', 18)
     pdf.cell(0, 12, f"REPORTE COMPLETO DE ASAMBLEA", ln=True, align="C")
-    pdf.set_font("Arial", 'B', 14)
+    pdf.set_font("Helvetica", 'B', 14)
     pdf.cell(0, 8, f"{conjunto_name}", ln=True, align="C")
     
-    pdf.set_font("Arial", size=10)
+    pdf.set_font("Helvetica", size=10)
     pdf.cell(0, 6, f"Fecha: {datetime.now().strftime('%d/%m/%Y %H:%M')}", ln=True, align="C")
     pdf.ln(8)
 
     # SECCIÓN 1: LISTA DE ASISTENCIA DETALLADA
-    pdf.set_font("Arial", 'B', 12)
+    pdf.set_font("Helvetica", 'B', 12)
     pdf.cell(0, 8, "1. LISTA DE ASISTENCIA DETALLADA", ln=True)
     pdf.ln(5)
 
     # Encabezados de tabla
-    pdf.set_font("Arial", 'B', 8)
+    pdf.set_font("Helvetica", 'B', 8)
     pdf.cell(15, 8, "No.", border=1, align="C")
     pdf.cell(25, 8, "Apartamento", border=1, align="C")
     pdf.cell(50, 8, "Nombre", border=1, align="C") 
@@ -341,7 +341,7 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
     pdf.cell(20, 8, "Poder", border=1, align="C", ln=True)
 
     # Datos de asistencia
-    pdf.set_font("Arial", size=8)
+    pdf.set_font("Helvetica", size=8)
     id_counter = 1
     
     for p in participantes:
@@ -368,11 +368,11 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
 
     # SECCIÓN 2: ESTADÍSTICAS GENERALES
     pdf.add_page()
-    pdf.set_font("Arial", 'B', 12)
+    pdf.set_font("Helvetica", 'B', 12)
     pdf.cell(0, 8, "2. ESTADÍSTICAS GENERALES", ln=True)
     pdf.ln(2)
     
-    pdf.set_font("Arial", size=9)
+    pdf.set_font("Helvetica", size=9)
     stats_data = [
         f"Total participantes registrados: {stats['total_participants']}",
         f"Participantes presentes: {stats['present_count']}",
@@ -386,17 +386,17 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
     pdf.ln(3)
 
     # SECCIÓN 3: ESTADO DEL QUÓRUM
-    pdf.set_font("Arial", 'B', 12)
+    pdf.set_font("Helvetica", 'B', 12)
     pdf.cell(0, 8, "3. ESTADO DEL QUÓRUM", ln=True)
     pdf.ln(2)
     
     if quorum_met:
         pdf.set_text_color(0, 128, 0)  # Verde
-        pdf.set_font("Arial", 'B', 11)
+        pdf.set_font("Helvetica", 'B', 11)
         pdf.cell(0, 8, f"QUÓRUM ALCANZADO ({coefficient_percentage:.2f}% >= 51%)", ln=True)
     else:
         pdf.set_text_color(255, 0, 0)  # Rojo
-        pdf.set_font("Arial", 'B', 11)
+        pdf.set_font("Helvetica", 'B', 11)
         pdf.cell(0, 8, f"SIN QUÓRUM ({coefficient_percentage:.2f}% < 51%)", ln=True)
     
     pdf.set_text_color(0, 0, 0)  # Volver a negro
@@ -404,7 +404,7 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
 
     # SECCIÓN 4: RESULTADOS DE VOTACIONES
     if resultados_preguntas:
-        pdf.set_font("Arial", 'B', 12)
+        pdf.set_font("Helvetica", 'B', 12)
         pdf.cell(0, 8, "4. RESULTADOS DE VOTACIONES", ln=True)
         pdf.ln(2)
         
@@ -412,10 +412,10 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
             pregunta = resultado['pregunta']
             resultados = resultado['resultados']
             
-            pdf.set_font("Arial", 'B', 10)
+            pdf.set_font("Helvetica", 'B', 10)
             pdf.cell(0, 7, f"Pregunta {i}: {pregunta['text'][:80]}...", ln=True)
             
-            pdf.set_font("Arial", size=9)
+            pdf.set_font("Helvetica", size=9)
             pdf.cell(0, 5, f"Total presentes en asamblea: {stats['present_count']}", ln=True)
             pdf.cell(0, 5, f"Participaron en esta votación: {resultado['total_participants']}", ln=True)
             pdf.cell(0, 5, f"Participación: {resultado['total_participant_coefficient']:.2f}%", ln=True)
@@ -428,7 +428,10 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
                 pdf.cell(0, 5, "Sin votos registrados", ln=True)
             pdf.ln(3)
 
-    pdf_bytes = pdf.output(dest="S").encode('latin-1')
+    pdf_bytes = pdf.output(dest="S")
+    if isinstance(pdf_bytes, str):
+        pdf_bytes = pdf_bytes.encode('latin-1')
+
     buffer = BytesIO(pdf_bytes)
     buffer.seek(0)
 
