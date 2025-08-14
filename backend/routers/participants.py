@@ -440,28 +440,32 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
                 pdf.set_font("Helvetica", size=8)
                 pdf.cell(0, 4, f"Total presentes en asamblea: {stats['present_count']}", ln=True)
                 pdf.cell(0, 4, f"Participaron en esta votación: {resultado['total_participants']}", ln=True)
-                pdf.cell(0, 4, f"Participación: {resultado['total_participant_coefficient']:.2f}%", ln=True)
+                pdf.cell(0, 4, f"Coeficiente total: {resultado['total_participant_coefficient']:.2f}", ln=True)
                 pdf.ln(3)
                 
-                # Resultado principal (opción más votada)
+                # Todas las opciones en lista
                 if resultados:
-                    # Ordenar por coeficiente_sum (ya lo haces antes)
-                    opcion_ganadora = resultados[0]
+                    # Ordenar y marcar ganadoras
+                    resultados_ordenados = sorted(resultados, key=lambda x: x['coefficient_sum'], reverse=True)
+                    max_coef = resultados_ordenados[0]['coefficient_sum']
                     
-                    pdf.set_font("Helvetica", 'B', 9)
-                    pdf.cell(0, 5, f"Opción más votada: {opcion_ganadora['answer']}", ln=True)
                     pdf.set_font("Helvetica", size=8)
-                    pdf.cell(0, 5, f"Coeficiente acumulado: {opcion_ganadora['coefficient_sum']:.2f} ({opcion_ganadora['coefficient_sum']/resultado['total_participant_coefficient']*100:.1f}% de los votantes)", ln=True)
-                    pdf.cell(0, 5, f"Votos: {opcion_ganadora['votes']}", ln=True)
+                    pdf.cell(0, 5, "Opciones:", ln=True)
                     
-                    # Mostrar otras opciones si hay más de una
-                    if len(resultados) > 1:
-                        pdf.ln(2)
-                        pdf.set_font("Helvetica", size=7)
-                        pdf.cell(0, 4, "Otras opciones:", ln=True)
-                        for res in resultados[1:]:
-                            pdf.cell(0, 4, f"- {res['answer']}: {res['coefficient_sum']:.2f} ({res['votes']} votos)", ln=True)
+                    for res in resultados_ordenados:
+                        # Establecer color verde para ganadoras
+                        if abs(res['coefficient_sum'] - max_coef) < 0.01:  # Permite empates
+                            pdf.set_text_color(0, 128, 0)  # Verde
+                            pdf.set_font("Helvetica", 'B', 8)
+                        else:
+                            pdf.set_text_color(0, 0, 0)  # Negro
+                            pdf.set_font("Helvetica", size=8)
+                        
+                        pdf.cell(0, 5, f"- {res['answer']}: {res['coefficient_sum']:.2f} % ({res['votes']} votos)", ln=True)
                     
+                    # Restaurar color por defecto
+                    pdf.set_text_color(0, 0, 0)
+                    pdf.set_font("Helvetica", size=8)
                 else:
                     pdf.cell(0, 6, "Sin votos registrados", ln=True)
                 

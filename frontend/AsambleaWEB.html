@@ -1493,19 +1493,18 @@
         }
 
         async function resetDatabase() {
-            if (!confirm('¿Está seguro de limpiar TODA la base de datos? Esta acción no se puede deshacer.')) {
+            if (!confirm('⚠️ ¿Resetear TODA la base de datos?\n\nSe cerrarán TODAS las sesiones activas y deberán volver a ingresar.')) {
                 return;
             }
 
             try {
-                showStatus('Limpiando base de datos...', 'info');
+                showStatus('Realizando reset completo...', 'info');
                 
-                await apiCall('/voting/admin/reset', {
-                    method: 'DELETE'
-                });
+                await apiCall('/voting/admin/reset', {method: 'DELETE'});
 
                 // Recargar datos
                 await loadAdminData();
+                
                 // Limpiar nombre del conjunto
                 await checkConjuntoName();
 
@@ -1514,9 +1513,18 @@
                 document.getElementById('status-text').textContent = 'Estado: Sin verificar';
                 document.getElementById('status-text').style.color = '#6c757d';
                 showStatus('Base de datos limpiada completamente', 'success');
-                
+
+                localStorage.clear();
+                sessionStorage.clear();
+                document.cookie.split(";").forEach(c => {
+                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
+                });
+                window.location.href = window.location.origin + '?nocache=' + Date.now();
+
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
+                // Fallback: recarga normal si hay error
+                window.location.reload();
             }
         }
 
