@@ -420,7 +420,7 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
         pdf.set_text_color(0, 0, 0)  # Volver a negro
         pdf.ln(5)
 
-        # SECCIÓN 4: RESULTADOS DE VOTACIONES (MEJORADA)
+        # SECCIÓN 4: RESULTADOS DE VOTACIONES (VERSIÓN SIMPLIFICADA)
         if resultados_preguntas:
             pdf.set_font("Helvetica", 'B', 12)
             pdf.cell(0, 8, "4. RESULTADOS DE VOTACIONES", ln=True)
@@ -433,8 +433,6 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
                 # Título de pregunta
                 pdf.set_font("Helvetica", 'B', 10)
                 pregunta_texto = str(pregunta['text'])
-                if len(pregunta_texto) > 80:
-                    pregunta_texto = pregunta_texto[:80] + "..."
                 pdf.cell(0, 7, f"Pregunta {i}: {pregunta_texto}", ln=True)
                 pdf.ln(2)
                 
@@ -445,29 +443,29 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
                 pdf.cell(0, 4, f"Participación: {resultado['total_participant_coefficient']:.2f}%", ln=True)
                 pdf.ln(3)
                 
-                # TABLA DE RESULTADOS MEJORADA
+                # Resultado principal (opción más votada)
                 if resultados:
-                    # Encabezados de tabla
-                    pdf.set_font("Helvetica", 'B', 8)
-                    pdf.cell(70, 6, "Opción", border=1, align="C")
-                    pdf.cell(25, 6, "Votos", border=1, align="C")
-                    pdf.cell(25, 6, "Coeficiente", border=1, align="C")
+                    # Ordenar por coeficiente_sum (ya lo haces antes)
+                    opcion_ganadora = resultados[0]
                     
-                    # Datos de la tabla
+                    pdf.set_font("Helvetica", 'B', 9)
+                    pdf.cell(0, 5, f"Opción más votada: {opcion_ganadora['answer']}", ln=True)
                     pdf.set_font("Helvetica", size=8)
-                    for res in resultados:
-                        opcion_texto = str(res['answer'])
-                        if len(opcion_texto) > 35:
-                            opcion_texto = opcion_texto[:35] + "..."
-                        
-                        pdf.cell(70, 6, opcion_texto, border=1)
-                        pdf.cell(25, 6, str(res['votes']), border=1, align="C")
-                        pdf.cell(25, 6, f"{res['coefficient_sum']:.2f}", border=1, align="C")
+                    pdf.cell(0, 5, f"Coeficiente acumulado: {opcion_ganadora['coefficient_sum']:.2f} ({opcion_ganadora['coefficient_sum']/resultado['total_participant_coefficient']*100:.1f}% de los votantes)", ln=True)
+                    pdf.cell(0, 5, f"Votos: {opcion_ganadora['votes']}", ln=True)
+                    
+                    # Mostrar otras opciones si hay más de una
+                    if len(resultados) > 1:
+                        pdf.ln(2)
+                        pdf.set_font("Helvetica", size=7)
+                        pdf.cell(0, 4, "Otras opciones:", ln=True)
+                        for res in resultados[1:]:
+                            pdf.cell(0, 4, f"- {res['answer']}: {res['coefficient_sum']:.2f} ({res['votes']} votos)", ln=True)
+                    
                 else:
-                    pdf.set_font("Helvetica", size=8)
                     pdf.cell(0, 6, "Sin votos registrados", ln=True)
                 
-                pdf.ln(5)
+                pdf.ln(8)
         else:
             # Si no hay preguntas, mostrar mensaje
             pdf.set_font("Helvetica", 'B', 12)
