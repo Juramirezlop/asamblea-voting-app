@@ -1518,8 +1518,8 @@
                     document.cookie = c.replace(/^ +/, "").replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
                 });
 
-                // 🔹 Redirigir al login inicial
-                window.location.href = '/'; // o '/index.html', según tu estructura
+                // Redirigir al login inicial
+                window.replace.href = '/'; 
 
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
