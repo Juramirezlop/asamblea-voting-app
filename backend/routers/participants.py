@@ -304,7 +304,7 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
                         })
                     
                     # Ordenar por porcentaje descendente
-                    resultados.sort(key=lambda x: x['percentage'], reverse=True)
+                    resultados.sort(key=lambda x: x['coefficient_sum'], reverse=True)
                     
                     resultados_preguntas.append({
                         'pregunta': pregunta,
@@ -452,7 +452,6 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
                     pdf.cell(70, 6, "Opción", border=1, align="C")
                     pdf.cell(25, 6, "Votos", border=1, align="C")
                     pdf.cell(25, 6, "Coeficiente", border=1, align="C")
-                    pdf.cell(25, 6, "Porcentaje", border=1, align="C", ln=True)
                     
                     # Datos de la tabla
                     pdf.set_font("Helvetica", size=8)
@@ -464,7 +463,6 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
                         pdf.cell(70, 6, opcion_texto, border=1)
                         pdf.cell(25, 6, str(res['votes']), border=1, align="C")
                         pdf.cell(25, 6, f"{res['coefficient_sum']:.2f}", border=1, align="C")
-                        pdf.cell(25, 6, f"{res['percentage']:.2f}%", border=1, align="C", ln=True)
                 else:
                     pdf.set_font("Helvetica", size=8)
                     pdf.cell(0, 6, "Sin votos registrados", ln=True)
