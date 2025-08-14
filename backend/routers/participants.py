@@ -233,7 +233,7 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
         preguntas = execute_query(
             conn,
             """
-            SELECT DISTINCT q.id, q.text, q.type
+            SELECT DISTINCT q.id, q.text, q.type, q.allow_multiple, q.max_selections
             FROM questions q
             ORDER BY q.id
             """,
@@ -451,21 +451,28 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
                     
                     pdf.set_font("Helvetica", size=8)
                     pdf.cell(0, 5, "Opciones:", ln=True)
+
+                    if pregunta['allow_multiple']:
+                        # Tomar las top N opciones según max_selections
+                        ganadoras = {r['answer'] for r in resultados_ordenados[:pregunta['max_selections']]}
+                    else:
+                        # Solo la de mayor coeficiente (posibles empates)
+                        max_coef = resultados_ordenados[0]['coefficient_sum']
+                        ganadoras = {r['answer'] for r in resultados_ordenados if abs(r['coefficient_sum'] - max_coef) < 0.01}
                     
                     for res in resultados_ordenados:
-                        # Establecer color verde para ganadoras
-                        if abs(res['coefficient_sum'] - max_coef) < 0.01:  # Permite empates
+                        if res['answer'] in ganadoras:
                             pdf.set_text_color(0, 128, 0)  # Verde
                             pdf.set_font("Helvetica", 'B', 8)
                         else:
-                            pdf.set_text_color(0, 0, 0)  # Negro
+                            pdf.set_text_color(0, 0, 0)
                             pdf.set_font("Helvetica", size=8)
-                        
                         pdf.cell(0, 5, f"- {res['answer']}: {res['coefficient_sum']:.2f} % ({res['votes']} votos)", ln=True)
                     
                     # Restaurar color por defecto
                     pdf.set_text_color(0, 0, 0)
                     pdf.set_font("Helvetica", size=8)
+                    
                 else:
                     pdf.cell(0, 6, "Sin votos registrados", ln=True)
                 
@@ -555,9 +562,12 @@ async def generar_xlsx_asistencia(user=Depends(admin_required)):
             fecha_ingreso = "-"
             if p.get("login_time") and p.get("present"):
                 try:
-                    dt = datetime.fromisoformat(str(p["login_time"]))
-                    fecha_ingreso = dt.strftime('%d/%m %H:%M')
-                except:
+                    # Convertir UTC a hora de Colombia
+                    dt_utc = datetime.fromisoformat(str(p["login_time"]).replace(tzinfo=timezone.utc))
+                    dt_colombia = dt_utc.astimezone(colombia_tz)
+                    fecha_ingreso = dt_colombia.strftime('%d/%m %H:%M')
+                except Exception as e:
+                    logger.warning(f"Error convirtiendo fecha {p['login_time']}: {e}")
                     fecha_ingreso = "Error"
             
             asistencia = "SI" if p.get("present") else "NO"

@@ -1502,9 +1502,6 @@
                 
                 await apiCall('/voting/admin/reset', {method: 'DELETE'});
 
-                // Recargar datos
-                await loadAdminData();
-                
                 // Limpiar nombre del conjunto
                 await checkConjuntoName();
 
@@ -1514,12 +1511,15 @@
                 document.getElementById('status-text').style.color = '#6c757d';
                 showStatus('Base de datos limpiada completamente', 'success');
 
+                // Borrar datos locales y cookies
                 localStorage.clear();
                 sessionStorage.clear();
                 document.cookie.split(";").forEach(c => {
                     document.cookie = c.replace(/^ +/, "").replace(/=.*/, `=;expires=${new Date().toUTCString()};path=/`);
                 });
-                window.location.href = window.location.origin + '?nocache=' + Date.now();
+
+                // 🔹 Redirigir al login inicial
+                window.location.href = '/'; // o '/index.html', según tu estructura
 
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
