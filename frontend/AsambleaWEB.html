@@ -1506,7 +1506,15 @@
 
                 // Recargar datos
                 await loadAdminData();
+                // Limpiar nombre del conjunto
+                await checkConjuntoName();
+
+                // Actualizar indicador de participantes 
+                document.getElementById('status-circle').style.background = '#6c757d';
+                document.getElementById('status-text').textContent = 'Estado: Sin verificar';
+                document.getElementById('status-text').style.color = '#6c757d';
                 showStatus('Base de datos limpiada completamente', 'success');
+                
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
             }

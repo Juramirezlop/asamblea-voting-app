@@ -229,7 +229,7 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
         coefficient_percentage = float(stats['present_coefficient']) if stats['present_coefficient'] else 0.0
         quorum_met = coefficient_percentage >= 51
         
-        # Obtener preguntas y resultados de manera más segura
+        # Obtener preguntas y resultados de manera más robusta
         preguntas = execute_query(
             conn,
             """
@@ -275,37 +275,35 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
                     )
                     total_participant_coefficient = float(total_coef_result["total_participant_coefficient"]) if total_coef_result else 0.0
                     
-                    # Calcular resultados por opción de manera más segura
+                    # Calcular resultados por opción de manera más robusta
                     resultados = []
                     for opcion in opciones:
+                        # Nueva query más robusta para manejar votos múltiples
                         result = execute_query(
                             conn,
                             """
                             SELECT 
-                                COUNT(CASE WHEN v.participant_code IS NOT NULL THEN 1 END) as votes,
-                                COALESCE(SUM(CASE WHEN v.participant_code IS NOT NULL THEN p.coefficient ELSE 0 END), 0) as coefficient_sum
-                            FROM options o
-                            LEFT JOIN votes v ON v.question_id = o.question_id AND (
-                                v.answer = o.option_text OR 
-                                v.answer LIKE '%' || CAST(o.option_text AS TEXT) || '%'
-                            )
-                            LEFT JOIN participants p ON v.participant_code = p.code
-                            WHERE o.question_id = ? AND o.option_text = ?
+                                COUNT(DISTINCT v.participant_code) as unique_voters,
+                                COALESCE(SUM(DISTINCT p.coefficient), 0) as coefficient_sum
+                            FROM votes v
+                            JOIN participants p ON v.participant_code = p.code
+                            WHERE v.question_id = ? 
+                            AND (v.answer = ? OR v.answer LIKE ? OR v.answer LIKE ? OR v.answer LIKE ?)
                             """,
-                            (pregunta['id'], opcion),
+                            (pregunta['id'], opcion, f"{opcion},%", f"%, {opcion},%", f"%, {opcion}"),
                             fetchone=True
                         )
                         
-                        votes = int(result['votes']) if result and result['votes'] else 0
-                        coefficient_sum = float(result['coefficient_sum']) if result and result['coefficient_sum'] else 0.0
+                        votes = int(result['unique_voters']) if result and result['unique_voters'] else 0
+                        coefficient_sum = float(result['coefficient_sum']) if result and result['coefficient_sum'] else 0.00
                         
                         resultados.append({
                             'answer': opcion,
                             'votes': votes,
-                            'percentage': coefficient_sum
+                            'coefficient_sum': coefficient_sum,
                         })
                     
-                    # Ordenar por porcentaje (coeficiente) descendente
+                    # Ordenar por porcentaje descendente
                     resultados.sort(key=lambda x: x['percentage'], reverse=True)
                     
                     resultados_preguntas.append({
@@ -326,7 +324,7 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
         close_db(conn)
 
     try:
-        # Crear PDF (resto del código permanece igual...)
+        # Crear PDF
         pdf = FPDF()
         pdf.add_page()
         
@@ -355,7 +353,7 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
         pdf.cell(20, 8, "Asistencia", border=1, align="C")
         pdf.cell(20, 8, "Poder", border=1, align="C", ln=True)
 
-        # Datos de asistencia
+        # Datos de asistencia (CORREGIR TIMEZONE)
         pdf.set_font("Helvetica", size=8)
         id_counter = 1
         
@@ -363,9 +361,14 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
             fecha_ingreso = "-"
             if p.get("login_time") and p.get("present"):
                 try:
-                    dt = datetime.fromisoformat(str(p["login_time"]))
-                    fecha_ingreso = dt.strftime('%d/%m %H:%M')
-                except:
+                    # Convertir UTC a Colombia
+                    dt_utc = datetime.fromisoformat(str(p["login_time"]).replace('Z', '+00:00'))
+                    if dt_utc.tzinfo is None:
+                        dt_utc = dt_utc.replace(tzinfo=timezone.utc)
+                    dt_colombia = dt_utc.astimezone(colombia_tz)
+                    fecha_ingreso = dt_colombia.strftime('%d/%m %H:%M')
+                except Exception as e:
+                    logger.warning(f"Error convirtiendo fecha {p['login_time']}: {e}")
                     fecha_ingreso = "Error"
             
             asistencia = "SÍ" if p.get("present") else "NO"
@@ -417,32 +420,65 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
         pdf.set_text_color(0, 0, 0)  # Volver a negro
         pdf.ln(5)
 
-        # SECCIÓN 4: RESULTADOS DE VOTACIONES
+        # SECCIÓN 4: RESULTADOS DE VOTACIONES (MEJORADA)
         if resultados_preguntas:
             pdf.set_font("Helvetica", 'B', 12)
             pdf.cell(0, 8, "4. RESULTADOS DE VOTACIONES", ln=True)
-            pdf.ln(2)
+            pdf.ln(3)
             
             for i, resultado in enumerate(resultados_preguntas, 1):
                 pregunta = resultado['pregunta']
                 resultados = resultado['resultados']
                 
+                # Título de pregunta
                 pdf.set_font("Helvetica", 'B', 10)
-                pdf.cell(0, 7, f"Pregunta {i}: {str(pregunta['text'])[:80]}...", ln=True)
-                
-                pdf.set_font("Helvetica", size=9)
-                pdf.cell(0, 5, f"Total presentes en asamblea: {stats['present_count']}", ln=True)
-                pdf.cell(0, 5, f"Participaron en esta votación: {resultado['total_participants']}", ln=True)
-                pdf.cell(0, 5, f"Participación: {resultado['total_participant_coefficient']:.2f}%", ln=True)
+                pregunta_texto = str(pregunta['text'])
+                if len(pregunta_texto) > 80:
+                    pregunta_texto = pregunta_texto[:80] + "..."
+                pdf.cell(0, 7, f"Pregunta {i}: {pregunta_texto}", ln=True)
                 pdf.ln(2)
                 
-                if resultados:
-                    for res in resultados:
-                        pdf.cell(0, 5, f"  - {res['answer']}: {res['votes']} votos ({res['percentage']:.2f}%)", ln=True)
-                else:
-                    pdf.cell(0, 5, "Sin votos registrados", ln=True)
+                # Información general
+                pdf.set_font("Helvetica", size=8)
+                pdf.cell(0, 4, f"Total presentes en asamblea: {stats['present_count']}", ln=True)
+                pdf.cell(0, 4, f"Participaron en esta votación: {resultado['total_participants']}", ln=True)
+                pdf.cell(0, 4, f"Participación: {resultado['total_participant_coefficient']:.2f}%", ln=True)
                 pdf.ln(3)
+                
+                # TABLA DE RESULTADOS MEJORADA
+                if resultados:
+                    # Encabezados de tabla
+                    pdf.set_font("Helvetica", 'B', 8)
+                    pdf.cell(70, 6, "Opción", border=1, align="C")
+                    pdf.cell(25, 6, "Votos", border=1, align="C")
+                    pdf.cell(25, 6, "Coeficiente", border=1, align="C")
+                    pdf.cell(25, 6, "Porcentaje", border=1, align="C", ln=True)
+                    
+                    # Datos de la tabla
+                    pdf.set_font("Helvetica", size=8)
+                    for res in resultados:
+                        opcion_texto = str(res['answer'])
+                        if len(opcion_texto) > 35:
+                            opcion_texto = opcion_texto[:35] + "..."
+                        
+                        pdf.cell(70, 6, opcion_texto, border=1)
+                        pdf.cell(25, 6, str(res['votes']), border=1, align="C")
+                        pdf.cell(25, 6, f"{res['coefficient_sum']:.2f}", border=1, align="C")
+                        pdf.cell(25, 6, f"{res['percentage']:.2f}%", border=1, align="C", ln=True)
+                else:
+                    pdf.set_font("Helvetica", size=8)
+                    pdf.cell(0, 6, "Sin votos registrados", ln=True)
+                
+                pdf.ln(5)
+        else:
+            # Si no hay preguntas, mostrar mensaje
+            pdf.set_font("Helvetica", 'B', 12)
+            pdf.cell(0, 8, "4. RESULTADOS DE VOTACIONES", ln=True)
+            pdf.ln(3)
+            pdf.set_font("Helvetica", size=10)
+            pdf.cell(0, 6, "No se han realizado votaciones en esta asamblea.", ln=True)
 
+        # Generar PDF
         pdf_bytes = pdf.output(dest="S")
         if isinstance(pdf_bytes, str):
             pdf_bytes = pdf_bytes.encode('latin-1')
@@ -457,7 +493,6 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
     except Exception as e:
         logger.error(f"Error creando PDF: {e}")
         raise HTTPException(status_code=500, detail=f"Error creando PDF: {str(e)}")
-
 
 @router.post("/asistencia/xlsx")
 async def generar_xlsx_asistencia(user=Depends(admin_required)):
