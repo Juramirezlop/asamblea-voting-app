@@ -362,11 +362,14 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
             if p.get("login_time") and p.get("present"):
                 try:
                     # Convertir UTC a Colombia
-                    dt_utc = datetime.fromisoformat(str(p["login_time"]).replace('Z', '+00:00'))
-                    if dt_utc.tzinfo is None:
+                    login_time_str = str(p["login_time"])
+                    if 'T' in login_time_str:
+                        dt_utc = datetime.fromisoformat(login_time_str.replace('Z', '+00:00'))
+                    else:
+                        dt_utc = datetime.strptime(login_time_str, '%Y-%m-%d %H:%M:%S')
                         dt_utc = dt_utc.replace(tzinfo=timezone.utc)
                     dt_colombia = dt_utc.astimezone(colombia_tz)
-                    fecha_ingreso = dt_colombia.strftime('%d/%m %H:%M')
+                    fecha_ingreso = dt_colombia.strftime('%d/%m/%Y %H:%M')
                 except Exception as e:
                     logger.warning(f"Error convirtiendo fecha {p['login_time']}: {e}")
                     fecha_ingreso = "Error"
@@ -563,9 +566,14 @@ async def generar_xlsx_asistencia(user=Depends(admin_required)):
             if p.get("login_time") and p.get("present"):
                 try:
                     # Convertir UTC a hora de Colombia
-                    dt_utc = datetime.fromisoformat(str(p["login_time"]).replace(tzinfo=timezone.utc))
+                    login_time_str = str(p["login_time"])
+                    if 'T' in login_time_str:
+                        dt_utc = datetime.fromisoformat(login_time_str.replace('Z', '+00:00'))
+                    else:
+                        dt_utc = datetime.strptime(login_time_str, '%Y-%m-%d %H:%M:%S')
+                        dt_utc = dt_utc.replace(tzinfo=timezone.utc)
                     dt_colombia = dt_utc.astimezone(colombia_tz)
-                    fecha_ingreso = dt_colombia.strftime('%d/%m %H:%M')
+                    fecha_ingreso = dt_colombia.strftime('%d/%m/%Y %H:%M')
                 except Exception as e:
                     logger.warning(f"Error convirtiendo fecha {p['login_time']}: {e}")
                     fecha_ingreso = "Error"
