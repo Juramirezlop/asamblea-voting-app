@@ -1502,9 +1502,6 @@
                 
                 await apiCall('/voting/admin/reset', {method: 'DELETE'});
 
-                // Limpiar nombre del conjunto
-                await checkConjuntoName();
-
                 // Actualizar indicador de participantes 
                 document.getElementById('status-circle').style.background = '#6c757d';
                 document.getElementById('status-text').textContent = 'Estado: Sin verificar';
