@@ -1510,7 +1510,7 @@
                 document.getElementById('status-text').textContent = 'Estado: Sin verificar';
                 document.getElementById('status-text').style.color = '#6c757d';
                 showStatus('Base de datos limpiada completamente', 'success');
-                
+
                 // Limpiar estado local
                 clearTokens();
                 adminToken = null;
@@ -1531,6 +1531,18 @@
 
                 // Volver al panel de inicio
                 showScreen('welcome-screen');
+                
+                // Forzar ocultación del modal si existe
+                const modals = document.querySelectorAll('div[style*="position: fixed"]');
+                modals.forEach(modal => {
+                    if (modal.parentNode === document.body) {
+                        document.body.removeChild(modal);
+                    }
+                });
+
+                // Limpiar upload status
+                document.getElementById('upload-status').innerHTML = '';
+
                 hideStatus();
 
             } catch (error) {
