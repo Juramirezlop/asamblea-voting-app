@@ -1511,7 +1511,9 @@
                 document.getElementById('status-text').style.color = '#6c757d';
                 showStatus('Base de datos limpiada completamente', 'success');
 
-                // Limpiar estado local
+                showStatus('Base de datos limpiada completamente', 'success');
+
+                // Limpiar estado local ANTES de cambiar pantalla
                 clearTokens();
                 adminToken = null;
                 voterToken = null;
@@ -1528,22 +1530,23 @@
                 document.getElementById('admin-username').value = '';
                 document.getElementById('admin-password').value = '';
                 document.getElementById('admin-login').classList.add('hidden');
-
-                // Volver al panel de inicio
-                showScreen('welcome-screen');
-                
-                // Forzar ocultación del modal si existe
-                const modals = document.querySelectorAll('div[style*="position: fixed"]');
-                modals.forEach(modal => {
-                    if (modal.parentNode === document.body) {
-                        document.body.removeChild(modal);
-                    }
-                });
-
-                // Limpiar upload status
                 document.getElementById('upload-status').innerHTML = '';
 
+                // Forzar ocultación de modales
+                setTimeout(() => {
+                    const modals = document.querySelectorAll('div[style*="position: fixed"]');
+                    modals.forEach(modal => {
+                        if (modal.parentNode === document.body) {
+                            document.body.removeChild(modal);
+                        }
+                    });
+                }, 100);
+
+                // Cambiar pantalla AL FINAL
+                showScreen('welcome-screen');
                 hideStatus();
+
+                return;
 
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
