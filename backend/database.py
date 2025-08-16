@@ -1,5 +1,4 @@
 import os
-import sqlite3
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from psycopg2.pool import ThreadedConnectionPool
@@ -7,11 +6,9 @@ import threading
 import logging
 import atexit
 
-# Configurar logging para debug
+# Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-DB_NAME = "database.db"
 
 # Pool de conexiones global
 postgres_pool = None
@@ -31,16 +28,16 @@ def init_postgres_pool():
             
         database_url = os.getenv("DATABASE_URL")
         if not database_url:
-            return
+            raise Exception("DATABASE_URL no configurada. Este sistema requiere PostgreSQL.")
             
         # Normalizar URL si es necesario
         if database_url.startswith("postgresql://"):
             database_url = database_url.replace("postgresql://", "postgres://", 1)
         
         try:
-            # Configuración optimizada para Railway
-            minconn = int(os.getenv("DATABASE_POOL_SIZE", "2"))  # Conexiones siempre activas
-            maxconn = int(os.getenv("DATABASE_MAX_CONNECTIONS", "5"))  # Máximo total
+            # Configuración más conservadora y realista
+            minconn = int(os.getenv("DATABASE_POOL_SIZE", "2"))  # Mínimo razonable
+            maxconn = int(os.getenv("DATABASE_MAX_CONNECTIONS", "8"))  # Máximo balanceado
             
             logger.info(f"Inicializando pool PostgreSQL: min={minconn}, max={maxconn}")
             
@@ -55,32 +52,31 @@ def init_postgres_pool():
             
         except Exception as e:
             logger.error(f"❌ Error inicializando pool PostgreSQL: {e}")
-            postgres_pool = None
+            raise
 
 def get_db():
-    """Obtener conexión a la base de datos (con pool para PostgreSQL)"""
-    database_url = os.getenv("DATABASE_URL")
+    """Obtener conexión a la base de datos PostgreSQL"""
+    if postgres_pool is None:
+        init_postgres_pool()
     
-    if database_url:
-        # PostgreSQL con pool
-        if postgres_pool is None:
-            init_postgres_pool()
-        
-        if postgres_pool is not None:
-            try:
-                # Obtener conexión del pool
-                conn = postgres_pool.getconn()
-                if conn:
-                    # Verificar que la conexión esté activa
-                    conn.autocommit = False
-                    return conn
-                else:
-                    logger.warning("Pool devolvió conexión None")
-            except Exception as e:
-                logger.error(f"Error obteniendo conexión del pool: {e}")
+    try:
+        # Obtener conexión del pool
+        conn = postgres_pool.getconn()
+        if conn:
+            # Verificar que la conexión esté activa
+            conn.autocommit = False
+            return conn
+        else:
+            logger.error("Pool devolvió conexión None")
+            raise Exception("No se pudo obtener conexión del pool")
+            
+    except Exception as e:
+        logger.error(f"Error obteniendo conexión del pool: {e}")
         
         # Fallback: conexión directa si pool falla
         logger.warning("Usando conexión directa PostgreSQL (fallback)")
+        database_url = os.getenv("DATABASE_URL")
+        
         if database_url.startswith("postgresql://"):
             database_url = database_url.replace("postgresql://", "postgres://", 1)
         
@@ -88,23 +84,16 @@ def get_db():
             conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
             conn.autocommit = False
             return conn
-        except Exception as e:
-            logger.error(f"Error en conexión directa PostgreSQL: {e}")
+        except Exception as fallback_error:
+            logger.error(f"Error en conexión directa PostgreSQL: {fallback_error}")
             raise
-    else:
-        # SQLite en desarrollo local
-        conn = sqlite3.connect(DB_NAME)
-        conn.row_factory = sqlite3.Row
-        return conn
 
 def close_db(conn):
-    """Cerrar conexión correctamente (devolver al pool si es PostgreSQL)"""
+    """Cerrar conexión correctamente (devolver al pool)"""
     if conn is None:
         return
         
-    database_url = os.getenv("DATABASE_URL")
-    
-    if database_url and postgres_pool is not None:
+    if postgres_pool is not None:
         # PostgreSQL: devolver conexión al pool
         try:
             postgres_pool.putconn(conn)
@@ -117,36 +106,28 @@ def close_db(conn):
             except:
                 pass
     else:
-        # SQLite o conexión directa: cerrar normalmente
+        # Conexión directa: cerrar normalmente
         try:
             conn.close()
         except Exception as e:
             logger.error(f"Error cerrando conexión: {e}")
 
 def execute_query(conn, query, params=(), fetchone=False, fetchall=False, commit=False):
-    """Ejecutar query con manejo de errores mejorado"""
+    """Ejecutar query PostgreSQL con manejo de errores mejorado"""
     if conn is None:
         raise Exception("Conexión a base de datos es None")
     
-    # Detectar si es Postgres
-    is_postgres = 'psycopg2' in str(type(conn))
-    
     cur = None
     try:
-        if is_postgres:
-            postgres_query = query.replace("?", "%s")
-            postgres_query = postgres_query.replace("CONCAT('%', o.option_text, '%')", "'%' || o.option_text || '%'")
-            logger.debug(f"Query DESPUÉS del replace: {postgres_query}")
-            cur = conn.cursor()
-            logger.debug(f"PostgreSQL Query: {postgres_query}")
-            logger.debug(f"PostgreSQL Params: {params}")
-            cur.execute(postgres_query, params)
-        else:
-            # SQLite
-            cur = conn.cursor()
-            logger.debug(f"SQLite Query: {query}")
-            logger.debug(f"SQLite Params: {params}")
-            cur.execute(query, params)
+        # Convertir placeholders SQLite a PostgreSQL si es necesario
+        postgres_query = query.replace("?", "%s")
+        # Manejar concatenación específica si aparece
+        postgres_query = postgres_query.replace("CONCAT('%', o.option_text, '%')", "'%' || o.option_text || '%'")
+        
+        cur = conn.cursor()
+        logger.debug(f"PostgreSQL Query: {postgres_query}")
+        logger.debug(f"PostgreSQL Params: {params}")
+        cur.execute(postgres_query, params)
         
         result = None
         if fetchone:
@@ -185,133 +166,70 @@ def execute_query(conn, query, params=(), fetchone=False, fetchall=False, commit
                 pass
 
 def init_db():
-    """Inicializar base de datos con manejo de errores mejorado"""
-    logger.info("Inicializando base de datos...")
+    """Inicializar base de datos PostgreSQL"""
+    logger.info("Inicializando base de datos PostgreSQL...")
     
     db = None
     try:
         db = get_db()
         
-        # Detectar tipo de base de datos
-        is_postgres = 'psycopg2' in str(type(db))
-        logger.info(f"Tipo de BD detectado: {'PostgreSQL' if is_postgres else 'SQLite'}")
-        
-        if is_postgres:
-            # Sintaxis PostgreSQL
-            tables = [
-                """
-                CREATE TABLE IF NOT EXISTS participants (
-                    code TEXT PRIMARY KEY,
-                    name TEXT,
-                    coefficient REAL,
-                    has_voted INTEGER DEFAULT 0,
-                    present INTEGER DEFAULT 0,
-                    is_power BOOLEAN DEFAULT FALSE,
-                    login_time TEXT
-                )
-                """,
-                """
-                CREATE TABLE IF NOT EXISTS users (
-                    username TEXT PRIMARY KEY,
-                    password_hash TEXT NOT NULL,
-                    role TEXT NOT NULL CHECK (role IN ('admin', 'voter'))
-                )
-                """,
-                """
-                CREATE TABLE IF NOT EXISTS questions (
-                    id SERIAL PRIMARY KEY,
-                    text TEXT NOT NULL,
-                    type TEXT NOT NULL CHECK (type IN ('yesno', 'multiple')),
-                    active INTEGER DEFAULT 1,
-                    closed INTEGER DEFAULT 0,
-                    allow_multiple INTEGER DEFAULT 0,
-                    max_selections INTEGER DEFAULT 1
-                )
-                """,
-                """
-                CREATE TABLE IF NOT EXISTS options (
-                    id SERIAL PRIMARY KEY,
-                    question_id INTEGER NOT NULL,
-                    option_text TEXT NOT NULL,
-                    FOREIGN KEY (question_id) REFERENCES questions(id)
-                )
-                """,
-                """
-                CREATE TABLE IF NOT EXISTS votes (
-                    participant_code TEXT,
-                    question_id INTEGER,
-                    answer TEXT,
-                    timestamp TEXT,
-                    PRIMARY KEY (participant_code, question_id),
-                    FOREIGN KEY (participant_code) REFERENCES participants(code),
-                    FOREIGN KEY (question_id) REFERENCES questions(id)
-                )
-                """,
-                """
-                CREATE TABLE IF NOT EXISTS config (
-                    key TEXT PRIMARY KEY,
-                    value TEXT
-                )
-                """
-            ]
-        else:
-            # Sintaxis SQLite
-            tables = [
-                """
-                CREATE TABLE IF NOT EXISTS participants (
-                    code TEXT PRIMARY KEY,
-                    name TEXT,
-                    coefficient REAL,
-                    has_voted INTEGER DEFAULT 0,
-                    present INTEGER DEFAULT 0,
-                    is_power BOOLEAN DEFAULT 0,
-                    login_time TEXT
-                )
-                """,
-                """
-                CREATE TABLE IF NOT EXISTS users (
-                    username TEXT PRIMARY KEY,
-                    password_hash TEXT NOT NULL,
-                    role TEXT NOT NULL CHECK (role IN ('admin', 'voter'))
-                )
-                """,
-                """
-                CREATE TABLE IF NOT EXISTS questions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    text TEXT NOT NULL,
-                    type TEXT NOT NULL CHECK (type IN ('yesno', 'multiple')),
-                    active INTEGER DEFAULT 1,
-                    closed INTEGER DEFAULT 0,
-                    allow_multiple INTEGER DEFAULT 0,
-                    max_selections INTEGER DEFAULT 1
-                )
-                """,
-                """
-                CREATE TABLE IF NOT EXISTS options (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    question_id INTEGER NOT NULL,
-                    option_text TEXT NOT NULL,
-                    FOREIGN KEY (question_id) REFERENCES questions(id)
-                )
-                """,
-                """
-                CREATE TABLE IF NOT EXISTS votes (
-                    participant_code TEXT,
-                    question_id INTEGER,
-                    answer TEXT,
-                    timestamp TEXT,
-                    PRIMARY KEY (participant_code, question_id),
-                    FOREIGN KEY (participant_code) REFERENCES participants(code),
-                    FOREIGN KEY (question_id) REFERENCES questions(id)
-                )
-                """,
-                """
-                CREATE TABLE IF NOT EXISTS config (
-                    key TEXT PRIMARY KEY,
-                    value TEXT
-                )
-                """
-            ]
+        # Tablas con sintaxis PostgreSQL optimizada
+        tables = [
+            """
+            CREATE TABLE IF NOT EXISTS participants (
+                code TEXT PRIMARY KEY,
+                name TEXT,
+                coefficient REAL,
+                has_voted INTEGER DEFAULT 0,
+                present INTEGER DEFAULT 0,
+                is_power BOOLEAN DEFAULT FALSE,
+                login_time TEXT
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                username TEXT PRIMARY KEY,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL CHECK (role IN ('admin', 'voter'))
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS questions (
+                id SERIAL PRIMARY KEY,
+                text TEXT NOT NULL,
+                type TEXT NOT NULL CHECK (type IN ('yesno', 'multiple')),
+                active INTEGER DEFAULT 1,
+                closed INTEGER DEFAULT 0,
+                allow_multiple INTEGER DEFAULT 0,
+                max_selections INTEGER DEFAULT 1
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS options (
+                id SERIAL PRIMARY KEY,
+                question_id INTEGER NOT NULL,
+                option_text TEXT NOT NULL,
+                FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS votes (
+                participant_code TEXT,
+                question_id INTEGER,
+                answer TEXT,
+                timestamp TEXT,
+                PRIMARY KEY (participant_code, question_id),
+                FOREIGN KEY (participant_code) REFERENCES participants(code) ON DELETE CASCADE,
+                FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS config (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+            """
+        ]
         
         # Ejecutar creación de tablas
         cursor = db.cursor()
@@ -325,7 +243,7 @@ def init_db():
         
         db.commit()
         cursor.close()
-        logger.info("✅ Base de datos inicializada correctamente")
+        logger.info("✅ Base de datos PostgreSQL inicializada correctamente")
         
     except Exception as e:
         logger.error(f"❌ Error inicializando base de datos: {e}")
@@ -345,5 +263,5 @@ def cleanup_connections():
         except Exception as e:
             logger.error(f"Error cerrando pool: {e}")
 
-# Registrar limpieza al finalizar aplicación (opcional)
+# Registrar limpieza al finalizar aplicación
 atexit.register(cleanup_connections)
