@@ -805,6 +805,11 @@
         }
 
         function logout() {
+            if (syncChannel) {
+                syncChannel.close();
+                syncChannel = null;
+            }
+            
             clearTokens();
             adminToken = null;
             voterToken = null;
@@ -1399,6 +1404,7 @@
 
                 await loadActiveQuestions();
                 showStatus('Votación creada y activada', 'success');
+                broadcastSync('force-refresh', {});
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
             }
@@ -1411,6 +1417,7 @@
                 await apiCall(`/voting/questions/${questionId}`, { method: 'DELETE' });
                 await loadActiveQuestions();
                 showStatus('Encuesta eliminada', 'success');
+                broadcastSync('force-refresh', {});
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
             }
@@ -1584,6 +1591,7 @@
                 await apiCall(`/voting/questions/${questionId}/toggle`, { method: 'PUT' });
                 await loadActiveQuestions();
                 showStatus('Estado de votación actualizado', 'success');
+                broadcastSync('force-refresh', {});
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
             }
