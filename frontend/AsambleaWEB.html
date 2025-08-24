@@ -727,6 +727,11 @@
             lastUpdateTimestamp = timestamp;
             
             switch (type) {
+                case 'force-refresh-voters':
+                    if (!isAdmin) {
+                        loadVotingQuestions();
+                    }
+                    break;
                 case 'aforo-update':
                     updateAforoDisplay(data);
                     break;
@@ -884,6 +889,17 @@
             }
         }
 
+        function showTestVoterScreen() {
+            currentUser = {
+                code: CODIGO_PRUEBA,
+                name: 'Usuario de Prueba',
+                id: 'test'
+            };
+            isAdmin = false;
+            showVoterScreen();
+            loadTestVotingQuestions();
+        }
+
         // Nueva función que simula preguntas sin base de datos
         function getSimulatedTestQuestions() {
             return [
@@ -935,6 +951,10 @@
         function initTestUser() {
             document.body.removeChild(document.querySelector('[style*="position: fixed"]'));
             accessTestVoting();
+        }
+
+        function accessTestVoting() {
+            showTestVoterScreen();
         }
 
         async function registerAttendance() {
@@ -1217,34 +1237,38 @@
                 const pageParticipants = filteredParticipants.slice(startIndex, endIndex);
                 const totalPages = Math.ceil(filteredParticipants.length / participantsPerPage);
                 
+                // Paginación arriba
+                const paginationHTML = totalPages > 1 ? `
+                    <div style="padding: 1rem; background: #fff; border: 1px solid #e9ecef; border-radius: 4px; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+                        <button onclick="changePage(${currentPage - 1})" 
+                                ${currentPage === 1 ? 'disabled' : ''} 
+                                style="padding: 0.5rem 1rem; border: 1px solid #dee2e6; background: ${currentPage === 1 ? '#f8f9fa' : 'white'}; border-radius: 4px; cursor: ${currentPage === 1 ? 'not-allowed' : 'pointer'};">
+                            ← Anterior
+                        </button>
+                        <span style="color: #6c757d; font-size: 0.9rem;">
+                            Página ${currentPage} de ${totalPages} (${filteredParticipants.length} resultados)
+                        </span>
+                        <button onclick="changePage(${currentPage + 1})" 
+                                ${currentPage === totalPages ? 'disabled' : ''} 
+                                style="padding: 0.5rem 1rem; border: 1px solid #dee2e6; background: ${currentPage === totalPages ? '#f8f9fa' : 'white'}; border-radius: 4px; cursor: ${currentPage === totalPages ? 'not-allowed' : 'pointer'};">
+                            Siguiente →
+                        </button>
+                    </div>
+                ` : '';
+                
+                document.getElementById('pagination-top').innerHTML = paginationHTML;
+                
+                // Lista de participantes (sin paginación)
                 const participantsList = filteredParticipants.length === 0 ? 
                     '<p style="text-align: center; color: #7f8c8d; font-style: italic; padding: 2rem;">No se encontraron participantes</p>' :
                     `<div style="max-height: 400px; overflow-y: auto; border: 1px solid #e9ecef; border-radius: 4px; background: #f8f9fa;">
                         ${pageParticipants.map(p => `
-                            <div style="padding: 0.8rem 1rem; border-bottom: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-weight: 600; color: #2c3e50; min-width: 80px;">${p.code}</span>
-                                <span style="flex: 1; margin: 0 1rem; color: #495057;">${p.name || 'Sin nombre'}</span>
-                                <span style="color: #007bff; font-weight: 500; min-width: 60px; text-align: right;">${p.coefficient || 0}%</span>
+                            <div style="padding: 0.8rem 1rem; border-bottom: 1px solid #e9ecef; display: grid; grid-template-columns: 100px 1fr 80px; gap: 1rem; align-items: center;">
+                                <span style="font-weight: 600; color: #2c3e50;">${p.code}</span>
+                                <span style="color: #495057; overflow: hidden; text-overflow: ellipsis;">${p.name || 'Sin nombre'}</span>
+                                <span style="color: #007bff; font-weight: 500; text-align: right;">${p.coefficient || 0}%</span>
                             </div>
                         `).join('')}
-                        
-                        ${totalPages > 1 ? `
-                            <div style="padding: 1rem; background: #fff; border-top: 2px solid #e9ecef; display: flex; justify-content: between; align-items: center; gap: 1rem;">
-                                <button onclick="changePage(${currentPage - 1})" 
-                                        ${currentPage === 1 ? 'disabled' : ''} 
-                                        style="padding: 0.5rem 1rem; border: 1px solid #dee2e6; background: ${currentPage === 1 ? '#f8f9fa' : 'white'}; border-radius: 4px; cursor: ${currentPage === 1 ? 'not-allowed' : 'pointer'};">
-                                    ← Anterior
-                                </button>
-                                <span style="color: #6c757d; font-size: 0.9rem;">
-                                    Página ${currentPage} de ${totalPages} (${filteredParticipants.length} resultados)
-                                </span>
-                                <button onclick="changePage(${currentPage + 1})" 
-                                        ${currentPage === totalPages ? 'disabled' : ''} 
-                                        style="padding: 0.5rem 1rem; border: 1px solid #dee2e6; background: ${currentPage === totalPages ? '#f8f9fa' : 'white'}; border-radius: 4px; cursor: ${currentPage === totalPages ? 'not-allowed' : 'pointer'};">
-                                    Siguiente →
-                                </button>
-                            </div>
-                        ` : ''}
                     </div>`;
                 
                 document.getElementById('participants-content').innerHTML = participantsList;
@@ -1274,6 +1298,9 @@
                             oninput="filterParticipants(this.value)">
                     </div>
                     
+                    <!-- Paginación arriba -->
+                    <div id="pagination-top"></div>
+
                     <!-- Contenido de participantes -->
                     <div id="participants-content"></div>
                     
@@ -1477,6 +1504,7 @@
 
                 await loadActiveQuestions();
                 showStatus('Votación creada y activada', 'success');
+                broadcastSync('force-refresh-voters', {});
                 broadcastSync('force-refresh', {});
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
@@ -1545,13 +1573,13 @@
                 // Obtener datos actuales de la pregunta
                 const questions = await apiCall('/voting/questions/active');
                 const question = questions.find(q => q.id === questionId);
-                
                 if (!question) {
                     showStatus('Votación no encontrada', 'error');
                     return;
                 }
-
                 showEditModal(question);
+                broadcastSync('force-refresh-voters', {});
+
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
             }
@@ -1664,6 +1692,7 @@
                 await apiCall(`/voting/questions/${questionId}/toggle`, { method: 'PUT' });
                 await loadActiveQuestions();
                 showStatus('Estado de votación actualizado', 'success');
+                broadcastSync('force-refresh-voters', {});
                 broadcastSync('force-refresh', {});
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
@@ -2184,12 +2213,8 @@
             updateInterval = setInterval(async () => {
                 if (isAdmin) {
                     await loadAforoData();
-                    await loadActiveQuestions();
-                } else {
-                    // Para votantes: actualizar sus votaciones
-                    await loadVotingQuestions();
                 }
-            }, 4000);
+            }, 5000);
         }
 
         function checkMaxSelections(questionId, maxSelections) {
