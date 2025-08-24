@@ -63,57 +63,28 @@ def login_voter(data: VoterLoginRequest):
     conn = get_db()
     
     try:
-        # 1. Validar participante
+        # 1. Validar que el participante existe Y ya tiene asistencia
         participant = execute_query(
             conn,
-            "SELECT code, name, is_power, login_time FROM participants WHERE code = ?",
+            "SELECT code, name, is_power, present FROM participants WHERE code = ?",
             (data.code,),
             fetchone=True
         )
         if not participant:
             raise HTTPException(status_code=404, detail="Código no encontrado")
-
-        # 2. Actualizar datos (primera vez o no)
-        login_timestamp = datetime.now().isoformat()
-        is_first_time = participant.get("login_time") is None
-
-        if is_first_time:
-            execute_query(
-                conn,
-                """UPDATE participants 
-                    SET present = 1, is_power = ?, login_time = ? 
-                    WHERE code = ?""",
-                (data.is_power, login_timestamp, data.code),
-                commit=True
-            )
-        else:
-            execute_query(
-                conn,
-                "UPDATE participants SET present = 1, is_power = ? WHERE code = ?",
-                (data.is_power, data.code),
-                commit=True
-            )
-
-        # 3. Obtener datos actualizados
-        updated_participant = execute_query(
-            conn,
-            "SELECT code, name, is_power FROM participants WHERE code = ?",
-            (data.code,),
-            fetchone=True
-        )
         
-        if not updated_participant:
-            raise HTTPException(status_code=500, detail="Error obteniendo datos actualizados")
+        if participant.get("present") != 1:
+            raise HTTPException(status_code=403, detail="Debe registrar su asistencia primero")
 
-        # Generar token
+        # 2. Generar token sin modificar datos (los datos ya están fijos desde el registro)
         token = create_access_token({"sub": data.code, "role": "votante", "code": data.code})
         
         return {
             "access_token": token, 
             "token_type": "bearer",
-            "name": updated_participant.get("name", ""),
-            "code": updated_participant.get("code", ""),
-            "skip_power_question": not is_first_time
+            "name": participant.get("name", ""),
+            "code": participant.get("code", ""),
+            "is_power": participant.get("is_power", False)
         }
     
     except HTTPException:
@@ -124,11 +95,49 @@ def login_voter(data: VoterLoginRequest):
     finally:
         close_db(conn)
 
-# ---------- Test endpoints ----------
-@router.get("/solo-admin", dependencies=[Depends(admin_required)])
-def test_admin():
-    return {"msg": "Acceso admin OK"}
+# ---------- Nuevas dependencias de login ----------
+@router.post("/register-attendance")
+def register_attendance(data: VoterLoginRequest):
+    conn = get_db()
+    
+    try:
+        # 1. Validar que el participante existe
+        participant = execute_query(
+            conn,
+            "SELECT code, name, present, is_power FROM participants WHERE code = ?",
+            (data.code,),
+            fetchone=True
+        )
+        if not participant:
+            raise HTTPException(status_code=404, detail="Código no encontrado")
 
-@router.get("/solo-voter", dependencies=[Depends(voter_required)])
-def test_voter():
-    return {"msg": "Acceso votante OK"}
+        # 2. Verificar si ya está registrado
+        if participant.get("present") == 1:
+            raise HTTPException(status_code=400, detail="Ya tiene asistencia registrada")
+
+        # 3. Registrar asistencia con datos fijos (no modificables después)
+        login_timestamp = datetime.now().isoformat()
+        execute_query(
+            conn,
+            """UPDATE participants 
+                SET present = 1, is_power = ?, login_time = ? 
+                WHERE code = ?""",
+            (data.is_power, login_timestamp, data.code),
+            commit=True
+        )
+
+        # 4. Retornar datos de confirmación
+        return {
+            "code": data.code,
+            "name": participant.get("name", "Sin nombre"),
+            "is_power": data.is_power,
+            "message": "Asistencia registrada correctamente"
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error en register_attendance: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+    finally:
+        close_db(conn)

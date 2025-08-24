@@ -80,6 +80,49 @@
             border-color: #3498db;
         }
 
+        .code-input::placeholder {
+            color: #adb5bd;
+        }
+
+        .tabs-container {
+            display: flex;
+            border-bottom: 2px solid #e1e8ed;
+            margin-bottom: 2rem;
+            gap: 0;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 1rem 2rem;
+            background: #f8f9fa;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            color: #6c757d;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button:hover {
+            background: #e9ecef;
+            color: #495057;
+        }
+
+        .tab-button.active {
+            background: white;
+            color: #2c3e50;
+            border-bottom-color: #3498db;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         .btn {
             background: #3498db;
             color: white;
@@ -477,7 +520,8 @@
                 </p>
                 <input type="text" class="code-input" id="access-code" placeholder="1-201" maxlength="10">
                 <br>
-                <button class="btn btn-large" onclick="validateAccess()">Ingresar a Votación</button>
+                <button class="btn btn-large" onclick="registerAttendance()">Solo Asistencia</button>
+                <button class="btn btn-large" onclick="accessVoting()">Votaciones</button>
                 <br>
                 <button class="btn btn-admin" onclick="showAdminLogin()">Acceso Administrador</button>
             </div>
@@ -496,126 +540,128 @@
                 <p>Gestión de Votaciones en Tiempo Real</p>
             </div>
 
-            <!-- Carga de Excel -->
-            <div class="admin-panel">
-                <h3>Cargar Participantes</h3>
-                <div class="file-upload" onclick="document.getElementById('excel-file').click()">
-                    <input type="file" id="excel-file" accept=".xlsx,.xls" onchange="uploadExcel()">
-                    <p>📄 Clic para cargar archivo Excel (.xlsx)</p>
-                    <small>El archivo debe contener las columnas: code, name, coefficient</small>
-                </div>
-                <div id="upload-status"></div>
+            <!-- Pestañas -->
+            <div class="tabs-container">
+                <button class="tab-button active" onclick="showTab('estado')">Estado</button>
+                <button class="tab-button" onclick="showTab('votaciones')">Votaciones</button>
+                <button class="tab-button" onclick="showTab('reportes')">Reportes</button>
             </div>
 
-            <!-- Verificación de Participantes -->
-            <div class="admin-panel">
-                <h3>Verificación de Participantes</h3>
-                <div style="display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
-                    <!-- Botón a la izquierda -->
-                    <div style="flex: 0 0 auto;">
-                        <button class="btn btn-success" onclick="checkParticipants()" style="background: #17a2b8; padding: 0.8rem 1.5rem;">
-                            📋 Verificar Participantes
-                        </button>
+            <!-- Contenido Pestaña Estado -->
+            <div id="tab-estado" class="tab-content active">
+                <!-- Carga de Excel -->
+                <div class="admin-panel">
+                    <h3>Cargar Participantes</h3>
+                    <div class="file-upload" onclick="document.getElementById('excel-file').click()">
+                        <input type="file" id="excel-file" accept=".xlsx,.xls" onchange="uploadExcel()">
+                        <p>📄 Clic para cargar archivo Excel (.xlsx)</p>
+                        <small>El archivo debe contener las columnas: code, name, coefficient</small>
                     </div>
-                    
-                    <!-- Estado a la derecha -->
-                    <div id="participants-indicator" style="flex: 1; display: flex; align-items: center; gap: 0.8rem; min-height: 45px; padding: 0.8rem; background: #f8f9fa; border-radius: 6px; border: 1px solid #dee2e6;">
-                        <div id="status-circle" style="width: 16px; height: 16px; border-radius: 50%; background: #6c757d; flex-shrink: 0;"></div>
-                        <span id="status-text" style="color: #6c757d; font-weight: 500; font-size: 0.9rem;">Estado: Sin verificar</span>
-                    </div>
+                    <div id="upload-status"></div>
                 </div>
-            </div>
 
-            <!-- Estado de la Asamblea -->
-            <div class="admin-panel">
-                <h3>Estado de la Asamblea</h3>
-                <div class="aforo-container" style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: center;">
-                    <!-- Porcentaje grande lado izquierdo -->
-                    <div style="text-align: center; padding: 2rem; background: linear-gradient(135deg, #27ae60, #2ecc71); border-radius: 12px; color: white; box-shadow: 0 8px 25px rgba(46, 204, 113, 0.3);">
-                        <div id="coefficient-percentage" style="font-size: 4rem; font-weight: 800; margin-bottom: 0.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">-%</div>
-                        <div style="font-size: 1.2rem; font-weight: 500; opacity: 0.9;">Aforo por Coeficiente</div>
-                    </div>
-                                    
-                    <!-- Panel de estado lado derecho -->
-                    <div class="status-container">
-                        <div class="stats-grid" style="grid-template-columns: 1fr 1fr;">
-                            <div class="stat-card">
-                                <div class="stat-number" id="total-participants">-</div>
-                                <div class="stat-label">Registrados</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-number" id="present-count">-</div>
-                                <div class="stat-label">Presentes</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-number" id="own-votes-count">-</div>
-                                <div class="stat-label">Aptos Propios</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-number" id="power-votes-count">-</div>
-                                <div class="stat-label">Con Poder</div>
-                            </div>
+                <!-- Verificación de Participantes -->
+                <div class="admin-panel">
+                    <h3>Verificación de Participantes</h3>
+                    <div style="display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
+                        <div style="flex: 0 0 auto;">
+                            <button class="btn btn-success" onclick="checkParticipants()" style="background: #17a2b8; padding: 0.8rem 1.5rem;">
+                                📋 Verificar Participantes
+                            </button>
                         </div>
                         
-                        <!-- Panel de Quórum -->
-                        <div class="quorum-panel" style="background: #f8f9fa; border: 2px solid #e9ecef; border-radius: 8px; padding: 1.5rem; margin-top: 1rem;">
-                            <h4 style="margin-bottom: 1rem; color: #2c3e50; text-align: center;">Estado del Quórum</h4>
+                        <div id="participants-indicator" style="flex: 1; display: flex; align-items: center; gap: 0.8rem; min-height: 45px; padding: 0.8rem; background: #f8f9fa; border-radius: 6px; border: 1px solid #dee2e6;">
+                            <div id="status-circle" style="width: 16px; height: 16px; border-radius: 50%; background: #6c757d; flex-shrink: 0;"></div>
+                            <span id="status-text" style="color: #6c757d; font-weight: 500; font-size: 0.9rem;">Estado: Sin verificar</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Estado de la Asamblea -->
+                <div class="admin-panel">
+                    <h3>Estado de la Asamblea</h3>
+                    <div class="aforo-container" style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: center;">
+                        <div style="text-align: center; padding: 2rem; background: linear-gradient(135deg, #27ae60, #2ecc71); border-radius: 12px; color: white; box-shadow: 0 8px 25px rgba(46, 204, 113, 0.3);">
+                            <div id="coefficient-percentage" style="font-size: 4rem; font-weight: 800; margin-bottom: 0.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">-%</div>
+                            <div style="font-size: 1.2rem; font-weight: 500; opacity: 0.9;">Aforo por Coeficiente</div>
+                        </div>
+                                        
+                        <div class="status-container">
+                            <div class="stats-grid" style="grid-template-columns: 1fr 1fr;">
+                                <div class="stat-card">
+                                    <div class="stat-number" id="total-participants">-</div>
+                                    <div class="stat-label">Registrados</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-number" id="present-count">-</div>
+                                    <div class="stat-label">Presentes</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-number" id="own-votes-count">-</div>
+                                    <div class="stat-label">Aptos Propios</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-number" id="power-votes-count">-</div>
+                                    <div class="stat-label">Con Poder</div>
+                                </div>
+                            </div>
                             
-                            <div class="quorum-status" style="text-align: center; margin-bottom: 1rem;">
-                                <span id="quorum-indicator" style="font-size: 2rem;">❓</span>
-                                <p id="quorum-text" style="margin: 0.8rem 0; font-weight: 700; font-size: 1.4rem;">Calculando...</p>
+                            <div class="quorum-panel" style="background: #f8f9fa; border: 2px solid #e9ecef; border-radius: 8px; padding: 1.5rem; margin-top: 1rem;">
+                                <h4 style="margin-bottom: 1rem; color: #2c3e50; text-align: center;">Estado del Quórum</h4>
+                                
+                                <div class="quorum-status" style="text-align: center; margin-bottom: 1rem;">
+                                    <span id="quorum-indicator" style="font-size: 2rem;">❓</span>
+                                    <p id="quorum-text" style="margin: 0.8rem 0; font-weight: 700; font-size: 1.4rem;">Calculando...</p>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Crear Nueva Votación -->
-            <div class="admin-panel">
-                <h3>Crear Nueva Votación</h3>
-                <div class="question-form">
-                    <select id="question-type">
-                        <option value="yesno">Pregunta Sí/No</option>
-                        <option value="multiple">Elección de Candidatos</option>
-                    </select>
-                    <input type="text" id="question-text" placeholder="Escriba la pregunta o cargo a elegir">
-                    <textarea id="candidates-list" class="candidates-input" placeholder="Para elecciones, escriba cada candidato en una línea nueva:&#10;Juan Pérez&#10;María García&#10;Carlos López" style="display:none;"></textarea>
-                    
-                    <!-- Opciones de selección múltiple -->
-                    <div id="multiple-options" style="display:none;" class="multiple-selection-panel">
-                        <label style="display: block; margin-bottom: 1rem; font-weight: 500; color: #2c3e50;">
-                            Máximo número de selecciones permitidas:
-                        </label>
-                        <input type="number" id="max-selections" min="1" value="1" style="width: 120px; padding: 0.8rem; text-align: center; font-weight: 600; margin-bottom: 1rem;">
-                        <p style="font-size: 0.9rem; color: #7f8c8d; margin: 0;">
-                            Si es mayor a 1, se permitirá selección múltiple automáticamente
-                        </p>
+            <!-- Contenido Pestaña Votaciones -->
+            <div id="tab-votaciones" class="tab-content">
+                <!-- Crear Nueva Votación -->
+                <div class="admin-panel">
+                    <h3>Crear Nueva Votación</h3>
+                    <div class="question-form">
+                        <select id="question-type">
+                            <option value="yesno">Pregunta Sí/No</option>
+                            <option value="multiple">Elección de Candidatos</option>
+                        </select>
+                        <input type="text" id="question-text" placeholder="Escriba la pregunta o cargo a elegir">
+                        <textarea id="candidates-list" class="candidates-input" placeholder="Para elecciones, escriba cada candidato en una línea nueva:&#10;Juan Pérez&#10;María García&#10;Carlos López" style="display:none;"></textarea>
+                        
+                        <div id="multiple-options" style="display:none;" class="multiple-selection-panel">
+                            <label style="display: block; margin-bottom: 1rem; font-weight: 500; color: #2c3e50;">
+                                Máximo número de selecciones permitidas:
+                            </label>
+                            <input type="number" id="max-selections" min="1" value="1" style="width: 120px; padding: 0.8rem; text-align: center; font-weight: 600; margin-bottom: 1rem;">
+                            <p style="font-size: 0.9rem; color: #7f8c8d; margin: 0;">
+                                Si es mayor a 1, se permitirá selección múltiple automáticamente
+                            </p>
+                        </div>
+                        <button class="btn" onclick="createQuestion()">Crear Votación</button>
                     </div>
-                    <button class="btn" onclick="createQuestion()">Crear Votación</button>
+                </div>
+
+                <!-- Votaciones Activas -->
+                <div class="admin-panel">
+                    <h3>Votaciones Activas</h3>
+                    <div id="active-questions">
+                        <div class="loading">Cargando preguntas...</div>
+                    </div>
                 </div>
             </div>
 
-            <!-- Votaciones Activas -->
-            <div class="admin-panel">
-                <h3>Votaciones Activas</h3>
-                <div id="active-questions">
-                    <div class="loading">Cargando preguntas...</div>
+            <!-- Contenido Pestaña Reportes -->
+            <div id="tab-reportes" class="tab-content">
+                <!-- Acciones Administrativas -->
+                <div class="admin-panel">
+                    <h3>Reportes y Acciones</h3>
+                    <button class="btn btn-success" onclick="downloadPDF()">📄 Descargar PDF Asistencia</button>
+                    <button class="btn btn-danger" onclick="resetDatabase()">🗑️ Limpiar Base de Datos</button>
                 </div>
-            </div>
-
-            <!-- Resultados en Tiempo Real -->
-            <div class="admin-panel">
-                <h3>Resultados en Tiempo Real</h3>
-                <div id="results-container">
-                    <div class="loading">Cargando resultados...</div>
-                </div>
-            </div>
-
-            <!-- Acciones Administrativas -->
-            <div class="admin-panel">
-                <h3>Acciones</h3>
-                <button class="btn btn-success" onclick="downloadPDF()">📄 Descargar PDF Asistencia</button>
-                <button class="btn btn-danger" onclick="resetDatabase()">🗑️ Limpiar Base de Datos</button>
             </div>
         </div>
 
@@ -631,10 +677,6 @@
                 <p>Código: <strong id="voter-code">-</strong></p>
                 <p>Estado: <span id="voter-status">Conectado</span></p>
                 <div class="attendance-info">✅ Asistencia registrada automáticamente</div>
-            </div>
-
-            <div style="text-align: center; margin: 1rem 0;">
-                <button class="btn" onclick="loadVotingQuestions()">🔄 Actualizar Votaciones</button>
             </div>
 
             <div id="voting-questions">
@@ -740,45 +782,22 @@
             document.getElementById('admin-login').classList.remove('hidden');
         }
 
-        async function validateAccess() {
+        async function accessVoting() {
             const code = document.getElementById('access-code').value.trim().toUpperCase();
             
-            if (!code) {
-                showStatus('Por favor ingrese su código', 'error');
-                return;
-            }
-            
-            // Validar formato Torre-Apto (ej: 1-201, 2-1503)
-            const codePattern = /^\d+-\d+$/;
-            if (!codePattern.test(code)) {
+            if (!code || !/^\d+-\d+$/.test(code)) {
                 showStatus('Formato de código inválido. Use formato Torre-Apto (ej: 1-201)', 'error');
                 return;
             }
 
             try {
-                showStatus('Verificando acceso...', 'info');
+                showStatus('Verificando acceso a votaciones...', 'info');
                 
-                // Siempre intentar login primero
-                let response = await apiCall('/auth/login/voter', {
+                // Intentar login directo (sin preguntar poder, ya debe estar registrado)
+                const response = await apiCall('/auth/login/voter', {
                     method: 'POST',
-                    body: JSON.stringify({ 
-                        code: code,
-                        is_power: false  // valor temporal que se ignora si ya existe
-                    })
+                    body: JSON.stringify({ code: code })
                 });
-                
-                // Si skip_power_question es false, significa que es primera vez
-                if (!response.skip_power_question) {
-                    const isPower = await showPowerQuestion();
-                    console.log("DEBUG: isPower recibido =", isPower);
-                    response = await apiCall('/auth/login/voter', {
-                        method: 'POST',
-                        body: JSON.stringify({ 
-                            code: code,
-                            is_power: isPower
-                        })
-                    });
-                }
 
                 voterToken = response.access_token;
                 saveToken('voter', voterToken);
@@ -790,10 +809,65 @@
                 isAdmin = false;
                 
                 showVoterScreen();
-                showStatus('Acceso autorizado - Asistencia registrada', 'success');
+                showStatus('Acceso a votaciones autorizado', 'success');
+            } catch (error) {
+                if (error.message.includes('no registrado') || error.message.includes('not found')) {
+                    showStatus('Debe registrar su asistencia primero usando "Solo Asistencia"', 'error');
+                } else {
+                    showStatus(`Error: ${error.message}`, 'error');
+                }
+            }
+        }
+
+        async function registerAttendance() {
+            const code = document.getElementById('access-code').value.trim().toUpperCase();
+            
+            if (!code || !/^\d+-\d+$/.test(code)) {
+                showStatus('Formato de código inválido. Use formato Torre-Apto (ej: 1-201)', 'error');
+                return;
+            }
+
+            try {
+                showStatus('Registrando asistencia...', 'info');
+                
+                const isPower = await showPowerQuestion();
+                
+                const response = await apiCall('/auth/register-attendance', {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        code: code,
+                        is_power: isPower
+                    })
+                });
+
+                showAttendanceModal(response);
+                showStatus('Asistencia registrada correctamente', 'success');
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
             }
+        }
+
+        function showAttendanceModal(userData) {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.7); display: flex; align-items: center; 
+                justify-content: center; z-index: 2000;
+            `;
+            
+            modal.innerHTML = `
+                <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 400px; text-align: center;">
+                    <h3 style="color: #27ae60; margin-bottom: 1.5rem;">✅ Asistencia Registrada</h3>
+                    <p><strong>Código:</strong> ${userData.code}</p>
+                    <p><strong>Nombre:</strong> ${userData.name}</p>
+                    <p><strong>Tipo:</strong> ${userData.is_power ? 'Con Poder' : 'Propietario'}</p>
+                    <button class="btn" onclick="document.body.removeChild(this.closest('div').parentNode)" style="margin-top: 1.5rem;">
+                        Cerrar
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
         }
 
         function showPowerQuestion() {
@@ -896,8 +970,7 @@
         async function loadAdminData() {
             await Promise.all([
                 loadAforoData(),
-                loadActiveQuestions(),
-                loadResultsConditionally()
+                loadActiveQuestions()
             ]);
         }
 
@@ -1145,7 +1218,6 @@
                 document.getElementById('max-selections').value = '1';
 
                 await loadActiveQuestions();
-                await loadResultsConditionally();
                 showStatus('Votación creada y activada', 'success');
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
@@ -1158,7 +1230,6 @@
             try {
                 await apiCall(`/voting/questions/${questionId}`, { method: 'DELETE' });
                 await loadActiveQuestions();
-                await loadResultsConditionally();
                 showStatus('Encuesta eliminada', 'success');
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
@@ -1211,7 +1282,6 @@
             try {
                 await apiCall(`/voting/questions/${questionId}/toggle`, { method: 'PUT' });
                 await loadActiveQuestions();
-                await loadResultsConditionally();
                 showStatus('Estado de votación actualizado', 'success');
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
@@ -1228,83 +1298,11 @@
                 return new Set();
             }
         }
-        
-        async function loadResultsConditionally() {
-            try {
-                const questions = await apiCall('/voting/questions/active');
-                const openQuestions = questions.filter(q => !q.closed);
-                
-                if (openQuestions.length === 0) {
-                    document.getElementById('results-container').innerHTML = 
-                        '<p style="color: #7f8c8d; font-style: italic; text-align: center; padding: 2rem;">📊 Los resultados se mostrarán solo para votaciones abiertas</p>';
-                    return;
-                }
-                
-                // Cargar resultados solo para votaciones abiertas
-                await loadResultsForOpenQuestions(openQuestions);
-            } catch (error) {
-                console.error('Error loading conditional results:', error);
-            }
-        }
-
-        async function loadResultsForOpenQuestions(openQuestions) {
-            try {
-                const resultsContainer = document.getElementById('results-container');
-                
-                const resultsHTML = await Promise.all(openQuestions.map(async (question) => {
-                    try {
-                        const results = await apiCall(`/voting/results/${question.id}`);
-                        return renderQuestionResults(question, results);
-                    } catch (error) {
-                        return `<div class="results-panel">
-                            <h4>${question.text}</h4>
-                            <p style="color: #e74c3c;">Error cargando resultados</p>
-                        </div>`;
-                    }
-                }));
-
-                resultsContainer.innerHTML = resultsHTML.join('');
-            } catch (error) {
-                console.error('Error loading results for open questions:', error);
-            }
-        }
-
-        function renderQuestionResults(question, results) {
-            const totalVotes = results.total_votes || 0;
-            const totalParticipants = results.total_participants || 0;
-            
-            return `
-                <div class="results-panel">
-                    <h4 style="margin-bottom: 1rem; color: #2c3e50;">${question.text}</h4>
-                    <div>
-                        ${results.results ? results.results.map(result => `
-                            <div class="result-item">
-                                <span><strong>${result.answer}:</strong></span>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: ${result.percentage}%; background: #3498db;"></div>
-                                </div>
-                                <span>${result.votes} votos (${result.percentage.toFixed(2)}%)</span>
-                            </div>
-                        `).join('') : '<p>Sin votos aún</p>'}
-                    </div>
-                    <p style="margin-top: 1rem; font-size: 0.9rem; color: #7f8c8d;">
-                        <strong>Participantes:</strong> ${totalParticipants} | 
-                        <strong>Total votos:</strong> ${totalVotes} |
-                        <strong>Participación:</strong> ${results.total_participant_coefficient.toFixed(2)}%
-                    </p>
-                </div>
-            `;
-        }
 
         async function viewResults(questionId) {
+            let updateInterval = null;
+            
             try {
-                const results = await apiCall(`/voting/results/${questionId}`);
-                const aforo = await apiCall('/voting/aforo');
-                
-                // Calcular participación en esta pregunta específica
-                const participationPercent = aforo.present_count > 0 ? 
-                    ((results.total_participants / aforo.present_count) * 100).toFixed(2) : '0.00';
-                
                 const modal = document.createElement('div');
                 modal.style.cssText = `
                     position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
@@ -1312,36 +1310,70 @@
                     justify-content: center; z-index: 2000;
                 `;
                 
+                const updateModalContent = async () => {
+                    try {
+                        const results = await apiCall(`/voting/results/${questionId}`);
+                        const aforo = await apiCall('/voting/aforo');
+                        
+                        const content = document.getElementById('modal-content');
+                        if (content) {
+                            content.innerHTML = `
+                                <div style="background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
+                                    <p><strong>Pregunta:</strong> ${results.question_text}</p>
+                                    <p><strong>Total presentes en asamblea:</strong> ${aforo.present_count}</p>
+                                    <p><strong>Participaron en esta votación:</strong> ${results.total_participants}</p>
+                                    <p><strong>Participación:</strong> ${results.total_participant_coefficient.toFixed(2)}%</p>
+                                </div>
+                                
+                                <div class="results-container">
+                                    ${results.results ? results.results.map(result => `
+                                        <div class="result-item">
+                                            <span><strong>${result.answer}:</strong></span>
+                                            <div class="progress-bar">
+                                                <div class="progress-fill" style="width: ${result.percentage}%; background: #3498db;"></div>
+                                            </div>
+                                            <span>${result.votes} votos (${result.percentage.toFixed(2)}%)</span>
+                                        </div>
+                                    `).join('') : '<p>Sin votos registrados</p>'}
+                                </div>
+                            `;
+                        }
+                    } catch (error) {
+                        console.error('Error updating modal:', error);
+                    }
+                };
+                
                 modal.innerHTML = `
                     <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto;">
-                        <h3 style="margin-bottom: 1.5rem; color: #2c3e50;">Resultados Detallados</h3>
+                        <h3 style="margin-bottom: 1.5rem; color: #2c3e50;">Resultados Detallados (Tiempo Real)</h3>
                         
-                        <div style="background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem;">
-                            <p><strong>Pregunta:</strong> ${results.question_text}</p>
-                            <p><strong>Total presentes en asamblea:</strong> ${aforo.present_count}</p>
-                            <p><strong>Participaron en esta votación:</strong> ${results.total_participants}</p>
-                            <p><strong>Participación:</strong> ${results.total_participant_coefficient.toFixed(2)}%</p>
+                        <div id="modal-content">
+                            <div class="loading">Cargando...</div>
                         </div>
                         
-                        <div class="results-container">
-                            ${results.results ? results.results.map(result => `
-                                <div class="result-item">
-                                    <span><strong>${result.answer}:</strong></span>
-                                    <div class="progress-bar">
-                                        <div class="progress-fill" style="width: ${result.percentage}%; background: #3498db;"></div>
-                                    </div>
-                                    <span>${result.votes} votos (${result.percentage.toFixed(2)}%)</span>
-                                </div>
-                            `).join('') : '<p>Sin votos registrados</p>'}
-                        </div>
-                        
-                        <button class="btn" onclick="document.body.removeChild(this.closest('div').parentNode)" style="margin-top: 1.5rem; width: 100%;">
+                        <button class="btn" onclick="closeResultsModal()" style="margin-top: 1.5rem; width: 100%;">
                             Cerrar
                         </button>
                     </div>
                 `;
                 
                 document.body.appendChild(modal);
+                
+                // Función global para cerrar modal
+                window.closeResultsModal = () => {
+                    if (updateInterval) {
+                        clearInterval(updateInterval);
+                        updateInterval = null;
+                    }
+                    document.body.removeChild(modal);
+                    delete window.closeResultsModal;
+                };
+                
+                // Primera carga
+                await updateModalContent();
+                
+                // Actualizar cada 3 segundos
+                updateInterval = setInterval(updateModalContent, 3000);
                 
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
@@ -1367,6 +1399,20 @@
                 console.error('Error obteniendo nombre conjunto:', error);
                 await showConjuntoModal();
             }
+        }
+
+        function showTab(tabName) {
+            // Ocultar todas las pestañas
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Mostrar pestaña seleccionada
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            document.querySelector(`[onclick="showTab('${tabName}')"]`).classList.add('active');
         }
 
         // Modal para pedir/cambiar nombre del conjunto
@@ -1432,13 +1478,11 @@
                 header.innerHTML = `Panel de Administrador`;
             }
             
-            // Buscar específicamente el panel de estado
-            const estadoPanels = document.querySelectorAll('.admin-panel h3');
-            estadoPanels.forEach(title => {
-                if (title.textContent.includes('Estado de la Asamblea')) {
-                    title.textContent = `Estado de la Asamblea - ${nombre}`;
-                }
-            });
+            // Buscar en la pestaña Estado específicamente
+            const estadoPanel = document.querySelector('#tab-estado .admin-panel h3');
+            if (estadoPanel && estadoPanel.textContent.includes('Estado de la Asamblea')) {
+                estadoPanel.textContent = `Estado de la Asamblea - ${nombre}`;
+            }
         }
 
         // Función downloadPDF simplificada
@@ -1587,7 +1631,13 @@
 
             const votedQuestions = await checkUserVotes();
 
-            container.innerHTML = questions.map(question => {
+            // Ordenar: primero abiertas (!closed), después cerradas (closed)
+            const sortedQuestions = questions.sort((a, b) => {
+                if (a.closed === b.closed) return 0;
+                return a.closed ? 1 : -1; // false (abierta) primero, true (cerrada) después
+            });
+
+            container.innerHTML = sortedQuestions.map(question => {
                 const options = question.options || [{text: 'Sí'}, {text: 'No'}];
                 const hasVoted = votedQuestions.has(question.id);
                 const isClosed = question.closed;
@@ -1669,14 +1719,15 @@
                 clearInterval(updateInterval);
             }
 
-            // Solo auto-refresh para admins
-            if (isAdmin) {
-                updateInterval = setInterval(async () => {
+            updateInterval = setInterval(async () => {
+                if (isAdmin) {
                     await loadAforoData();
                     await loadActiveQuestions();
-                    await loadResultsConditionally();
-                }, 4000);
-            }
+                } else {
+                    // Para votantes: actualizar sus votaciones
+                    await loadVotingQuestions();
+                }
+            }, 4000);
         }
 
         function checkMaxSelections(questionId, maxSelections) {
@@ -1754,7 +1805,7 @@
         // Event listeners
         document.getElementById('access-code').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
-                validateAccess();
+                accessVoting();
             }
         });
 
