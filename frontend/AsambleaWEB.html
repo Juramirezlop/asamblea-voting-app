@@ -727,11 +727,6 @@
             lastUpdateTimestamp = timestamp;
             
             switch (type) {
-                case 'force-refresh-voters':
-                    if (!isAdmin) {
-                        loadVotingQuestions();
-                    }
-                    break;
                 case 'aforo-update':
                     updateAforoDisplay(data);
                     break;
@@ -740,6 +735,11 @@
                     break;
                 case 'force-refresh':
                     loadAdminData();
+                    break;
+                case 'force-refresh-voters':
+                    if (!isAdmin) {
+                        loadVotingQuestions();
+                    }
                     break;
             }
         }
@@ -1288,7 +1288,7 @@
             }
             
             modal.innerHTML = `
-                <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 700px; width: 90%; max-height: 80vh; overflow: hidden;">
+                <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 700px; width: 90%; max-height: 80vh; overflow: hidden; position: relative;">
                     <h3 style="margin-bottom: 1.5rem; color: #2c3e50; text-align: center;">${title}</h3>
                     
                     <!-- Buscador -->
@@ -1304,6 +1304,13 @@
                     <!-- Contenido de participantes -->
                     <div id="participants-content"></div>
                     
+                    <!-- Botón X en esquina superior derecha -->
+                    <button onclick="document.body.removeChild(this.closest('div').parentNode)" 
+                            style="position: absolute; top: 15px; right: 15px; background: #e74c3c; color: white; border: none; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2);"
+                            title="Cerrar">
+                        ×
+                    </button>
+
                     <button class="btn" onclick="document.body.removeChild(this.closest('div').parentNode)" 
                             style="margin-top: 1.5rem; width: 100%;">
                         Cerrar
@@ -1578,7 +1585,6 @@
                     return;
                 }
                 showEditModal(question);
-                broadcastSync('force-refresh-voters', {});
 
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
@@ -1674,6 +1680,7 @@
                     closeEditModal();
                     await loadActiveQuestions();
                     showStatus('Votación actualizada correctamente', 'success');
+                    broadcastSync('force-refresh-voters', {});
                 } catch (error) {
                     showStatus(`Error: ${error.message}`, 'error');
                 }
@@ -2080,6 +2087,7 @@
         // Funciones del votante
         async function showVoterScreen() {
             showScreen('voter-screen');
+            initTabSync();
             
             document.getElementById('voter-code').textContent = currentUser.code;
             document.getElementById('voter-name').textContent = `Bienvenido/a, ${currentUser.name}`;
