@@ -1524,10 +1524,11 @@
 
                 showStatus('Votación creada y activada', 'success');
 
-                await loadActiveQuestions();
+                const questions = await apiCall('/voting/questions/active');
+                renderActiveQuestions(questions);
                 showStatus('Votación creada y activada', 'success');
                 broadcastSync('force-refresh-voters', {});
-                broadcastSync('questions-update', questions); // Enviar las preguntas actualizadas
+                broadcastSync('questions-update', questions);
                 broadcastSync('force-refresh', {});
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
@@ -1813,7 +1814,7 @@
                 // Primera carga
                 await updateModalContent();
                 
-                // Actualizar cada 3 segundos
+                // Actualizar cada segundo
                 updateInterval = setInterval(updateModalContent, 3000);
                 
             } catch (error) {
@@ -2121,21 +2122,24 @@
         }
 
         function startVotingPolling() {
-            if (isAdmin) return; // Solo para votantes
+            if (isAdmin) return;
             
             let votingPollInterval = setInterval(async () => {
                 if (!document.getElementById('voter-screen').classList.contains('hidden')) {
-                    try {
-                        await loadVotingQuestions();
-                    } catch (error) {
-                        // Silencioso para evitar spam de errores
-                        console.log('Polling error:', error);
+                    const hasSelectedCheckboxes = document.querySelectorAll('input[type="checkbox"]:checked').length > 0;
+                    
+                    if (!hasSelectedCheckboxes) {
+                        try {
+                            await loadVotingQuestions();
+                        } catch (error) {
+                            console.log('Polling error:', error);
+                        }
                     }
+                    // Si hay checkboxes seleccionados, saltamos esta actualización
                 } else {
-                    // Si ya no está en pantalla de votante, limpiar
                     clearInterval(votingPollInterval);
                 }
-            }, 3000); // Cada 3 segundos
+            }, 3000); // Mantener 3 segundos
         }
 
         async function loadVotingQuestions() {
@@ -2267,14 +2271,16 @@
             }
 
             if (isAdmin) {
-                // Para admin: actualizar cada 5 segundos solo el aforo
                 updateInterval = setInterval(async () => {
                     await loadAforoData();
                 }, 5000);
             } else {
-                // Para votantes: actualizar cada 3 segundos las votaciones
+                // Para votantes: solo actualizar si no están seleccionando
                 updateInterval = setInterval(async () => {
-                    await loadVotingQuestions();
+                    const hasSelectedCheckboxes = document.querySelectorAll('input[type="checkbox"]:checked').length > 0;
+                    if (!hasSelectedCheckboxes) {
+                        await loadVotingQuestions();
+                    }
                 }, 3000);
             }
         }
