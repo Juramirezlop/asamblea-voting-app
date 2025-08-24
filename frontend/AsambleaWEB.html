@@ -728,16 +728,22 @@
             
             switch (type) {
                 case 'aforo-update':
-                    updateAforoDisplay(data);
+                    if (isAdmin) {
+                        updateAforoDisplay(data);
+                    }
                     break;
                 case 'questions-update':
-                    renderActiveQuestions(data);
+                    if (isAdmin) {
+                        renderActiveQuestions(data);
+                    }
                     break;
                 case 'force-refresh':
-                    loadAdminData();
+                    if (isAdmin) {
+                        loadAdminData();
+                    }
                     break;
                 case 'force-refresh-voters':
-                    if (!isAdmin) {
+                    if (!isAdmin && voterToken) {
                         loadVotingQuestions();
                     }
                     break;
@@ -1509,9 +1515,12 @@
                 document.getElementById('candidates-list').value = '';
                 document.getElementById('max-selections').value = '1';
 
+                showStatus('Votación creada y activada', 'success');
+
                 await loadActiveQuestions();
                 showStatus('Votación creada y activada', 'success');
                 broadcastSync('force-refresh-voters', {});
+                broadcastSync('questions-update', questions); // Enviar las preguntas actualizadas
                 broadcastSync('force-refresh', {});
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
@@ -1523,9 +1532,12 @@
             
             try {
                 await apiCall(`/voting/questions/${questionId}`, { method: 'DELETE' });
-                await loadActiveQuestions();
+                const questions = await apiCall('/voting/questions/active');
+                renderActiveQuestions(questions);
                 showStatus('Encuesta eliminada', 'success');
+                broadcastSync('force-refresh-voters', {});
                 broadcastSync('force-refresh', {});
+                broadcastSync('questions-update', questions);
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
             }
@@ -1678,9 +1690,11 @@
                     });
                     
                     closeEditModal();
-                    await loadActiveQuestions();
+                    const questions = await apiCall('/voting/questions/active');
+                    renderActiveQuestions(questions);
                     showStatus('Votación actualizada correctamente', 'success');
                     broadcastSync('force-refresh-voters', {});
+                    broadcastSync('questions-update', questions);
                 } catch (error) {
                     showStatus(`Error: ${error.message}`, 'error');
                 }
@@ -1697,10 +1711,12 @@
         async function toggleQuestion(questionId) {
             try {
                 await apiCall(`/voting/questions/${questionId}/toggle`, { method: 'PUT' });
-                await loadActiveQuestions();
+                const questions = await apiCall('/voting/questions/active');
+                renderActiveQuestions(questions);
                 showStatus('Estado de votación actualizado', 'success');
                 broadcastSync('force-refresh-voters', {});
                 broadcastSync('force-refresh', {});
+                broadcastSync('questions-update', questions);
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
             }
