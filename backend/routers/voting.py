@@ -250,6 +250,64 @@ def delete_question(question_id: int):
     finally:
         close_db(conn)
 
+# --- Editar pregunta cerrada (admin) ---
+@router.put("/questions/{question_id}", dependencies=[Depends(admin_required)])
+def editar_pregunta(question_id: int, payload: dict):
+    conn = get_db()
+    try:
+        # Verificar que la pregunta existe y está cerrada
+        question = execute_query(
+            conn,
+            "SELECT id, type, closed FROM questions WHERE id = ?",
+            (question_id,),
+            fetchone=True
+        )
+        if not question:
+            raise HTTPException(status_code=404, detail="Pregunta no encontrada")
+        
+        if not question["closed"]:
+            raise HTTPException(status_code=400, detail="Solo se pueden editar preguntas cerradas")
+        
+        # Actualizar texto de la pregunta
+        if "text" in payload:
+            execute_query(
+                conn,
+                "UPDATE questions SET text = ? WHERE id = ?",
+                (payload["text"], question_id),
+                commit=True
+            )
+        
+        # Si es pregunta múltiple y se actualizan opciones
+        if question["type"] == "multiple" and "options" in payload:
+            if len(payload["options"]) < 2:
+                raise HTTPException(status_code=400, detail="Debe tener al menos 2 opciones")
+            
+            # Eliminar opciones existentes
+            execute_query(conn, "DELETE FROM options WHERE question_id = ?", (question_id,), commit=True)
+            
+            # Insertar nuevas opciones
+            for option in payload["options"]:
+                execute_query(
+                    conn,
+                    "INSERT INTO options (question_id, option_text) VALUES (?, ?)",
+                    (question_id, option),
+                    commit=True
+                )
+        
+        # Actualizar max_selections si se proporciona
+        if "max_selections" in payload:
+            execute_query(
+                conn,
+                "UPDATE questions SET max_selections = ? WHERE id = ?",
+                (payload["max_selections"], question_id),
+                commit=True
+            )
+        
+        return {"status": "pregunta actualizada"}
+    
+    finally:
+        close_db(conn)
+
 # --- Resultados (admin) ---
 @router.get("/results/{question_id}", dependencies=[Depends(admin_required)])
 def resultados(question_id: int):

@@ -544,7 +544,7 @@
             <div class="tabs-container">
                 <button class="tab-button active" onclick="showTab('estado')">Estado</button>
                 <button class="tab-button" onclick="showTab('votaciones')">Votaciones</button>
-                <button class="tab-button" onclick="showTab('reportes')">Reportes</button>
+                <button class="tab-button" onclick="showTab('reportes')">Estadísticas</button>
             </div>
 
             <!-- Contenido Pestaña Estado -->
@@ -581,7 +581,9 @@
                 <div class="admin-panel">
                     <h3>Estado de la Asamblea</h3>
                     <div class="aforo-container" style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem; align-items: center;">
+                        <!-- REEMPLAZAR todo el div del coeficiente -->
                         <div style="text-align: center; padding: 2rem; background: linear-gradient(135deg, #27ae60, #2ecc71); border-radius: 12px; color: white; box-shadow: 0 8px 25px rgba(46, 204, 113, 0.3);">
+                            <div id="conjunto-name-display" style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; opacity: 0.95;"></div>
                             <div id="coefficient-percentage" style="font-size: 4rem; font-weight: 800; margin-bottom: 0.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">-%</div>
                             <div style="font-size: 1.2rem; font-weight: 500; opacity: 0.9;">Aforo por Coeficiente</div>
                         </div>
@@ -661,6 +663,7 @@
                     <h3>Reportes y Acciones</h3>
                     <button class="btn btn-success" onclick="downloadPDF()">📄 Descargar PDF Asistencia</button>
                     <button class="btn btn-danger" onclick="resetDatabase()">🗑️ Limpiar Base de Datos</button>
+                    <button class="btn" onclick="showDeleteCodeModal()" style="background: #e67e22;">🚫 Eliminar Código APTO</button>
                 </div>
             </div>
         </div>
@@ -699,6 +702,50 @@
         let currentUser = null;
         let isAdmin = false;
         let updateInterval = null;
+
+        // Apto prueba
+        const CODIGO_PRUEBA = 'TEST-999';
+
+        // Sistema de sincronización entre pestañas
+        let lastUpdateTimestamp = 0;
+        let syncChannel = null;
+
+        // Inicializar comunicación entre pestañas
+        function initTabSync() {
+            if ('BroadcastChannel' in window) {
+                syncChannel = new BroadcastChannel('admin-sync');
+                syncChannel.onmessage = handleSyncMessage;
+            }
+        }
+
+        function handleSyncMessage(event) {
+            const { type, data, timestamp } = event.data;
+            
+            // Solo procesar si es más reciente que nuestra última actualización
+            if (timestamp <= lastUpdateTimestamp) return;
+            
+            lastUpdateTimestamp = timestamp;
+            
+            switch (type) {
+                case 'aforo-update':
+                    updateAforoDisplay(data);
+                    break;
+                case 'questions-update':
+                    renderActiveQuestions(data);
+                    break;
+                case 'force-refresh':
+                    loadAdminData();
+                    break;
+            }
+        }
+
+        function broadcastSync(type, data) {
+            if (syncChannel) {
+                const timestamp = Date.now();
+                lastUpdateTimestamp = timestamp;
+                syncChannel.postMessage({ type, data, timestamp });
+            }
+        }
 
         // Utilidades de localStorage (para tokens)
         function saveToken(type, token) {
@@ -790,6 +837,18 @@
                 return;
             }
 
+            if (code === CODIGO_PRUEBA) {
+                // Simular login para usuario de prueba
+                currentUser = {
+                    code: CODIGO_PRUEBA,
+                    name: 'Usuario de Prueba',
+                    id: 'test'
+                };
+                isAdmin = false;
+                showTestVoterScreen();
+                return;
+            }
+
             try {
                 showStatus('Verificando acceso a votaciones...', 'info');
                 
@@ -819,11 +878,70 @@
             }
         }
 
+        // Nueva función que simula preguntas sin base de datos
+        function getSimulatedTestQuestions() {
+            return [
+                {
+                    id: 9991,
+                    text: "[PRUEBA] ¿Aprueba la propuesta de mejoras?",
+                    type: "yesno",
+                    closed: false,
+                    options: [{text: 'Sí'}, {text: 'No'}]
+                },
+                {
+                    id: 9992, 
+                    text: "[PRUEBA] Elija el representante de la junta",
+                    type: "multiple",
+                    closed: false,
+                    allow_multiple: false,
+                    max_selections: 1,
+                    options: [
+                        {text: "Juan Pérez"}, 
+                        {text: "María García"}, 
+                        {text: "Carlos López"}
+                    ]
+                },
+                {
+                    id: 9993,
+                    text: "[PRUEBA] Seleccione mejoras prioritarias (máximo 2)",
+                    type: "multiple", 
+                    closed: false,
+                    allow_multiple: true,
+                    max_selections: 2,
+                    options: [
+                        {text: "Piscina"}, 
+                        {text: "Gimnasio"}, 
+                        {text: "Jardines"}, 
+                        {text: "Parqueaderos"}
+                    ]
+                }
+            ];
+        }
+
+        // Reemplazar loadTestVotingQuestions()
+        async function loadTestVotingQuestions() {
+            const testQuestions = getSimulatedTestQuestions();
+            renderVotingQuestions(testQuestions);
+            showStatus('Votaciones de prueba cargadas (solo demostración)', 'info');
+        }
+
+        // Simplificar initTestUser()
+        function initTestUser() {
+            document.body.removeChild(document.querySelector('[style*="position: fixed"]'));
+            accessTestVoting();
+        }
+
         async function registerAttendance() {
             const code = document.getElementById('access-code').value.trim().toUpperCase();
             
             if (!code || !/^\d+-\d+$/.test(code)) {
                 showStatus('Formato de código inválido. Use formato Torre-Apto (ej: 1-201)', 'error');
+                return;
+            }
+
+            if (code === CODIGO_PRUEBA) {
+                // Usuario de prueba - registrar sin afectar stats reales
+                showTestUserModal();
                 return;
             }
 
@@ -845,6 +963,23 @@
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
             }
+        }
+
+        function showTestUserModal() {
+            const modal = document.createElement('div');
+            modal.style.cssText = `/* mismo estilo del modal de asistencia */`;
+            modal.innerHTML = `
+                <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 400px; text-align: center;">
+                    <h3 style="color: #f39c12; margin-bottom: 1.5rem;">🧪 Usuario de Prueba</h3>
+                    <p><strong>Código:</strong> ${CODIGO_PRUEBA}</p>
+                    <p><strong>Tipo:</strong> Demostración</p>
+                    <p style="color: #7f8c8d; font-size: 0.9rem;">Este usuario no afecta estadísticas reales</p>
+                    <button class="btn" onclick="document.body.removeChild(this.closest('div').parentNode); accessTestVoting()">
+                        Ir a Votaciones de Prueba
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(modal);
         }
 
         function showAttendanceModal(userData) {
@@ -965,6 +1100,7 @@
                     multipleOptions.style.display = 'none';
                 }
             });
+            initTabSync();
         }
 
         async function loadAdminData() {
@@ -1153,6 +1289,14 @@
                     text.style.color = '#e74c3c';
                 }
 
+                broadcastSync('aforo-update', {
+                    total_participants: data.total_participants || 0,
+                    present_count: data.present_count || 0,
+                    own_votes: data.own_votes || 0,
+                    power_votes: data.power_votes || 0,
+                    coefficient_rate_percent: data.coefficient_rate_percent || 0
+                });
+
             } catch (error) {
                 console.error('Error loading aforo:', error);
                 // Mostrar valores de error
@@ -1162,6 +1306,42 @@
                 document.getElementById('power-votes-count').textContent = 'Error';
                 document.getElementById('volumetric-percentage').textContent = 'Error';
                 document.getElementById('coefficient-percentage').textContent = 'Error';
+            }
+        }
+
+        function updateAforoDisplay(data) {
+            document.getElementById('total-participants').textContent = data.total_participants;
+            document.getElementById('present-count').textContent = data.present_count;
+            document.getElementById('own-votes-count').textContent = data.own_votes;
+            document.getElementById('power-votes-count').textContent = data.power_votes;
+            
+            const coefficientPercentage = data.coefficient_rate_percent;
+            document.getElementById('coefficient-percentage').textContent = `${coefficientPercentage.toFixed(2)}%`;
+            
+            // Actualizar color del panel
+            const quorumRequired = 51;
+            const quorumMet = coefficientPercentage >= quorumRequired;
+            const panel = document.querySelector('.aforo-container > div:first-child');
+            
+            if (quorumMet) {
+                panel.style.background = 'linear-gradient(135deg, #27ae60, #2ecc71)';
+            } else {
+                panel.style.background = 'linear-gradient(135deg, #e74c3c, #c0392b)';
+            }
+            
+            const indicator = document.getElementById('quorum-indicator');
+            const text = document.getElementById('quorum-text');
+            
+            if (quorumMet) {
+                indicator.textContent = '✅';
+                indicator.style.color = '#27ae60';
+                text.textContent = 'QUÓRUM ALCANZADO';
+                text.style.color = '#27ae60';
+            } else {
+                indicator.textContent = '❌';
+                indicator.style.color = '#e74c3c';
+                text.textContent = 'SIN QUÓRUM';
+                text.style.color = '#e74c3c';
             }
         }
 
@@ -1240,6 +1420,7 @@
             try {
                 const questions = await apiCall('/voting/questions/active');
                 renderActiveQuestions(questions);
+                broadcastSync('questions-update', questions);
             } catch (error) {
                 console.error('Error loading questions:', error);
                 document.getElementById('active-questions').innerHTML = 
@@ -1274,8 +1455,128 @@
                         ${q.closed ? 'Abrir' : 'Cerrar'}
                     </button>
                     <button class="btn btn-success" onclick="viewResults(${q.id})">Ver Resultados Detallados</button>
+                    ${q.closed ? `<button class="btn" onclick="editQuestion(${q.id})" style="background: #f39c12; font-size: 0.85rem; padding: 0.6rem 1rem;">✏️ Editar</button>` : ''}
                 </div>
             `).join('');
+        }
+
+        async function editQuestion(questionId) {
+            try {
+                // Obtener datos actuales de la pregunta
+                const questions = await apiCall('/voting/questions/active');
+                const question = questions.find(q => q.id === questionId);
+                
+                if (!question) {
+                    showStatus('Votación no encontrada', 'error');
+                    return;
+                }
+
+                showEditModal(question);
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        function showEditModal(question) {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.7); display: flex; align-items: center; 
+                justify-content: center; z-index: 2000;
+            `;
+            
+            const isMultiple = question.type === 'multiple';
+            const options = question.options || [];
+            
+            modal.innerHTML = `
+                <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                    <h3 style="margin-bottom: 1.5rem; color: #2c3e50;">✏️ Editar Votación</h3>
+                    
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Pregunta:</label>
+                    <input type="text" id="edit-question-text" value="${question.text}" 
+                        style="width: 100%; padding: 0.8rem; border: 2px solid #dee2e6; border-radius: 6px; margin-bottom: 1rem;">
+                    
+                    ${isMultiple ? `
+                        <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Opciones (una por línea):</label>
+                        <textarea id="edit-candidates-list" style="width: 100%; min-height: 150px; padding: 0.8rem; border: 2px solid #dee2e6; border-radius: 6px; margin-bottom: 1rem; resize: vertical;">${options.map(opt => opt.text).join('\n')}</textarea>
+                        
+                        ${question.allow_multiple ? `
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Máximo selecciones:</label>
+                            <input type="number" id="edit-max-selections" value="${question.max_selections}" min="1" 
+                                style="width: 120px; padding: 0.8rem; border: 2px solid #dee2e6; border-radius: 6px; margin-bottom: 1rem;">
+                        ` : ''}
+                    ` : ''}
+                    
+                    <div style="text-align: center; margin-top: 1.5rem;">
+                        <button class="btn" onclick="saveEditedQuestion(${question.id})" style="margin-right: 1rem;">Guardar Cambios</button>
+                        <button class="btn" onclick="closeEditModal()" style="background: #6c757d;">Cancelar</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Focus en el campo de texto
+            setTimeout(() => document.getElementById('edit-question-text').focus(), 100);
+            
+            window.saveEditedQuestion = async (questionId) => {
+                const newText = document.getElementById('edit-question-text').value.trim();
+                
+                if (!newText) {
+                    showStatus('La pregunta no puede estar vacía', 'error');
+                    return;
+                }
+                
+                const updateData = { text: newText };
+                
+                // Si es pregunta múltiple, actualizar opciones
+                const candidatesList = document.getElementById('edit-candidates-list');
+                if (candidatesList) {
+                    const newOptions = candidatesList.value.split('\n')
+                        .map(c => c.trim())
+                        .filter(c => c.length > 0);
+                        
+                    if (newOptions.length < 2) {
+                        showStatus('Debe tener al menos 2 opciones', 'error');
+                        return;
+                    }
+                    
+                    updateData.options = newOptions;
+                    
+                    // Si permite múltiples selecciones
+                    const maxSelectionsInput = document.getElementById('edit-max-selections');
+                    if (maxSelectionsInput) {
+                        const maxSelections = parseInt(maxSelectionsInput.value);
+                        if (maxSelections > newOptions.length) {
+                            showStatus('El máximo de selecciones no puede ser mayor al número de opciones', 'error');
+                            return;
+                        }
+                        updateData.max_selections = maxSelections;
+                    }
+                }
+                
+                try {
+                    showStatus('Guardando cambios...', 'info');
+                    
+                    await apiCall(`/voting/questions/${questionId}`, {
+                        method: 'PUT',
+                        body: JSON.stringify(updateData)
+                    });
+                    
+                    closeEditModal();
+                    await loadActiveQuestions();
+                    showStatus('Votación actualizada correctamente', 'success');
+                } catch (error) {
+                    showStatus(`Error: ${error.message}`, 'error');
+                }
+            };
+
+            // Función global para cerrar
+            window.closeEditModal = () => {
+                document.body.removeChild(modal);
+                delete window.closeEditModal;
+                delete window.saveEditedQuestion;
+            };
         }
 
         async function toggleQuestion(questionId) {
@@ -1478,10 +1779,9 @@
                 header.innerHTML = `Panel de Administrador`;
             }
             
-            // Buscar en la pestaña Estado específicamente
-            const estadoPanel = document.querySelector('#tab-estado .admin-panel h3');
-            if (estadoPanel && estadoPanel.textContent.includes('Estado de la Asamblea')) {
-                estadoPanel.textContent = `Estado de la Asamblea - ${nombre}`;
+            const conjuntoDisplay = document.getElementById('conjunto-name-display');
+            if (conjuntoDisplay) {
+                conjuntoDisplay.textContent = nombre;
             }
         }
 
@@ -1596,6 +1896,77 @@
             }
         }
 
+        // Mostrar modal para eliminar código específico
+        function showDeleteCodeModal() {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.7); display: flex; align-items: center; 
+                justify-content: center; z-index: 2000;
+            `;
+            
+            modal.innerHTML = `
+                <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 400px; width: 90%;">
+                    <h3 style="margin-bottom: 1.5rem; color: #e67e22; text-align: center;">🚫 Eliminar Código</h3>
+                    
+                    <p style="color: #7f8c8d; margin-bottom: 1rem; text-align: center;">
+                        Esta acción eliminará el registro de asistencia del código especificado.
+                    </p>
+                    
+                    <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Código a eliminar:</label>
+                    <input type="text" id="delete-code-input" placeholder="1-201" 
+                        style="width: 100%; padding: 0.8rem; border: 2px solid #dee2e6; border-radius: 6px; margin-bottom: 1rem; text-transform: uppercase;">
+                    
+                    <div style="text-align: center;">
+                        <button class="btn btn-danger" onclick="confirmDeleteCode()" style="margin-right: 1rem;">
+                            Eliminar
+                        </button>
+                        <button class="btn" onclick="closeDeleteModal()" style="background: #6c757d;">
+                            Cancelar
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            setTimeout(() => document.getElementById('delete-code-input').focus(), 100);
+            
+            // Funciones globales para el modal
+            window.closeDeleteModal = () => {
+                document.body.removeChild(modal);
+                delete window.closeDeleteModal;
+                delete window.confirmDeleteCode;
+            };
+            
+            window.confirmDeleteCode = async () => {
+                const code = document.getElementById('delete-code-input').value.trim().toUpperCase();
+                
+                if (!code || !/^\d+-\d+$/.test(code)) {
+                    showStatus('Formato de código inválido. Use formato Torre-Apto (ej: 1-201)', 'error');
+                    return;
+                }
+                
+                if (!confirm(`¿Eliminar registro del código ${code}?\n\nEsta acción no se puede deshacer.`)) {
+                    return;
+                }
+                
+                try {
+                    showStatus('Eliminando registro...', 'info');
+                    
+                    await apiCall(`/admin/delete-code/${code}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    closeDeleteModal();
+                    await loadAforoData(); // Actualizar estadísticas
+                    showStatus(`Código ${code} eliminado correctamente`, 'success');
+                    
+                } catch (error) {
+                    showStatus(`Error: ${error.message}`, 'error');
+                }
+            };
+        }
+
         // Funciones del votante
         async function showVoterScreen() {
             showScreen('voter-screen');
@@ -1691,6 +2062,16 @@
         }
 
         async function submitDirectVote(questionId, answer) {
+            if (currentUser && currentUser.code === CODIGO_PRUEBA) {
+                // Simular voto exitoso para usuario de prueba
+                showStatus(`Voto de prueba registrado: ${answer}`, 'success');
+                // Marcar como votado visualmente
+                document.getElementById(`question-${questionId}-status`).innerHTML = 
+                    '<p style="color: #27ae60; font-weight: 500;">✅ Ya votaste en esta pregunta (simulación)</p>';
+                document.getElementById(`voting-options-${questionId}`).style.display = 'none';
+                return;
+            }
+
             try {
                 showStatus('Registrando voto...', 'info');
                 
@@ -1750,6 +2131,16 @@
         }
 
         async function submitMultipleVote(questionId) {
+            if (currentUser && currentUser.code === CODIGO_PRUEBA) {
+                const checkboxes = document.querySelectorAll(`input[name="question-${questionId}"]:checked`);
+                const answers = Array.from(checkboxes).map(cb => cb.value);
+                showStatus(`Votos de prueba registrados: ${answers.join(', ')}`, 'success');
+                document.getElementById(`question-${questionId}-status`).innerHTML = 
+                    '<p style="color: #27ae60; font-weight: 500;">✅ Ya votaste en esta pregunta (simulación)</p>';
+                document.getElementById(`voting-options-${questionId}`).style.display = 'none';
+                return;
+            }
+
             const checkboxes = document.querySelectorAll(`input[name="question-${questionId}"]:checked`);
             const answers = Array.from(checkboxes).map(cb => cb.value);
             

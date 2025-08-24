@@ -400,7 +400,7 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
         stats_data = [
             f"Total participantes registrados: {stats['total_participants']}",
             f"Participantes presentes: {stats['present_count']}",
-            f"Votos por cuenta propia: {stats['own_votes']}",
+            f"Votos por apto propio: {stats['own_votes']}",
             f"Votos por poder: {stats['power_votes']}",
             f"Participación por coeficiente: {coefficient_percentage:.2f}%"
         ]

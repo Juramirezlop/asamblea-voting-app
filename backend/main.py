@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
 from .database import init_db
-from .routers import participants, voting, auth_routes
+from .routers import participants, voting, auth_routes, admin
 from .auth.auth import create_default_admin_from_env
 import os
 import logging
@@ -43,6 +43,7 @@ create_default_admin_from_env()
 app.include_router(auth_routes.router, prefix="/api")
 app.include_router(participants.router, prefix="/api")
 app.include_router(voting.router, prefix="/api")
+app.include_router(admin.router, prefix='/api')
 
 @app.get("/api")
 def api_status():
