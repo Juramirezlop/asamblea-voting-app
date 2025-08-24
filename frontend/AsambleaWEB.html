@@ -832,6 +832,12 @@
                 updateInterval = null;
             }
 
+            const highestId = setTimeout(() => {}, 0);
+            for (let i = 0; i < highestId; i++) {
+                clearInterval(i);
+                clearTimeout(i);
+            }
+
             document.getElementById('access-code').value = '';
             document.getElementById('admin-username').value = '';
             document.getElementById('admin-password').value = '';
@@ -904,6 +910,7 @@
             isAdmin = false;
             showVoterScreen();
             loadTestVotingQuestions();
+            startVotingPolling();
         }
 
         // Nueva función que simula preguntas sin base de datos
@@ -2110,13 +2117,38 @@
             
             await loadVotingQuestions();
             startAutoRefresh();
+            startVotingPolling();
+        }
+
+        function startVotingPolling() {
+            if (isAdmin) return; // Solo para votantes
+            
+            let votingPollInterval = setInterval(async () => {
+                if (!document.getElementById('voter-screen').classList.contains('hidden')) {
+                    try {
+                        await loadVotingQuestions();
+                    } catch (error) {
+                        // Silencioso para evitar spam de errores
+                        console.log('Polling error:', error);
+                    }
+                } else {
+                    // Si ya no está en pantalla de votante, limpiar
+                    clearInterval(votingPollInterval);
+                }
+            }, 3000); // Cada 3 segundos
         }
 
         async function loadVotingQuestions() {
             try {
-                showStatus('Cargando votaciones...', 'info');
                 const questions = await apiCall('/voting/questions/active');
                 renderVotingQuestions(questions);
+                
+                // Indicador sutil de actualización
+                const voterStatus = document.getElementById('voter-status');
+                if (voterStatus) {
+                    voterStatus.textContent = 'Conectado - Actualizado ' + new Date().toLocaleTimeString();
+                }
+                
                 hideStatus();
             } catch (error) {
                 console.error('Error loading voting questions:', error);
@@ -2234,11 +2266,17 @@
                 clearInterval(updateInterval);
             }
 
-            updateInterval = setInterval(async () => {
-                if (isAdmin) {
+            if (isAdmin) {
+                // Para admin: actualizar cada 5 segundos solo el aforo
+                updateInterval = setInterval(async () => {
                     await loadAforoData();
-                }
-            }, 5000);
+                }, 5000);
+            } else {
+                // Para votantes: actualizar cada 3 segundos las votaciones
+                updateInterval = setInterval(async () => {
+                    await loadVotingQuestions();
+                }, 3000);
+            }
         }
 
         function checkMaxSelections(questionId, maxSelections) {
