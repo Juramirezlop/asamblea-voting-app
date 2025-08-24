@@ -1815,7 +1815,7 @@
                 await updateModalContent();
                 
                 // Actualizar cada segundo
-                updateInterval = setInterval(updateModalContent, 3000);
+                updateInterval = setInterval(updateModalContent, 2000);
                 
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
@@ -2139,7 +2139,7 @@
                 } else {
                     clearInterval(votingPollInterval);
                 }
-            }, 3000); // Mantener 3 segundos
+            }, 2000);
         }
 
         async function loadVotingQuestions() {
@@ -2281,7 +2281,7 @@
                     if (!hasSelectedCheckboxes) {
                         await loadVotingQuestions();
                     }
-                }, 3000);
+                }, 2000);
             }
         }
 
