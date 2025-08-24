@@ -549,16 +549,6 @@
 
             <!-- Contenido Pestaña Estado -->
             <div id="tab-estado" class="tab-content active">
-                <!-- Carga de Excel -->
-                <div class="admin-panel">
-                    <h3>Cargar Participantes</h3>
-                    <div class="file-upload" onclick="document.getElementById('excel-file').click()">
-                        <input type="file" id="excel-file" accept=".xlsx,.xls" onchange="uploadExcel()">
-                        <p>📄 Clic para cargar archivo Excel (.xlsx)</p>
-                        <small>El archivo debe contener las columnas: code, name, coefficient</small>
-                    </div>
-                    <div id="upload-status"></div>
-                </div>
 
                 <!-- Verificación de Participantes -->
                 <div class="admin-panel">
@@ -658,6 +648,16 @@
 
             <!-- Contenido Pestaña Reportes -->
             <div id="tab-reportes" class="tab-content">
+                <!-- Carga de Excel -->
+                <div class="admin-panel">
+                    <h3>Cargar Participantes</h3>
+                    <div class="file-upload" onclick="document.getElementById('excel-file').click()">
+                        <input type="file" id="excel-file" accept=".xlsx,.xls" onchange="uploadExcel()">
+                        <p>📄 Clic para cargar archivo Excel (.xlsx)</p>
+                        <small>El archivo debe contener las columnas: code, name, coefficient</small>
+                    </div>
+                    <div id="upload-status"></div>
+                </div>
                 <!-- Acciones Administrativas -->
                 <div class="admin-panel">
                     <h3>Reportes y Acciones</h3>
@@ -704,7 +704,7 @@
         let updateInterval = null;
 
         // Apto prueba
-        const CODIGO_PRUEBA = 'TEST-999';
+        const CODIGO_PRUEBA = '999-999';
 
         // Sistema de sincronización entre pestañas
         let lastUpdateTimestamp = 0;
@@ -809,7 +809,7 @@
                 syncChannel.close();
                 syncChannel = null;
             }
-            
+
             clearTokens();
             adminToken = null;
             voterToken = null;
@@ -832,6 +832,7 @@
         // Funciones de acceso
         function showAdminLogin() {
             document.getElementById('admin-login').classList.remove('hidden');
+            adminPanel.classList.toggle('hidden');
         }
 
         async function accessVoting() {
