@@ -831,8 +831,8 @@
 
         // Funciones de acceso
         function showAdminLogin() {
-            document.getElementById('admin-login').classList.remove('hidden');
-            adminPanel.classList.toggle('hidden');
+            const adminLogin = document.getElementById('admin-login');
+            adminLogin.classList.toggle('hidden');
         }
 
         async function accessVoting() {
@@ -1207,28 +1207,75 @@
                 justify-content: center; z-index: 2000;
             `;
             
-            const participantsList = participants.length === 0 ? 
-                '<p style="text-align: center; color: #7f8c8d; font-style: italic;">No hay participantes para mostrar</p>' :
-                `<div style="max-height: 300px; overflow-y: auto; border: 1px solid #e9ecef; border-radius: 4px; background: #f8f9fa;">
-                    ${participants.slice(0, 50).map(p => `
-                        <div style="padding: 0.5rem 1rem; border-bottom: 1px solid #e9ecef; display: flex; justify-content: space-between;">
-                            <span><strong>${p.code}</strong></span>
-                            <span>${p.name || 'Sin nombre'}</span>
-                            <span style="color: #007bff;">${p.coefficient || 0}%</span>
-                        </div>
-                    `).join('')}
-                    ${participants.length > 50 ? 
-                        `<div style="padding: 0.8rem; text-align: center; color: #7f8c8d; font-style: italic;">
-                            ... y ${participants.length - 50} participantes más
-                        </div>` : ''
-                    }
-                </div>`;
+            const participantsPerPage = 25;
+            let currentPage = 1;
+            let filteredParticipants = [...participants];
+            
+            function renderPage() {
+                const startIndex = (currentPage - 1) * participantsPerPage;
+                const endIndex = startIndex + participantsPerPage;
+                const pageParticipants = filteredParticipants.slice(startIndex, endIndex);
+                const totalPages = Math.ceil(filteredParticipants.length / participantsPerPage);
+                
+                const participantsList = filteredParticipants.length === 0 ? 
+                    '<p style="text-align: center; color: #7f8c8d; font-style: italic; padding: 2rem;">No se encontraron participantes</p>' :
+                    `<div style="max-height: 400px; overflow-y: auto; border: 1px solid #e9ecef; border-radius: 4px; background: #f8f9fa;">
+                        ${pageParticipants.map(p => `
+                            <div style="padding: 0.8rem 1rem; border-bottom: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-weight: 600; color: #2c3e50; min-width: 80px;">${p.code}</span>
+                                <span style="flex: 1; margin: 0 1rem; color: #495057;">${p.name || 'Sin nombre'}</span>
+                                <span style="color: #007bff; font-weight: 500; min-width: 60px; text-align: right;">${p.coefficient || 0}%</span>
+                            </div>
+                        `).join('')}
+                        
+                        ${totalPages > 1 ? `
+                            <div style="padding: 1rem; background: #fff; border-top: 2px solid #e9ecef; display: flex; justify-content: between; align-items: center; gap: 1rem;">
+                                <button onclick="changePage(${currentPage - 1})" 
+                                        ${currentPage === 1 ? 'disabled' : ''} 
+                                        style="padding: 0.5rem 1rem; border: 1px solid #dee2e6; background: ${currentPage === 1 ? '#f8f9fa' : 'white'}; border-radius: 4px; cursor: ${currentPage === 1 ? 'not-allowed' : 'pointer'};">
+                                    ← Anterior
+                                </button>
+                                <span style="color: #6c757d; font-size: 0.9rem;">
+                                    Página ${currentPage} de ${totalPages} (${filteredParticipants.length} resultados)
+                                </span>
+                                <button onclick="changePage(${currentPage + 1})" 
+                                        ${currentPage === totalPages ? 'disabled' : ''} 
+                                        style="padding: 0.5rem 1rem; border: 1px solid #dee2e6; background: ${currentPage === totalPages ? '#f8f9fa' : 'white'}; border-radius: 4px; cursor: ${currentPage === totalPages ? 'not-allowed' : 'pointer'};">
+                                    Siguiente →
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>`;
+                
+                document.getElementById('participants-content').innerHTML = participantsList;
+            }
+            
+            function filterParticipants(searchTerm) {
+                if (!searchTerm.trim()) {
+                    filteredParticipants = [...participants];
+                } else {
+                    filteredParticipants = participants.filter(p => 
+                        p.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        (p.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+                }
+                currentPage = 1;
+                renderPage();
+            }
             
             modal.innerHTML = `
-                <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;">
+                <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 700px; width: 90%; max-height: 80vh; overflow: hidden;">
                     <h3 style="margin-bottom: 1.5rem; color: #2c3e50; text-align: center;">${title}</h3>
                     
-                    ${participantsList}
+                    <!-- Buscador -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <input type="text" id="participant-search" placeholder="Buscar por código o nombre..." 
+                            style="width: 100%; padding: 0.8rem; border: 2px solid #dee2e6; border-radius: 6px; font-size: 1rem;"
+                            oninput="filterParticipants(this.value)">
+                    </div>
+                    
+                    <!-- Contenido de participantes -->
+                    <div id="participants-content"></div>
                     
                     <button class="btn" onclick="document.body.removeChild(this.closest('div').parentNode)" 
                             style="margin-top: 1.5rem; width: 100%;">
@@ -1238,6 +1285,31 @@
             `;
             
             document.body.appendChild(modal);
+            
+            // Funciones globales para el modal
+            window.changePage = (newPage) => {
+                const totalPages = Math.ceil(filteredParticipants.length / participantsPerPage);
+                if (newPage >= 1 && newPage <= totalPages) {
+                    currentPage = newPage;
+                    renderPage();
+                }
+            };
+            
+            window.filterParticipants = filterParticipants;
+            
+            // Renderizar primera página
+            renderPage();
+            
+            // Focus en el buscador
+            setTimeout(() => document.getElementById('participant-search').focus(), 100);
+            
+            // Limpiar funciones globales al cerrar
+            const originalClose = modal.querySelector('.btn').onclick;
+            modal.querySelector('.btn').onclick = () => {
+                delete window.changePage;
+                delete window.filterParticipants;
+                originalClose();
+            };
         }
 
         async function autoCheckOnLoad() {
