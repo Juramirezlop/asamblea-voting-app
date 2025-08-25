@@ -611,7 +611,7 @@
         }
 
         .admin-login-container {
-            background: rgba(248, 249, 250, 0.9);
+            background: rgba(108, 117, 125, 0.95);
             border: 1px solid var(--gray-300);
             border-radius: 16px;
             padding: 1.5rem;
@@ -624,6 +624,8 @@
         .admin-login-container input {
             font-size: 0.95rem;
             padding: 0.8rem;
+            background: rgba(255, 255, 255, 0.95);
+            color: var(--dark-color);
         }
 
         .stats-grid {
@@ -824,6 +826,7 @@
             <!-- Pestañas -->
             <div class="tabs-container">
                 <button class="tab-button active" onclick="showTab('estado')">Estado</button>
+                <button class="tab-button" onclick="showTab('votaciones')">Votaciones</button>
                 <button class="tab-button" onclick="showTab('reportes')">Estadísticas</button>
             </div>
 
