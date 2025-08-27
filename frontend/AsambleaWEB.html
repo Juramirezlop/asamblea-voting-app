@@ -745,24 +745,6 @@
             box-shadow: 0 8px 25px rgba(245, 101, 101, 0.4);
         }
 
-        .admin-login-container {
-            background: rgba(245, 240, 235, 0.95);
-            border: 1px solid rgba(210, 200, 190, 0.5);
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin: 1.5rem auto;
-            max-width: 320px;
-            backdrop-filter: blur(10px);
-            animation: fadeInUp 0.4s ease-out;
-        }
-
-        .admin-login-container input {
-            font-size: 0.95rem;
-            padding: 0.8rem;
-            background: rgba(255, 255, 255, 0.95);
-            color: var(--dark-color);
-        }
-
         .admin-modal {
             position: fixed;
             top: 0;
@@ -827,16 +809,16 @@
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 1.5rem;
-            margin: 1.5rem 0;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
         }
 
         .stat-card {
             background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(10px);
-            padding: 1.5rem;
-            border-radius: 16px;
+            padding: 1rem;
+            border-radius: 12px;
             border: 1px solid rgba(255, 255, 255, 0.3);
             text-align: center;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -867,13 +849,13 @@
         }
 
         .stat-number {
-            font-size: 2.2rem;
-            font-weight: 800;
+            font-size: 1.6rem;
+            font-weight: 700;
             background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.3rem;
             transition: all 0.3s ease;
         }
 
@@ -1043,7 +1025,7 @@
 </head>
 <body>
     <div class="container">
-        <button class="logout-btn hidden" onclick="logout()">Salir</button>
+        <button class="logout-btn hidden" onclick="logout()" id="logout-button">Salir</button>
         
         <!-- Pantalla de Bienvenida -->
         <div id="welcome-screen">
@@ -1106,8 +1088,7 @@
                         <!-- Panel del coeficiente -->
                         <div style="text-align: center; padding: 2.5rem; background: linear-gradient(135deg, var(--success-color), #38a169); border-radius: 20px; color: white; box-shadow: var(--shadow-xl); transition: all 0.3s ease;">
                             <div id="conjunto-name-display" style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; opacity: 0.95;"></div>
-                            <div id="coefficient-percentage" style="font-size: 4rem; font-weight: 800; margin-bottom: 0.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">-%</div>
-                            <div style="font-size: 1.2rem; font-weight: 500; opacity: 0.9;">Aforo por Coeficiente</div>
+                            <div id="coefficient-percentage" style="font-size: 5rem; font-weight: 900; margin-bottom: 0.5rem; text-shadow: 0 4px 8px rgba(0,0,0,0.3);">-%</div>                            <div style="font-size: 1.2rem; font-weight: 500; opacity: 0.9;">Aforo por Coeficiente</div>
                         </div>
                                         
                         <div class="status-container">
@@ -1363,18 +1344,8 @@
                 updateInterval = null;
             }
 
-            // Limpiar todos los intervalos y timeouts
-            const highestId = setTimeout(() => {}, 0);
-            for (let i = 0; i < highestId; i++) {
-                clearInterval(i);
-                clearTimeout(i);
-            }
-
             // Limpiar formularios
             document.getElementById('access-code').value = '';
-            document.getElementById('admin-username').value = '';
-            document.getElementById('admin-password').value = '';
-            document.getElementById('admin-login').classList.add('hidden');
             
             showScreen('welcome-screen');
             hideStatus();
@@ -1680,41 +1651,6 @@
             });
         }
 
-        async function validateAdmin() {
-            const username = document.getElementById('admin-username').value.trim();
-            const password = document.getElementById('admin-password').value.trim();
-            
-            if (!username || !password) {
-                showStatus('Complete usuario y contraseña', 'error');
-                return;
-            }
-
-            try {
-                showStatus('Verificando credenciales...', 'info');
-                
-                const formData = new URLSearchParams();
-                formData.append('username', username);
-                formData.append('password', password);
-
-                const response = await apiCall('/auth/login/admin', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: formData
-                });
-
-                adminToken = response.access_token;
-                saveToken('admin', adminToken);
-                isAdmin = true;
-                
-                showAdminScreen();
-                showStatus('Acceso de administrador autorizado', 'success');
-            } catch (error) {
-                showStatus(`Error: ${error.message}`, 'error');
-            }
-        }
-
         // ======= FUNCIONES DEL ADMINISTRADOR =======
         
         async function showAdminScreen() {
@@ -1804,7 +1740,11 @@
             try {
                 showStatus('Verificando participantes...', 'info');
                 
-                const response = await apiCall('/participants/');
+                const response = await apiCall('/participants/', {
+                    headers: {
+                        'Authorization': `Bearer ${adminToken}`
+                    }
+                });
                 
                 if (response.length === 0) {
                     document.getElementById('status-circle').style.background = 'var(--gray-500)';
@@ -3041,12 +2981,6 @@
         document.getElementById('access-code').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 accessVoting();
-            }
-        });
-
-        document.getElementById('admin-password').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                validateAdmin();
             }
         });
 
