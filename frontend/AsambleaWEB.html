@@ -479,6 +479,91 @@
             box-shadow: 0 8px 25px rgba(245, 101, 101, 0.3);
         }
 
+        .multiple-voting-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .candidate-card {
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid var(--gray-300);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin: 0.5rem 0;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            backdrop-filter: blur(5px);
+            overflow: hidden;
+        }
+
+        .candidate-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--primary-color);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+        }
+
+        .candidate-card.selected {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.25);
+        }
+
+        .candidate-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+        }
+
+        .candidate-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--dark-color);
+            flex: 1;
+        }
+
+        .selection-indicator {
+            width: 32px;
+            height: 32px;
+            border: 2px solid var(--gray-400);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.8);
+            flex-shrink: 0;
+        }
+
+        .candidate-card.selected .selection-indicator {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border-color: var(--primary-color);
+            color: white;
+        }
+
+        .selection-number {
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        .submit-multiple-btn {
+            transition: all 0.3s ease;
+        }
+
+        .submit-multiple-btn:disabled {
+            background: linear-gradient(135deg, var(--gray-400), var(--gray-500));
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .submit-multiple-btn:not(:disabled) {
+            opacity: 1 !important;
+        }
+
         .results-panel {
             background: linear-gradient(135deg, rgba(241, 248, 233, 0.9), rgba(200, 230, 201, 0.9));
             border: 1px solid var(--success-color);
@@ -611,8 +696,8 @@
         }
 
         .admin-login-container {
-            background: rgba(108, 117, 125, 0.95);
-            border: 1px solid var(--gray-300);
+            background: rgba(245, 240, 235, 0.95);
+            border: 1px solid rgba(210, 200, 190, 0.5);
             border-radius: 16px;
             padding: 1.5rem;
             margin: 1.5rem auto;
@@ -775,6 +860,8 @@
             
             .vote-option {
                 display: block;
+                background: rgba(245, 240, 235, 0.8);
+                border: 2px solid rgba(210, 200, 190, 0.8);
                 margin: 0.5rem 0;
                 width: calc(100% - 2rem);
             }
@@ -827,7 +914,7 @@
             <div class="tabs-container">
                 <button class="tab-button active" onclick="showTab('estado')">Estado</button>
                 <button class="tab-button" onclick="showTab('votaciones')">Votaciones</button>
-                <button class="tab-button" onclick="showTab('reportes')">Estadísticas</button>
+                <button class="tab-button" onclick="showTab('reportes')">Configuración</button>
             </div>
 
             <!-- Contenido Pestaña Estado -->
@@ -940,12 +1027,17 @@
                     </div>
                     <div id="upload-status"></div>
                 </div>
+                <!-- Eliminar Código APTO -->
+                <div class="admin-panel">
+                    <h3>Gestión de Participantes</h3>
+                    <button class="btn" onclick="showDeleteCodeModal()" style="background: linear-gradient(135deg, var(--warning-color), #dd6b20); margin-bottom: 1rem;">🚫 Eliminar Código APTO</button>
+                    <p style="font-size: 0.9rem; color: var(--gray-600); margin-bottom: 2rem;">Elimine registros de asistencia específicos si es necesario.</p>
+                </div>
                 <!-- Acciones Administrativas -->
                 <div class="admin-panel">
-                    <h3>Reportes y Acciones</h3>
+                    <h3>📊 Reportes y Configuración</h3>
                     <button class="btn btn-success" onclick="downloadPDF()">📄 Descargar PDF Asistencia</button>
                     <button class="btn btn-danger" onclick="resetDatabase()">🗑️ Limpiar Base de Datos</button>
-                    <button class="btn" onclick="showDeleteCodeModal()" style="background: linear-gradient(135deg, var(--warning-color), #dd6b20);">🚫 Eliminar Código APTO</button>
                 </div>
             </div>
         </div>
@@ -1232,9 +1324,15 @@
         }
 
         async function loadTestVotingQuestions() {
-            const testQuestions = getSimulatedTestQuestions();
-            renderVotingQuestions(testQuestions);
-            showStatus('Votaciones de prueba cargadas (solo demostración)', 'info');
+            try {
+                const testQuestions = getSimulatedTestQuestions();
+                await renderVotingQuestions(testQuestions);
+                showStatus('Votaciones de prueba cargadas (solo demostración)', 'info');
+            } catch (error) {
+                console.error('Error loading test questions:', error);
+                document.getElementById('voting-questions').innerHTML = 
+                    '<div class="voting-section"><p style="color: var(--success-color);">Votaciones de prueba cargadas correctamente</p></div>';
+            }
         }
 
         async function registerAttendance() {
@@ -2396,6 +2494,55 @@
         async function renderVotingQuestions(questions) {
             const container = document.getElementById('voting-questions');
             
+            // Para usuario de prueba
+            if (currentUser && currentUser.code === CODIGO_PRUEBA) {
+                container.innerHTML = questions.map(question => {
+                    const options = question.options || [{text: 'Sí'}, {text: 'No'}];
+                    const inputType = question.allow_multiple ? 'checkbox' : 'radio';
+                    const inputName = `question-${question.id}`;
+                    
+                    return `
+                        <div class="voting-section">
+                            <h3 style="margin-bottom: 1rem; color: var(--dark-color);">${question.text}</h3>
+                            ${question.allow_multiple ? 
+                                `<p style="color: var(--gray-700); font-size: 0.9rem; margin-bottom: 1rem;">
+                                    Puede seleccionar hasta ${question.max_selections} opción${question.max_selections > 1 ? 'es' : ''} (PRUEBA)
+                                </p>` : ''
+                            }
+                            
+                            <div id="voting-options-${question.id}">
+                                ${question.allow_multiple ? 
+                                    `<div class="multiple-voting-container">
+                                        ${options.map((option, index) => `
+                                            <div class="candidate-card" data-question="${question.id}" data-option="${option.text}" onclick="toggleCandidateSelection(this, ${question.id}, ${question.max_selections})">
+                                                <div class="candidate-content">
+                                                    <div class="candidate-name">${option.text}</div>
+                                                    <div class="selection-indicator">
+                                                        <span class="selection-number"></span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                        <button class="btn submit-multiple-btn" onclick="submitMultipleVote(${question.id})" style="margin-top: 1.5rem; width: 100%; opacity: 0.5;" disabled>Confirmar Selección</button>
+                                    </div>` :
+                                    `<div style="text-align: center;">
+                                        ${options.map((option, index) => {
+                                            const isYesNo = options.length === 2 && (option.text === 'Sí' || option.text === 'No');
+                                            const buttonClass = isYesNo ? 
+                                                (option.text === 'Sí' ? 'vote-option yes-option' : 'vote-option no-option') : 
+                                                'vote-option';
+                                            
+                                            return `<div class="${buttonClass}" onclick="submitDirectVote(${question.id}, '${option.text}')">${option.text}</div>`;
+                                        }).join('')}
+                                    </div>`
+                                }
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                return;
+            }
+
             if (questions.length === 0) {
                 container.innerHTML = '<div class="voting-section"><p style="color: var(--gray-700);">No hay votaciones activas en este momento</p></div>';
                 return;
@@ -2528,10 +2675,40 @@
             }
         }
 
+        function toggleCandidateSelection(element, questionId, maxSelections) {
+            const container = element.parentElement;
+            const selectedCards = container.querySelectorAll('.candidate-card.selected');
+            const submitBtn = container.querySelector('.submit-multiple-btn');
+            const isSelected = element.classList.contains('selected');
+            
+            if (!isSelected && selectedCards.length >= maxSelections) {
+                showStatus(`Solo puede seleccionar ${maxSelections} opción${maxSelections > 1 ? 'es' : ''}`, 'error');
+                return;
+            }
+            
+            element.classList.toggle('selected');
+            
+            // Actualizar números de selección
+            const nowSelectedCards = container.querySelectorAll('.candidate-card.selected');
+            nowSelectedCards.forEach((card, index) => {
+                const indicator = card.querySelector('.selection-number');
+                indicator.textContent = index + 1;
+            });
+            
+            // Habilitar/deshabilitar botón
+            if (nowSelectedCards.length > 0) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+            } else {
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.5';
+            }
+        }
+
         async function submitMultipleVote(questionId) {
             if (currentUser && currentUser.code === CODIGO_PRUEBA) {
-                const checkboxes = document.querySelectorAll(`input[name="question-${questionId}"]:checked`);
-                const answers = Array.from(checkboxes).map(cb => cb.value);
+                const selectedCards = document.querySelectorAll(`[data-question="${questionId}"].candidate-card.selected`);
+                const answers = Array.from(selectedCards).map(card => card.getAttribute('data-option'));
                 showStatus(`Votos de prueba registrados: ${answers.join(', ')}`, 'success');
                 document.getElementById(`question-${questionId}-status`).innerHTML = 
                     '<p style="color: var(--success-color); font-weight: 500;">✅ Ya votaste en esta pregunta (simulación)</p>';
