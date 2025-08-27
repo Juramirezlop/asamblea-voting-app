@@ -159,8 +159,8 @@
         }
 
         .code-input::placeholder {
-            color: var(--gray-500);
-            font-weight: 400;
+            color: #9CA3AF;
+            font-weight: 300;
             letter-spacing: 1px;
         }
 
@@ -384,6 +384,56 @@
             padding: 2rem;
             margin-top: 2rem;
             backdrop-filter: blur(5px);
+        }
+
+        .new-multiple-option {
+            background: rgba(255, 255, 255, 0.9);
+            border: 3px solid var(--gray-300);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin: 0.8rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-align: center;
+            display: inline-block;
+            min-width: 180px;
+            position: relative;
+            transform-origin: center;
+        }
+
+        .new-multiple-option:hover {
+            transform: translateY(-3px) scale(1.02);
+            border-color: var(--primary-color);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.25);
+            background: rgba(255, 255, 255, 1);
+        }
+
+        .new-multiple-option.selected {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border-color: var(--primary-color);
+            color: white;
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 12px 35px rgba(102, 126, 234, 0.4);
+        }
+
+        .new-multiple-option.selected::after {
+            content: '✓';
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: var(--success-color);
+            color: white;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
         }
 
         .checkbox-container {
@@ -713,6 +763,68 @@
             color: var(--dark-color);
         }
 
+        .admin-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            backdrop-filter: blur(5px);
+        }
+
+        .admin-modal-content {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 2.5rem;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            animation: modalSlideUp 0.3s ease-out;
+        }
+
+        @keyframes modalSlideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .admin-modal h3 {
+            color: var(--dark-color);
+            margin-bottom: 1.5rem;
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .admin-modal input {
+            width: 100%;
+            padding: 1rem;
+            margin: 0.8rem 0;
+            border: 2px solid var(--gray-300);
+            border-radius: 12px;
+            font-size: 1rem;
+            background: rgba(255, 255, 255, 0.9);
+            transition: all 0.3s ease;
+        }
+
+        .admin-modal input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -831,12 +943,69 @@
                 width: 95%;
                 padding: 1.5rem;
                 border-radius: 20px;
+                min-height: auto;
             }
             
             .header h1 {
-                font-size: 1.8rem;
+                font-size: 1.5rem;
+                line-height: 1.3;
             }
             
+            .header p {
+                font-size: 1rem;
+            }
+            
+            .logout-btn {
+                position: absolute;
+                top: 1rem;
+                right: 1rem;
+                padding: 0.5rem 0.8rem;
+                font-size: 0.8rem;
+                z-index: 100;
+            }
+
+            .aforo-container {
+                display: block !important;
+                gap: 1rem;
+            }
+            
+            .aforo-container > div:first-child {
+                margin-bottom: 1.5rem;
+                padding: 1.5rem;
+            }
+            
+            #coefficient-percentage {
+                font-size: 5rem !important;
+                font-weight: 900;
+            }
+
+            #conjunto-name-display {
+                font-size: 1.3rem !important;
+                font-weight: 700;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 1rem;
+            }
+            
+            .stat-card {
+                padding: 0.5rem;
+            }
+            
+            .stat-number {
+                font-size: 1.2rem;
+            }
+            
+            .quorum-panel {
+                margin-top: 1rem;
+                padding: 1rem;
+            }
+            
+            #quorum-text {
+                font-size: 1.1rem !important;
+            }
+
             .stats-grid {
                 grid-template-columns: 1fr;
             }
@@ -890,16 +1059,10 @@
                 </p>
                 <input type="text" class="code-input" id="access-code" placeholder="1-201" maxlength="10">
                 <br>
-                <button class="btn btn-large btn-success" onclick="registerAttendance()">Solo Asistencia</button>
+                <button class="btn btn-large btn-success" onclick="registerAttendance()">Registro</button>
                 <button class="btn btn-large" onclick="accessVoting()">Votaciones</button>
                 <br>
                 <button class="btn btn-admin" onclick="showAdminLogin()">Acceso Administrador</button>
-            </div>
-            
-            <div id="admin-login" class="admin-login-container hidden">
-                <input type="text" class="code-input" id="admin-username" placeholder="Usuario" style="max-width: 100%; font-size: 0.9rem;">
-                <input type="password" class="code-input" id="admin-password" placeholder="Contraseña" style="max-width: 100%; font-size: 0.9rem;">
-                <button class="btn btn-admin" onclick="validateAdmin()">Ingresar</button>
             </div>
         </div>
 
@@ -1031,7 +1194,6 @@
                 <div class="admin-panel">
                     <h3>Gestión de Participantes</h3>
                     <button class="btn" onclick="showDeleteCodeModal()" style="background: linear-gradient(135deg, var(--warning-color), #dd6b20); margin-bottom: 1rem;">🚫 Eliminar Código APTO</button>
-                    <p style="font-size: 0.9rem; color: var(--gray-600); margin-bottom: 2rem;">Elimine registros de asistencia específicos si es necesario.</p>
                 </div>
                 <!-- Acciones Administrativas -->
                 <div class="admin-panel">
@@ -1221,8 +1383,70 @@
         // ======= FUNCIONES DE ACCESO =======
         
         function showAdminLogin() {
-            const adminLogin = document.getElementById('admin-login');
-            adminLogin.classList.toggle('hidden');
+            const modal = document.createElement('div');
+            modal.className = 'admin-modal';
+            modal.id = 'admin-modal';
+            
+            modal.innerHTML = `
+                <div class="admin-modal-content">
+                    <h3>🔐 Acceso Administrador</h3>
+                    <input type="text" id="modal-admin-username" placeholder="Usuario" />
+                    <input type="password" id="modal-admin-password" placeholder="Contraseña" />
+                    <button class="btn" onclick="validateAdminFromModal()" style="width: 100%; margin-top: 1rem;">
+                        Ingresar
+                    </button>
+                    <button class="btn" onclick="closeAdminModal()" 
+                            style="width: 100%; margin-top: 0.5rem; background: linear-gradient(135deg, var(--gray-500), var(--gray-700));">
+                        Cancelar
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            setTimeout(() => document.getElementById('modal-admin-username').focus(), 100);
+        }
+
+        function closeAdminModal() {
+            const modal = document.getElementById('admin-modal');
+            if (modal) {
+                document.body.removeChild(modal);
+            }
+        }
+
+        async function validateAdminFromModal() {
+            const username = document.getElementById('modal-admin-username').value.trim();
+            const password = document.getElementById('modal-admin-password').value.trim();
+            
+            if (!username || !password) {
+                showStatus('Complete usuario y contraseña', 'error');
+                return;
+            }
+
+            try {
+                showStatus('Verificando credenciales...', 'info');
+                
+                const formData = new URLSearchParams();
+                formData.append('username', username);
+                formData.append('password', password);
+
+                const response = await apiCall('/auth/login/admin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: formData
+                });
+
+                adminToken = response.access_token;
+                saveToken('admin', adminToken);
+                isAdmin = true;
+                
+                closeAdminModal();
+                showAdminScreen();
+                showStatus('Acceso de administrador autorizado', 'success');
+            } catch (error) {
+                showStatus(`Error: ${error.message}`, 'error');
+            }
         }
 
         async function accessVoting() {
@@ -1349,7 +1573,14 @@
             }
 
             try {
-                showStatus('Registrando asistencia...', 'info');
+                showStatus('Verificando código...', 'info');
+                
+                // Primero verificar si ya está registrado
+                const checkResponse = await apiCall(`/participants/check/${code}`);
+                if (checkResponse.exists) {
+                    showStatus('Este código ya tiene asistencia registrada', 'error');
+                    return;
+                }
                 
                 const isPower = await showPowerQuestion();
                 
@@ -1684,7 +1915,7 @@
                     <div id="participants-content"></div>
                     
                     <!-- Botón X en esquina superior derecha -->
-                    <button onclick="document.body.removeChild(this.closest('div').parentNode)" 
+                    <button onclick="closeParticipantsModal()" 
                             style="position: absolute; top: 15px; right: 15px; background: var(--danger-color); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; cursor: pointer; font-size: 18px; font-weight: bold; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-md);"
                             title="Cerrar">
                         ×
@@ -1693,6 +1924,14 @@
             `;
             
             document.body.appendChild(modal);
+
+            // Función global para cerrar
+            window.closeParticipantsModal = () => {
+                document.body.removeChild(modal);
+                delete window.closeParticipantsModal;
+                delete window.changePage;
+                delete window.filterParticipants;
+            };
             
             // Funciones globales para el modal
             window.changePage = (newPage) => {
@@ -2512,18 +2751,17 @@
                             
                             <div id="voting-options-${question.id}">
                                 ${question.allow_multiple ? 
-                                    `<div class="multiple-voting-container">
+                                    `<div class="multiple-voting-container" style="text-align: center;">
                                         ${options.map((option, index) => `
-                                            <div class="candidate-card" data-question="${question.id}" data-option="${option.text}" onclick="toggleCandidateSelection(this, ${question.id}, ${question.max_selections})">
-                                                <div class="candidate-content">
-                                                    <div class="candidate-name">${option.text}</div>
-                                                    <div class="selection-indicator">
-                                                        <span class="selection-number"></span>
-                                                    </div>
-                                                </div>
+                                            <div class="new-multiple-option" data-question="${question.id}" data-option="${option.text}" 
+                                                onclick="toggleNewMultipleOption(this, ${question.id}, ${question.max_selections})">
+                                                ${option.text}
                                             </div>
                                         `).join('')}
-                                        <button class="btn submit-multiple-btn" onclick="submitMultipleVote(${question.id})" style="margin-top: 1.5rem; width: 100%; opacity: 0.5;" disabled>Confirmar Selección</button>
+                                        <button class="btn" onclick="submitMultipleVote(${question.id})" 
+                                                id="submit-btn-${question.id}" style="margin-top: 1.5rem; width: 100%; opacity: 0.5;" disabled>
+                                            Confirmar Selección
+                                        </button>
                                     </div>` :
                                     `<div style="text-align: center;">
                                         ${options.map((option, index) => {
@@ -2604,6 +2842,28 @@
                     </div>
                 `;
             }).join('');
+        }
+
+        function toggleNewMultipleOption(element, questionId, maxSelections) {
+            const container = element.parentElement;
+            const selectedOptions = container.querySelectorAll('.new-multiple-option.selected');
+            const submitBtn = document.getElementById(`submit-btn-${questionId}`);
+            
+            if (!element.classList.contains('selected') && selectedOptions.length >= maxSelections) {
+                showStatus(`Solo puede seleccionar ${maxSelections} opción${maxSelections > 1 ? 'es' : ''}`, 'error');
+                return;
+            }
+            
+            element.classList.toggle('selected');
+            
+            const nowSelected = container.querySelectorAll('.new-multiple-option.selected');
+            if (nowSelected.length > 0) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+            } else {
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.5';
+            }
         }
 
         async function submitDirectVote(questionId, answer) {
