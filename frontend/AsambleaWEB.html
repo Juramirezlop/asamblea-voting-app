@@ -436,6 +436,90 @@
             box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
         }
 
+        .admin-multiple-selection {
+            background: linear-gradient(135deg, rgba(248, 250, 252, 0.9), rgba(241, 245, 249, 0.9));
+            border: 2px solid var(--gray-300);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-top: 1.5rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .selection-type-toggle {
+            display: flex;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 12px;
+            padding: 0.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--gray-300);
+        }
+
+        .toggle-option {
+            flex: 1;
+            padding: 0.8rem 1.2rem;
+            text-align: center;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            color: var(--gray-700);
+        }
+
+        .toggle-option.active {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .selection-config {
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--gray-300);
+        }
+
+        .config-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .config-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .config-label {
+            min-width: 160px;
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+
+        .config-input {
+            width: 100px;
+            padding: 0.6rem;
+            border: 2px solid var(--gray-300);
+            border-radius: 8px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .config-input:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .config-hint {
+            flex: 1;
+            font-size: 0.85rem;
+            color: var(--gray-600);
+            font-style: italic;
+        }
+
         .checkbox-container {
             display: flex;
             align-items: center;
@@ -1020,6 +1104,7 @@
             .tabs-container {
                 flex-direction: column;
             }
+            
         }
     </style>
 </head>
@@ -1137,14 +1222,19 @@
                         <input type="text" id="question-text" placeholder="Escriba la pregunta o cargo a elegir">
                         <textarea id="candidates-list" class="candidates-input" placeholder="Para elecciones, escriba cada candidato en una línea nueva:&#10;Juan Pérez&#10;María García&#10;Carlos López" style="display:none;"></textarea>
                         
-                        <div id="multiple-options" style="display:none;" class="multiple-selection-panel">
-                            <label style="display: block; margin-bottom: 1rem; font-weight: 500; color: var(--dark-color);">
-                                Máximo número de selecciones permitidas:
-                            </label>
-                            <input type="number" id="max-selections" min="1" value="1" style="width: 120px; padding: 0.8rem; text-align: center; font-weight: 600; margin-bottom: 1rem;">
-                            <p style="font-size: 0.9rem; color: var(--gray-700); margin: 0;">
-                                Si es mayor a 1, se permitirá selección múltiple automáticamente
-                            </p>
+                        <div id="multiple-options" style="display:none;" class="admin-multiple-selection">
+                            <div class="selection-type-toggle">
+                                <button type="button" class="toggle-option active" onclick="setSelectionType('single')">Selección Única</button>
+                                <button type="button" class="toggle-option" onclick="setSelectionType('multiple')">Selección Múltiple</button>
+                            </div>
+                            
+                            <div class="selection-config">
+                                <div class="config-row">
+                                    <span class="config-label">Máximo selecciones:</span>
+                                    <input type="number" id="max-selections" class="config-input" min="1" value="1">
+                                    <span class="config-hint">Cuántas opciones puede elegir cada votante</span>
+                                </div>
+                            </div>
                         </div>
                         <button class="btn" onclick="createQuestion()">Crear Votación</button>
                     </div>
@@ -1459,8 +1549,8 @@
                 showVoterScreen();
                 showStatus('Acceso a votaciones autorizado', 'success');
             } catch (error) {
-                if (error.message.includes('no registrado') || error.message.includes('not found')) {
-                    showStatus('Debe registrar su asistencia primero usando "Solo Asistencia"', 'error');
+                if (error.message.includes('401') || error.message.includes('not found') || error.message.includes('Invalid credentials')) {
+                    showStatus('Código no encontrado o no registrado. Use "Registro" primero.', 'error');
                 } else {
                     showStatus(`Error: ${error.message}`, 'error');
                 }
@@ -2036,14 +2126,13 @@
                 }
                 questionData.options = candidates;
                 
-                // Opciones de selección múltiple
                 const maxSelections = parseInt(document.getElementById('max-selections').value) || 1;
                 const allowMultiple = maxSelections > 1;
 
                 questionData.allow_multiple = allowMultiple;
                 questionData.max_selections = maxSelections;
                 
-                if (allowMultiple && maxSelections > candidates.length) {
+                if (maxSelections > candidates.length) {
                     showStatus('El máximo de selecciones no puede ser mayor al número de candidatos', 'error');
                     return;
                 }
@@ -2072,6 +2161,23 @@
                 broadcastSync('force-refresh', {});
             } catch (error) {
                 showStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        function setSelectionType(type) {
+            const toggles = document.querySelectorAll('.toggle-option');
+            const maxInput = document.getElementById('max-selections');
+            
+            toggles.forEach(t => t.classList.remove('active'));
+            
+            if (type === 'single') {
+                toggles[0].classList.add('active');
+                maxInput.value = 1;
+                maxInput.disabled = true;
+            } else {
+                toggles[1].classList.add('active');
+                maxInput.value = 2;
+                maxInput.disabled = false;
             }
         }
 
@@ -2651,22 +2757,15 @@
             }, 2000);
         }
 
-        async function loadVotingQuestions() {
+        function loadTestVotingQuestions() {
             try {
-                const questions = await apiCall('/voting/questions/active');
-                renderVotingQuestions(questions);
-                
-                const voterStatus = document.getElementById('voter-status');
-                if (voterStatus) {
-                    voterStatus.textContent = 'Conectado - Actualizado ' + new Date().toLocaleTimeString();
-                }
-                
-                hideStatus();
+                const testQuestions = getSimulatedTestQuestions();
+                renderVotingQuestions(testQuestions);
+                showStatus('Votaciones de prueba cargadas (solo demostración)', 'info');
             } catch (error) {
-                console.error('Error loading voting questions:', error);
+                console.error('Error loading test questions:', error);
                 document.getElementById('voting-questions').innerHTML = 
-                    '<div class="voting-section"><p style="color: var(--danger-color);">Error cargando votaciones. Intente refrescar la página.</p></div>';
-                showStatus('Error cargando votaciones', 'error');
+                    '<div class="voting-section"><p style="color: var(--success-color);">Votaciones de prueba cargadas correctamente</p></div>';
             }
         }
 
@@ -2789,6 +2888,7 @@
             const selectedOptions = container.querySelectorAll('.new-multiple-option.selected');
             const submitBtn = document.getElementById(`submit-btn-${questionId}`);
             
+            // Si no está seleccionado y ya alcanzamos el máximo
             if (!element.classList.contains('selected') && selectedOptions.length >= maxSelections) {
                 showStatus(`Solo puede seleccionar ${maxSelections} opción${maxSelections > 1 ? 'es' : ''}`, 'error');
                 return;
@@ -2796,13 +2896,16 @@
             
             element.classList.toggle('selected');
             
+            // Actualizar estado del botón
             const nowSelected = container.querySelectorAll('.new-multiple-option.selected');
             if (nowSelected.length > 0) {
                 submitBtn.disabled = false;
                 submitBtn.style.opacity = '1';
+                submitBtn.textContent = `Confirmar ${nowSelected.length} selección${nowSelected.length > 1 ? 'es' : ''}`;
             } else {
                 submitBtn.disabled = true;
                 submitBtn.style.opacity = '0.5';
+                submitBtn.textContent = 'Confirmar Selección';
             }
         }
 
