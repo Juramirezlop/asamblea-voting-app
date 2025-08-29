@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List
 from ..database import get_db, execute_query, close_db
 from ..auth.auth import admin_required, voter_required, admin_or_voter_required
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/voting", tags=["Voting"])
 logger = logging.getLogger(__name__)
@@ -16,6 +16,7 @@ class QuestionCreate(BaseModel):
     options: List[str] | None = None
     allow_multiple: bool = False
     max_selections: int = 1
+    time_limit_minutes: int | None = None  # NUEVO: tiempo límite en minutos
 
 class VoteIn(BaseModel):
     question_id: int
@@ -28,7 +29,6 @@ def crear_pregunta(payload: QuestionCreate):
     if typ not in ("yesno", "multiple"):
         raise HTTPException(status_code=400, detail="Tipo inválido (yesno|multiple)")
 
-    # Validaciones para selección múltiple
     allow_multiple = payload.allow_multiple if typ == "multiple" else False
     max_selections = payload.max_selections if allow_multiple else 1
     
@@ -39,17 +39,24 @@ def crear_pregunta(payload: QuestionCreate):
         if max_selections > len(payload.options):
             raise HTTPException(status_code=400, detail="max_selections no puede ser mayor al número de opciones")
 
+    # CALCULAR tiempo de expiración si hay límite
+    expires_at = None
+    if payload.time_limit_minutes and payload.time_limit_minutes > 0:
+        expires_at = (datetime.utcnow() + timedelta(minutes=payload.time_limit_minutes)).isoformat()
+
     conn = get_db()
     try:
-        # Insertar pregunta y obtener el ID
+        # MODIFICAR query para incluir campos de cronómetro
         question = execute_query(
             conn,
-            "INSERT INTO questions (text, type, active, allow_multiple, max_selections) VALUES (?, ?, 1, ?, ?) RETURNING id",
-            (payload.text, typ, int(allow_multiple), max_selections),
+            """INSERT INTO questions (text, type, active, allow_multiple, max_selections, time_limit_minutes, expires_at) 
+               VALUES (?, ?, 1, ?, ?, ?, ?) RETURNING id""",
+            (payload.text, typ, int(allow_multiple), max_selections, payload.time_limit_minutes, expires_at),
             fetchone=True
         )
         qid = question["id"]
 
+        # Insertar opciones (sin cambios)
         if typ == "yesno":
             execute_query(conn, "INSERT INTO options (question_id, option_text) VALUES (?, ?)", (qid, "Sí"), commit=True)
             execute_query(conn, "INSERT INTO options (question_id, option_text) VALUES (?, ?)", (qid, "No"), commit=True)
@@ -59,7 +66,56 @@ def crear_pregunta(payload: QuestionCreate):
             for opt in payload.options:
                 execute_query(conn, "INSERT INTO options (question_id, option_text) VALUES (?, ?)", (qid, opt), commit=True)
         
-        return {"status": "ok", "id": qid}
+        return {
+            "status": "ok", 
+            "id": qid,
+            "expires_at": expires_at,
+            "time_limit_minutes": payload.time_limit_minutes
+        }
+    finally:
+        close_db(conn)
+
+# AGREGAR endpoint para verificar votaciones expiradas
+@router.post("/questions/check-expired", dependencies=[Depends(admin_required)])
+def check_expired_questions():
+    """Verificar y cerrar automáticamente votaciones que expiraron"""
+    conn = get_db()
+    try:
+        current_time = datetime.utcnow().isoformat()
+        
+        # Encontrar votaciones expiradas
+        expired_questions = execute_query(
+            conn,
+            """SELECT id, text FROM questions 
+               WHERE expires_at IS NOT NULL 
+               AND expires_at <= ? 
+               AND closed = 0 
+               AND active = 1""",
+            (current_time,),
+            fetchall=True
+        )
+        
+        expired_count = 0
+        for question in expired_questions:
+            # Cerrar la votación
+            execute_query(
+                conn,
+                "UPDATE questions SET closed = 1 WHERE id = ?",
+                (question["id"],),
+                commit=True
+            )
+            expired_count += 1
+            logger.info(f"Votación {question['id']} cerrada automáticamente por expiración")
+        
+        return {
+            "status": "ok",
+            "expired_questions": expired_count,
+            "expired_details": [dict(q) for q in expired_questions]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error verificando votaciones expiradas: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
     finally:
         close_db(conn)
 
@@ -68,27 +124,55 @@ def crear_pregunta(payload: QuestionCreate):
 def preguntas_activas():
     conn = get_db()
     try:
+        current_time = datetime.utcnow().isoformat()
+        
         qs = execute_query(
             conn,
-            "SELECT id, text, type, closed, allow_multiple, max_selections FROM questions WHERE active = 1",
+            """SELECT id, text, type, closed, allow_multiple, max_selections, 
+                      time_limit_minutes, expires_at FROM questions WHERE active = 1""",
             fetchall=True
         )
         
         out = []
         for q in qs:
+            # Verificar si expiró
+            is_expired = False
+            time_remaining = None
+            
+            if q["expires_at"] and q["closed"] == 0:
+                expires_at = datetime.fromisoformat(q["expires_at"])
+                current_dt = datetime.fromisoformat(current_time)
+                
+                if current_dt >= expires_at:
+                    is_expired = True
+                    # Auto-cerrar si expiró
+                    execute_query(
+                        conn,
+                        "UPDATE questions SET closed = 1 WHERE id = ?",
+                        (q["id"],),
+                        commit=True
+                    )
+                else:
+                    time_remaining = int((expires_at - current_dt).total_seconds())
+            
             options = execute_query(
                 conn,
                 "SELECT option_text FROM options WHERE question_id = ?",
                 (q["id"],),
                 fetchall=True
             )
+            
             out.append({
                 "id": q["id"],
                 "text": q["text"],
                 "type": q["type"],
-                "closed": bool(q["closed"]),
+                "closed": bool(q["closed"]) or is_expired,
                 "allow_multiple": bool(q["allow_multiple"]),
                 "max_selections": q["max_selections"],
+                "time_limit_minutes": q["time_limit_minutes"],
+                "expires_at": q["expires_at"],
+                "time_remaining_seconds": time_remaining,
+                "is_expired": is_expired,
                 "options": [{"text": o["option_text"]} for o in options]
             })
         return out

@@ -298,7 +298,9 @@ def init_db():
                 allow_multiple INTEGER DEFAULT 0,
                 max_selections INTEGER DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                time_limit_minutes INTEGER DEFAULT NULL,
+                expires_at TEXT DEFAULT NULL
             )
             """,
             """

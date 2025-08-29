@@ -5,6 +5,9 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi import WebSocket, WebSocketDisconnect
+from typing import List
+import json
 from pathlib import Path
 import os
 import logging
@@ -123,6 +126,35 @@ app = FastAPI(
     redoc_url="/redoc" if os.getenv("DEBUG") == "1" else None,
 )
 
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        logger.info(f"Admin conectado via WebSocket. Total: {len(self.active_connections)}")
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        logger.info(f"Admin desconectado. Total: {len(self.active_connections)}")
+
+    async def broadcast(self, message: dict):
+        """Enviar mensaje a todos los administradores conectados"""
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(json.dumps(message))
+            except:
+                disconnected.append(connection)
+        
+        # Limpiar conexiones muertas
+        for conn in disconnected:
+            self.disconnect(conn)
+
+manager = ConnectionManager()
+
 # ================================
 # MIDDLEWARE OPTIMIZADO PARA ALTA CARGA
 # ================================
@@ -240,6 +272,39 @@ async def api_status():
         "version": "2.0.0",
         "optimized_for": "400+ concurrent users"
     }
+
+@app.websocket("/ws/admin")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Recibir datos del admin
+            data = await websocket.receive_text()
+            message = json.loads(data)
+            
+            # Reenviar a todos los otros admins
+            await manager.broadcast({
+                "type": "sync",
+                "data": message.get("data"),
+                "timestamp": message.get("timestamp", time.time())
+            })
+            
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        manager.disconnect(websocket)
+
+# FUNCIÓN HELPER para broadcast desde endpoints
+async def broadcast_admin_update(update_type: str, data: dict = None):
+    """Función para enviar actualizaciones desde cualquier endpoint"""
+    message = {
+        "type": "admin_update", 
+        "update_type": update_type,
+        "data": data or {},
+        "timestamp": time.time()
+    }
+    await manager.broadcast(message)
 
 # Incluir routers optimizados
 app.include_router(auth_routes.router, prefix="/api")

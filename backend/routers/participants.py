@@ -607,3 +607,33 @@ async def generar_xlsx_asistencia(user=Depends(admin_required)):
     except Exception as e:
         logger.error(f"Error creando Excel: {e}")
         raise HTTPException(status_code=500, detail=f"Error creando Excel: {str(e)}")
+    
+@router.get("/info/{code}", dependencies=[Depends(admin_required)])
+def get_participant_info(code: str):
+    conn = get_db()
+    try:
+        participant = execute_query(
+            conn,
+            "SELECT * FROM participants WHERE code = ?",
+            (code,),
+            fetchone=True
+        )
+        if not participant:
+            raise HTTPException(status_code=404, detail="Participante no encontrado")
+        return dict(participant)
+    finally:
+        close_db(conn)
+
+@router.get("/check/{code}")
+def check_participant_exists(code: str):
+    conn = get_db()
+    try:
+        participant = execute_query(
+            conn,
+            "SELECT present FROM participants WHERE code = ?",
+            (code,),
+            fetchone=True
+        )
+        return {"exists": participant is not None and participant["present"] == 1}
+    finally:
+        close_db(conn)
