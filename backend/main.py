@@ -193,7 +193,7 @@ app.add_middleware(
 if os.getenv("RAILWAY_ENVIRONMENT"):
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=["https://web-production-d4d81.up.railway.app"],
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
