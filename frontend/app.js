@@ -2,7 +2,7 @@
 // CONFIGURACIÓN Y CONSTANTES
 // ================================
 
-const API_BASE = 'https://web-production-b3d70.up.railway.app/api';
+const API_BASE = 'https://web-production-d4d81.up.railway.app/';
 const CODIGO_PRUEBA = '999-999';
 
 // Variables globales de estado (manteniendo la lógica original)
@@ -269,6 +269,17 @@ function showAdminLogin() {
             }
         ]
     });
+    
+    setTimeout(() => {
+        const passwordInput = document.getElementById('modal-admin-password');
+        if (passwordInput) {
+            passwordInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    validateAdminCredentials();
+                }
+            });
+        }
+    }, 100);
 }
 
 async function validateAdminCredentials() {
