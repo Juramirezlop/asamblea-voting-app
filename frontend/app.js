@@ -270,18 +270,25 @@ function showAdminLogin() {
         ]
     });
     
+    // AGREGAR DESPUÉS DEL MODAL
     setTimeout(() => {
+        const usernameInput = document.getElementById('modal-admin-username');
         const passwordInput = document.getElementById('modal-admin-password');
-        if (passwordInput) {
-            passwordInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    validateAdminCredentials();
-                }
-            });
-        }
+        
+        [usernameInput, passwordInput].forEach(input => {
+            if (input) {
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        validateAdminCredentials();
+                    }
+                });
+            }
+        });
+        
+        // Focus en el primer input
+        if (usernameInput) usernameInput.focus();
     }, 100);
 }
-
 async function validateAdminCredentials() {
     const username = document.getElementById('modal-admin-username').value.trim();
     const password = document.getElementById('modal-admin-password').value.trim();

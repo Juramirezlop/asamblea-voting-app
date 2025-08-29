@@ -176,7 +176,7 @@ if os.getenv("RAILWAY_ENVIRONMENT"):
         allowed_hosts=[
             "*.railway.app",
             "*.up.railway.app", 
-            "web-production-b3d70.up.railway.app",
+            "web-production-d4d81.up.railway.app",
             "localhost",
             "127.0.0.1"
         ]
@@ -196,7 +196,7 @@ if os.getenv("RAILWAY_ENVIRONMENT"):
         allow_origins=[
             "https://*.railway.app",
             "https://*.up.railway.app",
-            "https://web-production-b3d70.up.railway.app"
+            "https://web-production-d4d81.up.railway.app"
         ],
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
