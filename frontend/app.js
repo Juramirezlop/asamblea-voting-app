@@ -233,7 +233,8 @@ async function accessVoting() {
         currentUser = {
             code: code,
             name: response.name || 'Usuario',
-            id: response.user_id || null
+            id: response.user_id || null,
+            coefficient: response.coefficient || 1.00
         };
         isAdmin = false;
         
@@ -383,6 +384,36 @@ async function showVoterScreen() {
     document.getElementById('voter-code').textContent = currentUser.code;
     document.getElementById('voter-name').textContent = `Bienvenido/a, ${currentUser.name}`;
     
+    // AÑADIR: Mostrar coeficiente si está disponible
+    if (currentUser.coefficient) {
+        // Crear elemento para coeficiente si no existe
+        let coeffElement = document.getElementById('voter-coefficient');
+        if (!coeffElement) {
+            const userMeta = document.querySelector('.user-meta');
+            coeffElement = document.createElement('span');
+            coeffElement.id = 'voter-coefficient';
+            userMeta.appendChild(coeffElement);
+        }
+        coeffElement.textContent = `Coeficiente: ${currentUser.coefficient}%`;
+    }
+    
+    // AÑADIR: Mostrar nombre del conjunto
+    try {
+        const conjuntoData = await apiCall('/participants/conjunto/nombre');
+        if (conjuntoData.nombre) {
+            let conjuntoElement = document.getElementById('voter-conjunto');
+            if (!conjuntoElement) {
+                const userMeta = document.querySelector('.user-meta');
+                conjuntoElement = document.createElement('span');
+                conjuntoElement.id = 'voter-conjunto';
+                userMeta.appendChild(conjuntoElement);
+            }
+            conjuntoElement.textContent = conjuntoData.nombre;
+        }
+    } catch (error) {
+        console.log('No se pudo cargar nombre del conjunto');
+    }
+    
     await loadVotingQuestions();
     startVotingPolling();
 }
@@ -398,6 +429,16 @@ async function loadVotingQuestions() {
             return;
         }
 
+        // CORRECCIÓN: Verificar que el usuario tenga token válido
+        if (!voterToken) {
+            container.innerHTML = `
+                <div class="panel">
+                    <p style="color: var(--danger-color); text-align: center;">Sesión expirada. Por favor, vuelva a ingresar.</p>
+                </div>
+            `;
+            return;
+        }
+
         const questions = await apiCall('/voting/questions/active');
         const votedQuestions = await checkUserVotes();
         
@@ -407,6 +448,7 @@ async function loadVotingQuestions() {
         container.innerHTML = `
             <div class="panel">
                 <p style="color: var(--danger-color); text-align: center;">Error cargando votaciones: ${error.message}</p>
+                <button class="btn btn-secondary" onclick="loadVotingQuestions()">Reintentar</button>
             </div>
         `;
     }

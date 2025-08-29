@@ -84,7 +84,8 @@ def login_voter(data: VoterLoginRequest):
             "token_type": "bearer",
             "name": participant.get("name", ""),
             "code": participant.get("code", ""),
-            "is_power": participant.get("is_power", False)
+            "is_power": participant.get("is_power", False),
+            "coefficient": participant.get("coefficient", 1.00)
         }
     
     except HTTPException:

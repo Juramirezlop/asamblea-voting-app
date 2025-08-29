@@ -509,7 +509,7 @@ def get_aforo(user=Depends(admin_required)):
         # Presentes (AGREGAR coeficiente presente) - FIX: usar TRUE/FALSE
         present_data = execute_query(
             conn,
-            "SELECT COUNT(*) as present_count, SUM(coefficient) as present_coefficient FROM participants WHERE present = 1",
+            "SELECT COUNT(*) as present_count, SUM(coefficient) as present_coefficient FROM participants WHERE present = true",
             fetchone=True
         )
         present_count = present_data["present_count"] or 0
@@ -518,16 +518,17 @@ def get_aforo(user=Depends(admin_required)):
         # FIX: Cambiar 1 y 0 por TRUE y FALSE
         own_votes_result = execute_query(
             conn,
-            "SELECT COUNT(*) as own_count FROM participants WHERE present = 1 AND is_power = FALSE",
+            "SELECT COUNT(*) as own_count FROM participants WHERE present = true AND is_power = false",
             fetchone=True
         )
         own_votes = own_votes_result["own_count"] or 0
 
         power_votes_result = execute_query(
             conn,
-            "SELECT COUNT(*) as power_count FROM participants WHERE present = 1 AND is_power = TRUE",
+            "SELECT COUNT(*) as power_count FROM participants WHERE present = true AND is_power = true",
             fetchone=True
         )
+
         power_votes = power_votes_result["power_count"] or 0
 
         # Usar booleanos PostgreSQL
@@ -561,13 +562,15 @@ def get_aforo(user=Depends(admin_required)):
 def reset_db():
     conn = get_db()
     try:
-        # Borrar preguntas, opciones, votos
-        execute_query(conn, "DELETE FROM config", commit=True)
+        # Solo resetear votos y preguntas, NO config
         execute_query(conn, "DELETE FROM votes", commit=True)
         execute_query(conn, "DELETE FROM options", commit=True) 
         execute_query(conn, "DELETE FROM questions", commit=True)
         execute_query(conn, "DELETE FROM participants", commit=True)
-        # No borrar sqlite_sequence en PostgreSQL
-        return {"status": "borrado realizado"}
+        
+        # Resetear estado de participantes sin borrarlos
+        execute_query(conn, "UPDATE participants SET present = false, has_voted = 0, is_power = null, login_time = null", commit=True)
+        
+        return {"status": "votaciones y asistencias reseteadas"}
     finally:
         close_db(conn)
