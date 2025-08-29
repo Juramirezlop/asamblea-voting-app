@@ -1,3 +1,532 @@
+// ================================
+// FUNCIONES GLOBALES PARA TEMPLATES
+// ================================
+
+// Estas funciones se llaman desde los templates HTML generados dinámicamente
+window.voteYesNo = voteYesNo;
+window.selectMultipleOption = selectMultipleOption;
+window.submitMultipleVote = submitMultipleVote;
+window.toggleVotingStatus = toggleVotingStatus;
+window.viewVotingResults = viewVotingResults;
+window.editVoting = editVoting;
+window.deleteVoting = deleteVoting;
+window.selectVotingType = selectVotingType;
+window.setSelectionMode = setSelectionMode;
+window.addNewOption = addNewOption;
+window.removeOptionItem = removeOptionItem;
+window.createNewVoting = createNewVoting;
+window.validateAdminCredentials = validateAdminCredentials;
+
+// ================================
+// MANEJO DE ERRORES GLOBALES
+// ================================
+
+window.addEventListener('error', (event) => {
+    console.error('Error global:', event.error);
+    notifications.show('Ha ocurrido un error inesperado. Por favor, recargue la página.', 'error', 10000);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('Promise rechazada:', event.reason);
+    notifications.show('Error de conectividad. Verifique su conexión a internet.', 'error', 8000);
+});
+
+// ================================
+// LIMPIAR AL CERRAR VENTANA
+// ================================
+
+window.addEventListener('beforeunload', () => {
+    if (updateInterval) {
+        clearInterval(updateInterval);
+    }
+});
+
+// Prevenir cierre accidental durante votaciones activas
+window.addEventListener('beforeunload', (e) => {
+    if (isAdmin || (currentUser && currentUser.code !== CODIGO_PRUEBA)) {
+        e.preventDefault();
+        e.returnValue = '¿Está seguro de que desea salir? Podría perder datos no guardados.';
+    }
+});
+
+console.log('🗳️ Sistema de Votación inicializado correctamente');
+
+// ================================
+// CONFIGURACIÓN Y CONSTANTES
+// ================================
+
+const API_BASE = 'https://web-production-b3d70.up.railway.app/api';
+const CODIGO_PRUEBA = '999-999';
+
+// Variables globales de estado (manteniendo la lógica original)
+let adminToken = null;
+let voterToken = null;
+let currentUser = null;
+let isAdmin = false;
+let updateInterval = null;
+let lastUpdateTimestamp = 0;
+
+// ================================
+// GESTIÓN DE TOKENS (LÓGICA ORIGINAL)
+// ================================
+
+function saveToken(type, token) {
+    localStorage.setItem(`${type}_token`, token);
+}
+
+function getToken(type) {
+    return localStorage.getItem(`${type}_token`);
+}
+
+function clearTokens() {
+    localStorage.removeItem('admin_token');
+    localStorage.removeItem('voter_token');
+}
+
+// ================================
+// COMUNICACIÓN CON API (OPTIMIZADA)
+// ================================
+
+async function apiCall(endpoint, options = {}) {
+    const token = isAdmin ? adminToken : voterToken;
+    
+    const config = {
+        headers: {
+            'Content-Type': 'application/json',
+            ...options.headers
+        },
+        ...options
+    };
+
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}${endpoint}`, config);
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || `HTTP ${response.status}`);
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return await response.json();
+        } else {
+            return response;
+        }
+    } catch (error) {
+        console.error('API Error:', error);
+        throw error;
+    }
+}
+
+// ================================
+// NAVEGACIÓN ENTRE PANTALLAS
+// ================================
+
+function showScreen(screenId) {
+    // Ocultar todas las pantallas
+    document.querySelectorAll('.screen').forEach(screen => {
+        screen.classList.add('hidden');
+    });
+    
+    // Mostrar pantalla solicitada
+    const screen = document.getElementById(screenId);
+    if (screen) {
+        screen.classList.remove('hidden');
+    }
+    
+    // Mostrar/ocultar botón de logout
+    const logoutBtn = document.getElementById('logout-button');
+    if (logoutBtn) {
+        logoutBtn.classList.toggle('hidden', screenId === 'welcome-screen');
+    }
+}
+
+function logout() {
+    // Limpiar tokens y variables
+    clearTokens();
+    adminToken = null;
+    voterToken = null;
+    currentUser = null;
+    isAdmin = false;
+    
+    // Limpiar intervalos
+    if (updateInterval) {
+        clearInterval(updateInterval);
+        updateInterval = null;
+    }
+
+    // Limpiar formularios
+    const accessCode = document.getElementById('access-code');
+    if (accessCode) {
+        accessCode.value = '';
+        accessCode.classList.remove('valid', 'invalid');
+    }
+    
+    // Limpiar status del input
+    const inputStatus = document.getElementById('input-status');
+    if (inputStatus) {
+        inputStatus.textContent = '';
+    }
+
+    showScreen('welcome-screen');
+    notifications.show('Sesión cerrada correctamente', 'info');
+}
+
+// ================================
+// FUNCIONES DE ACCESO (LÓGICA ORIGINAL)
+// ================================
+
+async function registerAttendance() {
+    const code = document.getElementById('access-code').value.trim().toUpperCase();
+    
+    if (!code || !Utils.validateCode(code)) {
+        notifications.show('Formato de código inválido. Use formato Torre-Apto (ej: 1-201)', 'error');
+        return;
+    }
+
+    if (code === CODIGO_PRUEBA) {
+        showTestUserModal();
+        return;
+    }
+
+    try {
+        notifications.show('Verificando código...', 'info');
+        
+        // Verificar si ya está registrado
+        const checkResponse = await apiCall(`/participants/check/${code}`);
+        if (checkResponse.exists) {
+            notifications.show('Este código ya tiene asistencia registrada', 'error');
+            return;
+        }
+        
+        const isPower = await showPowerQuestion();
+        
+        const response = await apiCall('/auth/register-attendance', {
+            method: 'POST',
+            body: JSON.stringify({ 
+                code: code,
+                is_power: isPower
+            })
+        });
+
+        showAttendanceModal(response);
+        notifications.show('Asistencia registrada correctamente', 'success');
+    } catch (error) {
+        notifications.show(`Error: ${error.message}`, 'error');
+    }
+}
+
+async function accessVoting() {
+    const code = document.getElementById('access-code').value.trim().toUpperCase();
+    
+    if (!code || !Utils.validateCode(code)) {
+        notifications.show('Formato de código inválido. Use formato Torre-Apto (ej: 1-201)', 'error');
+        return;
+    }
+
+    if (code === CODIGO_PRUEBA) {
+        currentUser = {
+            code: CODIGO_PRUEBA,
+            name: 'Usuario de Prueba',
+            id: 'test'
+        };
+        isAdmin = false;
+        showVoterScreen();
+        return;
+    }
+
+    try {
+        notifications.show('Verificando acceso a votaciones...', 'info');
+        
+        const response = await apiCall('/auth/login/voter', {
+            method: 'POST',
+            body: JSON.stringify({ code: code })
+        });
+
+        voterToken = response.access_token;
+        saveToken('voter', voterToken);
+        currentUser = {
+            code: code,
+            name: response.name || 'Usuario',
+            id: response.user_id || null
+        };
+        isAdmin = false;
+        
+        showVoterScreen();
+        notifications.show('Acceso a votaciones autorizado', 'success');
+    } catch (error) {
+        if (error.message.includes('401') || error.message.includes('not found') || error.message.includes('Invalid credentials')) {
+            notifications.show('Código no encontrado o no registrado. Use "Registro" primero.', 'error');
+        } else {
+            notifications.show(`Error: ${error.message}`, 'error');
+        }
+    }
+}
+
+function showAdminLogin() {
+    modals.show({
+        title: '🔐 Acceso Administrador',
+        content: `
+            <input type="text" id="modal-admin-username" class="modal-input" placeholder="Usuario" />
+            <input type="password" id="modal-admin-password" class="modal-input" placeholder="Contraseña" />
+        `,
+        actions: [
+            {
+                text: 'Cancelar',
+                class: 'btn-secondary',
+                handler: 'modals.hide()'
+            },
+            {
+                text: 'Ingresar',
+                class: 'btn-primary',
+                handler: 'validateAdminCredentials()'
+            }
+        ]
+    });
+}
+
+async function validateAdminCredentials() {
+    const username = document.getElementById('modal-admin-username').value.trim();
+    const password = document.getElementById('modal-admin-password').value.trim();
+    
+    if (!username || !password) {
+        notifications.show('Complete usuario y contraseña', 'error');
+        return;
+    }
+
+    try {
+        notifications.show('Verificando credenciales...', 'info');
+        
+        const formData = new URLSearchParams();
+        formData.append('username', username);
+        formData.append('password', password);
+
+        const response = await apiCall('/auth/login/admin', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: formData
+        });
+
+        adminToken = response.access_token;
+        saveToken('admin', adminToken);
+        isAdmin = true;
+        
+        modals.hide();
+        await showAdminScreen();
+        notifications.show('Acceso de administrador autorizado', 'success');
+    } catch (error) {
+        notifications.show(`Error: ${error.message}`, 'error');
+    }
+}
+
+// ================================
+// MODALES AUXILIARES
+// ================================
+
+function showTestUserModal() {
+    modals.show({
+        title: '🧪 Usuario de Prueba',
+        content: `
+            <p><strong>Código:</strong> ${CODIGO_PRUEBA}</p>
+            <p><strong>Tipo:</strong> Demostración</p>
+            <p style="color: var(--gray-700); font-size: 0.9rem;">Este usuario no afecta estadísticas reales</p>
+        `,
+        actions: [
+            {
+                text: 'Ir a Votaciones de Prueba',
+                class: 'btn-primary',
+                handler: 'modals.hide(); showVoterScreen();'
+            }
+        ]
+    });
+}
+
+function showAttendanceModal(userData) {
+    modals.show({
+        title: '✅ Asistencia Registrada',
+        content: `
+            <p><strong>Código:</strong> ${userData.code}</p>
+            <p><strong>Nombre:</strong> ${userData.name}</p>
+            <p><strong>Tipo:</strong> ${userData.is_power ? 'Con Poder' : 'Propietario'}</p>
+        `,
+        actions: [
+            {
+                text: 'Cerrar',
+                class: 'btn-primary',
+                handler: 'modals.hide()'
+            }
+        ]
+    });
+}
+
+function showPowerQuestion() {
+    return new Promise((resolve) => {
+        modals.show({
+            title: 'Información del Apartamento',
+            content: `
+                <p style="margin-bottom: 1.5rem;">¿Este apartamento es suyo o tiene poder para votar por él?</p>
+                <div style="display: flex; gap: 1rem; justify-content: center;">
+                    <button class="btn btn-success" onclick="resolvePowerQuestion(false)" style="flex: 1;">
+                        Soy propietario
+                    </button>
+                    <button class="btn btn-warning" onclick="resolvePowerQuestion(true)" style="flex: 1;">
+                        Tengo poder
+                    </button>
+                </div>
+            `,
+            closable: false
+        });
+        
+        window.resolvePowerQuestion = (isPower) => {
+            modals.hide();
+            delete window.resolvePowerQuestion;
+            resolve(isPower);
+        };
+    });
+}
+
+// ================================
+// PANTALLA DE VOTANTES
+// ================================
+
+async function showVoterScreen() {
+    showScreen('voter-screen');
+    
+    // Actualizar información del usuario
+    document.getElementById('voter-code').textContent = currentUser.code;
+    document.getElementById('voter-name').textContent = `Bienvenido/a, ${currentUser.name}`;
+    
+    await loadVotingQuestions();
+    startVotingPolling();
+}
+
+async function loadVotingQuestions() {
+    const container = document.getElementById('voting-questions');
+    
+    try {
+        // Para usuario de prueba
+        if (currentUser && currentUser.code === CODIGO_PRUEBA) {
+            const testQuestions = getSimulatedTestQuestions();
+            renderVotingQuestions(testQuestions);
+            return;
+        }
+
+        const questions = await apiCall('/voting/questions/active');
+        const votedQuestions = await checkUserVotes();
+        
+        renderVotingQuestions(questions, votedQuestions);
+    } catch (error) {
+        console.error('Error loading voting questions:', error);
+        container.innerHTML = `
+            <div class="panel">
+                <p style="color: var(--danger-color); text-align: center;">Error cargando votaciones: ${error.message}</p>
+            </div>
+        `;
+    }
+}
+
+function renderVotingQuestions(questions, votedQuestions = new Set()) {
+    const container = document.getElementById('voting-questions');
+    
+    if (questions.length === 0) {
+        container.innerHTML = `
+            <div class="panel">
+                <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 1rem; opacity: 0.5;">
+                        <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"></path>
+                        <path d="M9 7V3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path>
+                    </svg>
+                    <h3 style="margin-bottom: 0.5rem; color: var(--gray-700);">No hay votaciones activas</h3>
+                    <p>Espere a que el administrador active nuevas votaciones</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    // Ordenar preguntas: abiertas primero, luego cerradas
+    const sortedQuestions = [...questions].sort((a, b) => {
+        if (a.closed === b.closed) return 0;
+        return a.closed ? 1 : -1;
+    });
+
+    let html = '';
+    sortedQuestions.forEach(question => {
+        const hasVoted = votedQuestions.has(question.id);
+        
+        if (hasVoted) {
+            // Mostrar que ya votó
+            html += VotingComponents.createVotedStatus(question, 'Registrado');
+        } else if (question.closed) {
+            // Votación cerrada
+            html += `
+                <div class="voting-card">
+                    <div class="question-header">
+                        <div class="question-title">${question.text}</div>
+                    </div>
+                    <div class="voted-status" style="background: linear-gradient(145deg, #fef2f2, #fecaca); border-color: var(--danger-color); color: var(--danger-dark);">
+                        🔒 Esta votación ha sido cerrada
+                    </div>
+                </div>
+            `;
+        } else {
+            // Votación activa
+            if (question.type === 'yesno') {
+                html += VotingComponents.createYesNoVoting(question);
+            } else {
+                html += VotingComponents.createMultipleVoting(question);
+            }
+        }
+    });
+
+    container.innerHTML = html;
+}
+
+function getSimulatedTestQuestions() {
+    return [
+        {
+            id: 9991,
+            text: "[PRUEBA] ¿Aprueba la propuesta de mejoras?",
+            type: "yesno",
+            closed: false,
+            options: [{text: 'SÍ'}, {text: 'No'}]
+        },
+        {
+            id: 9992, 
+            text: "[PRUEBA] Elija el representante de la junta",
+            type: "multiple",
+            closed: false,
+            allow_multiple: false,
+            max_selections: 1,
+            options: [
+                {text: "Juan Pérez"}, 
+                {text: "María García"}, 
+                {text: "Carlos López"}
+            ]
+        },
+        {
+            id: 9993,
+            text: "[PRUEBA] Seleccione mejoras prioritarias (máximo 2)",
+            type: "multiple", 
+            closed: false,
+            allow_multiple: true,
+            max_selections: 2,
+            options: [
+                {text: "Piscina"}, 
+                {text: "Gimnasio"}, 
+                {text: "Jardines"}, 
+                {text: "Parqueaderos"}
+            ]
+        }
+    ];
+}
+
 async function checkUserVotes() {
     try {
         if (currentUser && currentUser.code === CODIGO_PRUEBA) {
@@ -1215,536 +1744,4 @@ function setupVisualEffects() {
             }
         });
     });
-}
-
-// ================================
-// FUNCIONES GLOBALES PARA TEMPLATES
-// ================================
-
-// Estas funciones se llaman desde los templates HTML generados dinámicamente
-window.voteYesNo = voteYesNo;
-window.selectMultipleOption = selectMultipleOption;
-window.submitMultipleVote = submitMultipleVote;
-window.toggleVotingStatus = toggleVotingStatus;
-window.viewVotingResults = viewVotingResults;
-window.editVoting = editVoting;
-window.deleteVoting = deleteVoting;
-window.selectVotingType = selectVotingType;
-window.setSelectionMode = setSelectionMode;
-window.addNewOption = addNewOption;
-window.removeOptionItem = removeOptionItem;
-window.createNewVoting = createNewVoting;
-window.validateAdminCredentials = validateAdminCredentials;
-
-// ================================
-// MANEJO DE ERRORES GLOBALES
-// ================================
-
-window.addEventListener('error', (event) => {
-    console.error('Error global:', event.error);
-    notifications.show('Ha ocurrido un error inesperado. Por favor, recargue la página.', 'error', 10000);
-});
-
-window.addEventListener('unhandledrejection', (event) => {
-    console.error('Promise rechazada:', event.reason);
-    notifications.show('Error de conectividad. Verifique su conexión a internet.', 'error', 8000);
-});
-
-// ================================
-// LIMPIAR AL CERRAR VENTANA
-// ================================
-
-window.addEventListener('beforeunload', () => {
-    if (updateInterval) {
-        clearInterval(updateInterval);
-    }
-});
-
-// Prevenir cierre accidental durante votaciones activas
-window.addEventListener('beforeunload', (e) => {
-    if (isAdmin || (currentUser && currentUser.code !== CODIGO_PRUEBA)) {
-        e.preventDefault();
-        e.returnValue = '¿Está seguro de que desea salir? Podría perder datos no guardados.';
-    }
-});
-
-console.log('🗳️ Sistema de Votación inicializado correctamente');/**
- * APLICACIÓN PRINCIPAL DE VOTACIÓN
- * Mantiene toda la lógica existente pero optimizada y modernizada
- */
-
-// ================================
-// CONFIGURACIÓN Y CONSTANTES
-// ================================
-
-const API_BASE = 'https://web-production-b3d70.up.railway.app/api';
-const CODIGO_PRUEBA = '999-999';
-
-// Variables globales de estado (manteniendo la lógica original)
-let adminToken = null;
-let voterToken = null;
-let currentUser = null;
-let isAdmin = false;
-let updateInterval = null;
-let lastUpdateTimestamp = 0;
-
-// ================================
-// GESTIÓN DE TOKENS (LÓGICA ORIGINAL)
-// ================================
-
-function saveToken(type, token) {
-    localStorage.setItem(`${type}_token`, token);
-}
-
-function getToken(type) {
-    return localStorage.getItem(`${type}_token`);
-}
-
-function clearTokens() {
-    localStorage.removeItem('admin_token');
-    localStorage.removeItem('voter_token');
-}
-
-// ================================
-// COMUNICACIÓN CON API (OPTIMIZADA)
-// ================================
-
-async function apiCall(endpoint, options = {}) {
-    const token = isAdmin ? adminToken : voterToken;
-    
-    const config = {
-        headers: {
-            'Content-Type': 'application/json',
-            ...options.headers
-        },
-        ...options
-    };
-
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-
-    try {
-        const response = await fetch(`${API_BASE}${endpoint}`, config);
-        
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(errorData.detail || `HTTP ${response.status}`);
-        }
-
-        const contentType = response.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-            return await response.json();
-        } else {
-            return response;
-        }
-    } catch (error) {
-        console.error('API Error:', error);
-        throw error;
-    }
-}
-
-// ================================
-// NAVEGACIÓN ENTRE PANTALLAS
-// ================================
-
-function showScreen(screenId) {
-    // Ocultar todas las pantallas
-    document.querySelectorAll('.screen').forEach(screen => {
-        screen.classList.add('hidden');
-    });
-    
-    // Mostrar pantalla solicitada
-    const screen = document.getElementById(screenId);
-    if (screen) {
-        screen.classList.remove('hidden');
-    }
-    
-    // Mostrar/ocultar botón de logout
-    const logoutBtn = document.getElementById('logout-button');
-    if (logoutBtn) {
-        logoutBtn.classList.toggle('hidden', screenId === 'welcome-screen');
-    }
-}
-
-function logout() {
-    // Limpiar tokens y variables
-    clearTokens();
-    adminToken = null;
-    voterToken = null;
-    currentUser = null;
-    isAdmin = false;
-    
-    // Limpiar intervalos
-    if (updateInterval) {
-        clearInterval(updateInterval);
-        updateInterval = null;
-    }
-
-    // Limpiar formularios
-    const accessCode = document.getElementById('access-code');
-    if (accessCode) {
-        accessCode.value = '';
-        accessCode.classList.remove('valid', 'invalid');
-    }
-    
-    // Limpiar status del input
-    const inputStatus = document.getElementById('input-status');
-    if (inputStatus) {
-        inputStatus.textContent = '';
-    }
-
-    showScreen('welcome-screen');
-    notifications.show('Sesión cerrada correctamente', 'info');
-}
-
-// ================================
-// FUNCIONES DE ACCESO (LÓGICA ORIGINAL)
-// ================================
-
-async function registerAttendance() {
-    const code = document.getElementById('access-code').value.trim().toUpperCase();
-    
-    if (!code || !Utils.validateCode(code)) {
-        notifications.show('Formato de código inválido. Use formato Torre-Apto (ej: 1-201)', 'error');
-        return;
-    }
-
-    if (code === CODIGO_PRUEBA) {
-        showTestUserModal();
-        return;
-    }
-
-    try {
-        notifications.show('Verificando código...', 'info');
-        
-        // Verificar si ya está registrado
-        const checkResponse = await apiCall(`/participants/check/${code}`);
-        if (checkResponse.exists) {
-            notifications.show('Este código ya tiene asistencia registrada', 'error');
-            return;
-        }
-        
-        const isPower = await showPowerQuestion();
-        
-        const response = await apiCall('/auth/register-attendance', {
-            method: 'POST',
-            body: JSON.stringify({ 
-                code: code,
-                is_power: isPower
-            })
-        });
-
-        showAttendanceModal(response);
-        notifications.show('Asistencia registrada correctamente', 'success');
-    } catch (error) {
-        notifications.show(`Error: ${error.message}`, 'error');
-    }
-}
-
-async function accessVoting() {
-    const code = document.getElementById('access-code').value.trim().toUpperCase();
-    
-    if (!code || !Utils.validateCode(code)) {
-        notifications.show('Formato de código inválido. Use formato Torre-Apto (ej: 1-201)', 'error');
-        return;
-    }
-
-    if (code === CODIGO_PRUEBA) {
-        currentUser = {
-            code: CODIGO_PRUEBA,
-            name: 'Usuario de Prueba',
-            id: 'test'
-        };
-        isAdmin = false;
-        showVoterScreen();
-        return;
-    }
-
-    try {
-        notifications.show('Verificando acceso a votaciones...', 'info');
-        
-        const response = await apiCall('/auth/login/voter', {
-            method: 'POST',
-            body: JSON.stringify({ code: code })
-        });
-
-        voterToken = response.access_token;
-        saveToken('voter', voterToken);
-        currentUser = {
-            code: code,
-            name: response.name || 'Usuario',
-            id: response.user_id || null
-        };
-        isAdmin = false;
-        
-        showVoterScreen();
-        notifications.show('Acceso a votaciones autorizado', 'success');
-    } catch (error) {
-        if (error.message.includes('401') || error.message.includes('not found') || error.message.includes('Invalid credentials')) {
-            notifications.show('Código no encontrado o no registrado. Use "Registro" primero.', 'error');
-        } else {
-            notifications.show(`Error: ${error.message}`, 'error');
-        }
-    }
-}
-
-function showAdminLogin() {
-    modals.show({
-        title: '🔐 Acceso Administrador',
-        content: `
-            <input type="text" id="modal-admin-username" class="modal-input" placeholder="Usuario" />
-            <input type="password" id="modal-admin-password" class="modal-input" placeholder="Contraseña" />
-        `,
-        actions: [
-            {
-                text: 'Cancelar',
-                class: 'btn-secondary',
-                handler: 'modals.hide()'
-            },
-            {
-                text: 'Ingresar',
-                class: 'btn-primary',
-                handler: 'validateAdminCredentials()'
-            }
-        ]
-    });
-}
-
-async function validateAdminCredentials() {
-    const username = document.getElementById('modal-admin-username').value.trim();
-    const password = document.getElementById('modal-admin-password').value.trim();
-    
-    if (!username || !password) {
-        notifications.show('Complete usuario y contraseña', 'error');
-        return;
-    }
-
-    try {
-        notifications.show('Verificando credenciales...', 'info');
-        
-        const formData = new URLSearchParams();
-        formData.append('username', username);
-        formData.append('password', password);
-
-        const response = await apiCall('/auth/login/admin', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: formData
-        });
-
-        adminToken = response.access_token;
-        saveToken('admin', adminToken);
-        isAdmin = true;
-        
-        modals.hide();
-        await showAdminScreen();
-        notifications.show('Acceso de administrador autorizado', 'success');
-    } catch (error) {
-        notifications.show(`Error: ${error.message}`, 'error');
-    }
-}
-
-// ================================
-// MODALES AUXILIARES
-// ================================
-
-function showTestUserModal() {
-    modals.show({
-        title: '🧪 Usuario de Prueba',
-        content: `
-            <p><strong>Código:</strong> ${CODIGO_PRUEBA}</p>
-            <p><strong>Tipo:</strong> Demostración</p>
-            <p style="color: var(--gray-700); font-size: 0.9rem;">Este usuario no afecta estadísticas reales</p>
-        `,
-        actions: [
-            {
-                text: 'Ir a Votaciones de Prueba',
-                class: 'btn-primary',
-                handler: 'modals.hide(); showVoterScreen();'
-            }
-        ]
-    });
-}
-
-function showAttendanceModal(userData) {
-    modals.show({
-        title: '✅ Asistencia Registrada',
-        content: `
-            <p><strong>Código:</strong> ${userData.code}</p>
-            <p><strong>Nombre:</strong> ${userData.name}</p>
-            <p><strong>Tipo:</strong> ${userData.is_power ? 'Con Poder' : 'Propietario'}</p>
-        `,
-        actions: [
-            {
-                text: 'Cerrar',
-                class: 'btn-primary',
-                handler: 'modals.hide()'
-            }
-        ]
-    });
-}
-
-function showPowerQuestion() {
-    return new Promise((resolve) => {
-        modals.show({
-            title: 'Información del Apartamento',
-            content: `
-                <p style="margin-bottom: 1.5rem;">¿Este apartamento es suyo o tiene poder para votar por él?</p>
-                <div style="display: flex; gap: 1rem; justify-content: center;">
-                    <button class="btn btn-success" onclick="resolvePowerQuestion(false)" style="flex: 1;">
-                        Soy propietario
-                    </button>
-                    <button class="btn btn-warning" onclick="resolvePowerQuestion(true)" style="flex: 1;">
-                        Tengo poder
-                    </button>
-                </div>
-            `,
-            closable: false
-        });
-        
-        window.resolvePowerQuestion = (isPower) => {
-            modals.hide();
-            delete window.resolvePowerQuestion;
-            resolve(isPower);
-        };
-    });
-}
-
-// ================================
-// PANTALLA DE VOTANTES
-// ================================
-
-async function showVoterScreen() {
-    showScreen('voter-screen');
-    
-    // Actualizar información del usuario
-    document.getElementById('voter-code').textContent = currentUser.code;
-    document.getElementById('voter-name').textContent = `Bienvenido/a, ${currentUser.name}`;
-    
-    await loadVotingQuestions();
-    startVotingPolling();
-}
-
-async function loadVotingQuestions() {
-    const container = document.getElementById('voting-questions');
-    
-    try {
-        // Para usuario de prueba
-        if (currentUser && currentUser.code === CODIGO_PRUEBA) {
-            const testQuestions = getSimulatedTestQuestions();
-            renderVotingQuestions(testQuestions);
-            return;
-        }
-
-        const questions = await apiCall('/voting/questions/active');
-        const votedQuestions = await checkUserVotes();
-        
-        renderVotingQuestions(questions, votedQuestions);
-    } catch (error) {
-        console.error('Error loading voting questions:', error);
-        container.innerHTML = `
-            <div class="panel">
-                <p style="color: var(--danger-color); text-align: center;">Error cargando votaciones: ${error.message}</p>
-            </div>
-        `;
-    }
-}
-
-function renderVotingQuestions(questions, votedQuestions = new Set()) {
-    const container = document.getElementById('voting-questions');
-    
-    if (questions.length === 0) {
-        container.innerHTML = `
-            <div class="panel">
-                <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 1rem; opacity: 0.5;">
-                        <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"></path>
-                        <path d="M9 7V3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path>
-                    </svg>
-                    <h3 style="margin-bottom: 0.5rem; color: var(--gray-700);">No hay votaciones activas</h3>
-                    <p>Espere a que el administrador active nuevas votaciones</p>
-                </div>
-            </div>
-        `;
-        return;
-    }
-
-    // Ordenar preguntas: abiertas primero, luego cerradas
-    const sortedQuestions = [...questions].sort((a, b) => {
-        if (a.closed === b.closed) return 0;
-        return a.closed ? 1 : -1;
-    });
-
-    let html = '';
-    sortedQuestions.forEach(question => {
-        const hasVoted = votedQuestions.has(question.id);
-        
-        if (hasVoted) {
-            // Mostrar que ya votó
-            html += VotingComponents.createVotedStatus(question, 'Registrado');
-        } else if (question.closed) {
-            // Votación cerrada
-            html += `
-                <div class="voting-card">
-                    <div class="question-header">
-                        <div class="question-title">${question.text}</div>
-                    </div>
-                    <div class="voted-status" style="background: linear-gradient(145deg, #fef2f2, #fecaca); border-color: var(--danger-color); color: var(--danger-dark);">
-                        🔒 Esta votación ha sido cerrada
-                    </div>
-                </div>
-            `;
-        } else {
-            // Votación activa
-            if (question.type === 'yesno') {
-                html += VotingComponents.createYesNoVoting(question);
-            } else {
-                html += VotingComponents.createMultipleVoting(question);
-            }
-        }
-    });
-
-    container.innerHTML = html;
-}
-
-function getSimulatedTestQuestions() {
-    return [
-        {
-            id: 9991,
-            text: "[PRUEBA] ¿Aprueba la propuesta de mejoras?",
-            type: "yesno",
-            closed: false,
-            options: [{text: 'SÍ'}, {text: 'No'}]
-        },
-        {
-            id: 9992, 
-            text: "[PRUEBA] Elija el representante de la junta",
-            type: "multiple",
-            closed: false,
-            allow_multiple: false,
-            max_selections: 1,
-            options: [
-                {text: "Juan Pérez"}, 
-                {text: "María García"}, 
-                {text: "Carlos López"}
-            ]
-        },
-        {
-            id: 9993,
-            text: "[PRUEBA] Seleccione mejoras prioritarias (máximo 2)",
-            type: "multiple", 
-            closed: false,
-            allow_multiple: true,
-            max_selections: 2,
-            options: [
-                {text: "Piscina"}, 
-                {text: "Gimnasio"}, 
-                {text: "Jardines"}, 
-                {text: "Parqueaderos"}
-            ]
-        }
-    ];
 }
