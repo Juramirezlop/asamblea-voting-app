@@ -2,7 +2,7 @@
 // CONFIGURACIÓN Y CONSTANTES
 // ================================
 
-const API_BASE = 'https://web-production-d4d81.up.railway.app/';
+const API_BASE = "https://web-production-b3d70.up.railway.app/api"
 const CODIGO_PRUEBA = '999-999';
 
 // Variables globales de estado (manteniendo la lógica original)
