@@ -255,6 +255,9 @@ class VotingComponents {
                 <div class="question-header">
                     <div class="question-title">${question.text}</div>
                     <div class="question-meta">
+                    ${question.time_remaining_seconds ? `
+                        <div class="question-timer">⏰ ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')} restantes</div>
+                    ` : ''}
                         <div class="meta-item">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M3 3v18h18"></path>
@@ -301,6 +304,9 @@ class VotingComponents {
                 <div class="question-header">
                     <div class="question-title">${question.text}</div>
                     <div class="question-meta">
+                    ${question.time_remaining_seconds ? `
+                        <div class="question-timer">⏰ ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')} restantes</div>
+                    ` : ''}
                         <div class="meta-item">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"></path>

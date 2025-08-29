@@ -2186,3 +2186,23 @@ body {
         width: 100%;
     }
 }
+
+/* Cronómetro de votaciones */
+.question-timer {
+    background: linear-gradient(135deg, var(--warning-color), var(--warning-dark));
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-full);
+    font-weight: 600;
+    display: inline-block;
+    margin-bottom: 1rem;
+    animation: pulse 2s infinite;
+}
+
+/* Panel de gestión de votantes */
+.voter-management-panel {
+    background: var(--gray-50);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    margin-top: 1rem;
+}

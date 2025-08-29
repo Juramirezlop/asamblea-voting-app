@@ -439,6 +439,10 @@ async function loadVotingQuestions() {
             return;
         }
 
+        if (isAdmin) {
+            await apiCall('/voting/questions/check-expired', { method: 'POST' });
+        }
+
         const questions = await apiCall('/voting/questions/active');
         const votedQuestions = await checkUserVotes();
         
@@ -1063,10 +1067,13 @@ function showParticipantsModal(title, participants) {
             '<p style="text-align: center; color: var(--gray-700); padding: 2rem;">No se encontraron participantes</p>' :
             `<div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--gray-300); border-radius: 12px;">
                 ${pageParticipants.map(p => `
-                    <div style="padding: 1rem; border-bottom: 1px solid var(--gray-300); display: grid; grid-template-columns: 80px 1fr 60px; gap: 1rem; align-items: center;">
+                    <div style="padding: 1rem; border-bottom: 1px solid var(--gray-300); display: grid; grid-template-columns: 80px 1fr 60px 90px; gap: 1rem; align-items: center;">
                         <span style="font-weight: 600;">${p.code}</span>
                         <span style="overflow: hidden; text-overflow: ellipsis;">${p.name || 'Sin nombre'}</span>
                         <span style="color: var(--primary-color); font-weight: 500; text-align: right;">${p.coefficient || 0}%</span>
+                        <button class="btn btn-info" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="showVoterManagementModal('${p.code}')">
+                            👤 Gestionar
+                        </button>
                     </div>
                 `).join('')}
             </div>`;
@@ -1573,6 +1580,72 @@ function showDeleteCodeModal() {
             notifications.show(`Error: ${error.message}`, 'error');
         }
     };
+}
+
+async function showVoterManagementModal(code) {
+    try {
+        // Obtener info del votante
+        const voterInfo = await apiCall(`/admin/voter-info/${code}`);
+        const voterVotes = await apiCall(`/admin/voter-votes/${code}`);
+        
+        const votesHTML = voterVotes.length > 0 ? 
+            voterVotes.map(vote => `<div>Pregunta ${vote.question_id}: ${vote.answer}</div>`).join('') :
+            '<p>Sin votos registrados</p>';
+        
+        modals.show({
+            title: `👤 Gestión de Votante`,
+            content: `
+                <div style="margin-bottom: 1rem;">
+                    <strong>Código:</strong> ${voterInfo.code}<br>
+                    <strong>Nombre:</strong> ${voterInfo.name}<br>
+                    <strong>Coeficiente:</strong> ${voterInfo.coefficient}%<br>
+                    <strong>Presente:</strong> ${voterInfo.present ? 'Sí' : 'No'}
+                </div>
+                
+                <label style="display: block; margin-bottom: 0.5rem;">Tipo de participación:</label>
+                <select id="voter-type-select" class="modal-input">
+                    <option value="false" ${!voterInfo.is_power ? 'selected' : ''}>Propietario</option>
+                    <option value="true" ${voterInfo.is_power ? 'selected' : ''}>Con Poder</option>
+                </select>
+                
+                <div style="margin-top: 1rem; padding: 1rem; background: var(--gray-50); border-radius: 8px;">
+                    <strong>Votos registrados:</strong>
+                    ${votesHTML}
+                </div>
+            `,
+            actions: [
+                {
+                    text: 'Cancelar',
+                    class: 'btn-secondary',
+                    handler: 'modals.hide()'
+                },
+                {
+                    text: 'Guardar Cambios',
+                    class: 'btn-primary',
+                    handler: `saveVoterChanges('${code}')`
+                }
+            ]
+        });
+    } catch (error) {
+        notifications.show(`Error: ${error.message}`, 'error');
+    }
+}
+
+async function saveVoterChanges(code) {
+    const isPower = document.getElementById('voter-type-select').value === 'true';
+    
+    try {
+        await apiCall(`/admin/edit-voter/${code}`, {
+            method: 'PUT',
+            body: JSON.stringify({ is_power: isPower })
+        });
+        
+        modals.hide();
+        await loadAforoData(); // Refrescar estadísticas
+        notifications.show('Votante actualizado correctamente', 'success');
+    } catch (error) {
+        notifications.show(`Error: ${error.message}`, 'error');
+    }
 }
 
 async function downloadReports() {
