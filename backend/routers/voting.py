@@ -530,10 +530,10 @@ def get_aforo(user=Depends(admin_required)):
         )
         power_votes = power_votes_result["power_count"] or 0
 
-        # FIX: usar TRUE para present
+        # Usar booleanos PostgreSQL
         voted_data = execute_query(
             conn,
-            "SELECT COUNT(*) as voted_count FROM participants WHERE present = 1 AND has_voted = 1",
+            "SELECT COUNT(*) as voted_count FROM participants WHERE present = true AND has_voted = 1",
             fetchone=True
         )
         voted_count = voted_data["voted_count"] or 0

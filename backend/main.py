@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi import WebSocket, WebSocketDisconnect
+from starlette.types import ASGIApp, Scope, Receive, Send
 from typing import List
 import json
 from pathlib import Path
@@ -44,18 +45,17 @@ PERFORMANCE_CONFIG = {
     'cache_control_max_age': 3600,
 }
 
-# Middleware de monitoreo de rendimiento
+# Middleware de monitoreo de rendimiento CORREGIDO
 class PerformanceMiddleware:
-    def __init__(self, app):
+    def __init__(self, app: ASGIApp):
         self.app = app
         self.request_times = []
         self.request_count = 0
         
-    async def __call__(self, scope, receive, send):
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "http":
             start_time = time.time()
             
-            # Wrapper para capturar tiempo de respuesta
             async def send_wrapper(message):
                 if message["type"] == "http.response.start":
                     duration = time.time() - start_time
@@ -100,6 +100,16 @@ async def lifespan(app: FastAPI):
         # Log de configuración
         pool_status = get_pool_status()
         logger.info(f"Pool de conexiones: {pool_status}")
+        
+        # Log adicional de startup
+        logger.info("=" * 60)
+        logger.info("🗳️  SISTEMA DE VOTACIÓN PARA ASAMBLEAS")
+        logger.info("=" * 60)
+        logger.info(f"Versión: 2.0.0")
+        logger.info(f"Entorno: {'Producción (Railway)' if os.getenv('RAILWAY_ENVIRONMENT') else 'Desarrollo'}")
+        logger.info(f"Optimizado para: {PERFORMANCE_CONFIG['limit_concurrency']}+ usuarios simultáneos")
+        logger.info(f"Pool de BD: {get_pool_status()}")
+        logger.info("=" * 60)
         
         yield
         
@@ -203,9 +213,8 @@ else:
         allow_headers=["*"],
     )
 
-# Middleware de rendimiento personalizado
-performance_middleware = PerformanceMiddleware(app)
-app.add_middleware(type(performance_middleware), app=performance_middleware.app)
+# CORRECCIÓN: Agregar middleware de rendimiento personalizado
+app.add_middleware(PerformanceMiddleware)
 
 # ================================
 # RUTAS DE SALUD Y MONITOREO
@@ -218,13 +227,26 @@ async def health_endpoint():
     pool_status = get_pool_status()
     cache_stats = query_cache.get_stats()
     
-    # Estadísticas de rendimiento
-    if hasattr(performance_middleware, 'request_times') and performance_middleware.request_times:
-        avg_response_time = sum(performance_middleware.request_times) / len(performance_middleware.request_times)
-        max_response_time = max(performance_middleware.request_times)
+    # Obtener estadísticas de rendimiento de manera segura
+    performance_middleware_instance = None
+    for middleware in app.user_middleware:
+        if hasattr(middleware, 'cls') and middleware.cls == PerformanceMiddleware:
+            performance_middleware_instance = middleware
+            break
+    
+    if performance_middleware_instance and hasattr(performance_middleware_instance, 'request_times'):
+        if performance_middleware_instance.request_times:
+            avg_response_time = sum(performance_middleware_instance.request_times) / len(performance_middleware_instance.request_times)
+            max_response_time = max(performance_middleware_instance.request_times)
+            request_count = performance_middleware_instance.request_count
+        else:
+            avg_response_time = 0
+            max_response_time = 0
+            request_count = 0
     else:
         avg_response_time = 0
         max_response_time = 0
+        request_count = 0
     
     status_code = 200 if health["status"] == "healthy" else 503
     
@@ -237,7 +259,7 @@ async def health_endpoint():
             "connection_pool": pool_status,
             "cache": cache_stats,
             "performance": {
-                "requests_processed": performance_middleware.request_count,
+                "requests_processed": request_count,
                 "avg_response_time_ms": round(avg_response_time * 1000, 2),
                 "max_response_time_ms": round(max_response_time * 1000, 2)
             },
@@ -251,12 +273,23 @@ async def metrics_endpoint():
     if not os.getenv("ENABLE_METRICS"):
         raise HTTPException(status_code=404, detail="Metrics not enabled")
     
+    # Obtener métricas de performance de manera segura
+    recent_response_times = []
+    total_requests = 0
+    
+    for middleware in app.user_middleware:
+        if hasattr(middleware, 'cls') and middleware.cls == PerformanceMiddleware:
+            if hasattr(middleware, 'request_times'):
+                recent_response_times = middleware.request_times[-10:] if middleware.request_times else []
+                total_requests = middleware.request_count
+            break
+    
     return {
         "database_pool": get_pool_status(),
         "cache": query_cache.get_stats(),
         "performance": {
-            "total_requests": performance_middleware.request_count,
-            "recent_response_times": performance_middleware.request_times[-10:] if performance_middleware.request_times else []
+            "total_requests": total_requests,
+            "recent_response_times": recent_response_times
         }
     }
 
@@ -440,22 +473,6 @@ async def http_exception_handler(request: Request, exc: HTTPException):
             "timestamp": time.time()
         }
     )
-
-# ================================
-# EVENTS DE APLICACIÓN
-# ================================
-
-@app.on_event("startup")
-async def log_startup():
-    """Log adicional en startup"""
-    logger.info("=" * 60)
-    logger.info("🗳️  SISTEMA DE VOTACIÓN PARA ASAMBLEAS")
-    logger.info("=" * 60)
-    logger.info(f"Versión: 2.0.0")
-    logger.info(f"Entorno: {'Producción (Railway)' if os.getenv('RAILWAY_ENVIRONMENT') else 'Desarrollo'}")
-    logger.info(f"Optimizado para: {PERFORMANCE_CONFIG['limit_concurrency']}+ usuarios simultáneos")
-    logger.info(f"Pool de BD: {get_pool_status()}")
-    logger.info("=" * 60)
 
 # ================================
 # CONFIGURACIÓN DE SERVIDOR

@@ -1,21 +1,17 @@
 // ================================
-// FUNCIONES GLOBALES PARA TEMPLATES
+// CONFIGURACIÓN Y CONSTANTES
 // ================================
 
-// Estas funciones se llaman desde los templates HTML generados dinámicamente
-window.voteYesNo = voteYesNo;
-window.selectMultipleOption = selectMultipleOption;
-window.submitMultipleVote = submitMultipleVote;
-window.toggleVotingStatus = toggleVotingStatus;
-window.viewVotingResults = viewVotingResults;
-window.editVoting = editVoting;
-window.deleteVoting = deleteVoting;
-window.selectVotingType = selectVotingType;
-window.setSelectionMode = setSelectionMode;
-window.addNewOption = addNewOption;
-window.removeOptionItem = removeOptionItem;
-window.createNewVoting = createNewVoting;
-window.validateAdminCredentials = validateAdminCredentials;
+const API_BASE = 'https://web-production-b3d70.up.railway.app/api';
+const CODIGO_PRUEBA = '999-999';
+
+// Variables globales de estado (manteniendo la lógica original)
+let adminToken = null;
+let voterToken = null;
+let currentUser = null;
+let isAdmin = false;
+let updateInterval = null;
+let lastUpdateTimestamp = 0;
 
 // ================================
 // MANEJO DE ERRORES GLOBALES
@@ -50,21 +46,6 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 console.log('🗳️ Sistema de Votación inicializado correctamente');
-
-// ================================
-// CONFIGURACIÓN Y CONSTANTES
-// ================================
-
-const API_BASE = 'https://web-production-b3d70.up.railway.app/api';
-const CODIGO_PRUEBA = '999-999';
-
-// Variables globales de estado (manteniendo la lógica original)
-let adminToken = null;
-let voterToken = null;
-let currentUser = null;
-let isAdmin = false;
-let updateInterval = null;
-let lastUpdateTimestamp = 0;
 
 // ================================
 // GESTIÓN DE TOKENS (LÓGICA ORIGINAL)

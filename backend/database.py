@@ -242,13 +242,13 @@ def optimize_query(query):
     """Aplicar optimizaciones específicas a queries comunes"""
     # Optimización para consultas de aforo (muy frecuentes)
     if "COUNT(*) as" in query and "participants" in query:
-        # Agregar hint para usar índices
+        # PostgreSQL usa booleanos reales
         if "present = 1" in query:
-            query = query.replace("WHERE present = 1", "WHERE present = true")
+            query = query.replace("present = 1", "present = true")
         if "is_power = FALSE" in query:
-            query = query.replace("is_power = FALSE", "is_power = false")
+            pass  # Ya está correcto
         elif "is_power = TRUE" in query:
-            query = query.replace("is_power = TRUE", "is_power = true")
+            pass  # Ya está correcto
     
     # Optimización para consultas de resultados de votación
     if "votes" in query and "participants" in query and "JOIN" in query:
