@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Votación - Asamblea General</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗳️</text></svg>">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Botón de salir (solo visible cuando no esté en pantalla inicial) -->
+    <button class="logout-btn hidden" id="logout-button">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16,17 21,12 16,7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+        Salir
+    </button>
+
+    <!-- PANTALLA INICIAL -->
+    <div class="screen" id="welcome-screen">
+        <div class="container">
+            <div class="header">
+                <div class="header-content">
+                    <div class="logo">
+                        <div class="logo-icon">🗳️</div>
+                        <div class="logo-text">
+                            <h1>Sistema de Votación</h1>
+                            <p>Asamblea General</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="welcome-content">
+                <div class="access-card">
+                    <div class="card-header">
+                        <h2>Ingrese su código de acceso</h2>
+                        <p>Formato: Torre-Apartamento (ejemplo: 1-201, 2-1503)</p>
+                    </div>
+
+                    <div class="input-group">
+                        <input type="text" 
+                               class="access-input" 
+                               id="access-code" 
+                               placeholder="1-201" 
+                               maxlength="10"
+                               autocomplete="off">
+                        <div class="input-status" id="input-status"></div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button class="btn btn-primary btn-large" id="register-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                            Registro de Asistencia
+                        </button>
+                        
+                        <button class="btn btn-secondary btn-large" id="voting-btn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"></path>
+                                <path d="M9 7V3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path>
+                            </svg>
+                            Acceder a Votaciones
+                        </button>
+                    </div>
+
+                    <button class="btn btn-admin" id="admin-btn">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"></path>
+                        </svg>
+                        Acceso Administrador
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA DE VOTANTES -->
+    <div class="screen hidden" id="voter-screen">
+        <div class="container">
+            <div class="header voter-header">
+                <div class="header-content">
+                    <h1>Sus Votaciones</h1>
+                    <div class="user-info">
+                        <div class="user-avatar">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                        </div>
+                        <div class="user-details">
+                            <h3 id="voter-name">Bienvenido/a</h3>
+                            <div class="user-meta">
+                                <span>Código: <strong id="voter-code">-</strong></span>
+                                <span class="status-badge" id="voter-status">Conectado</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="attendance-info">
+                        <div class="info-item">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22,4 12,14.01 9,11.01"></polyline>
+                            </svg>
+                            <span>Asistencia registrada automáticamente</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content">
+                <div id="voting-questions" class="voting-container">
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        <p>Cargando votaciones...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA DE ADMINISTRADOR -->
+    <div class="screen hidden" id="admin-screen">
+        <div class="container">
+            <div class="header admin-header">
+                <div class="header-content">
+                    <div class="admin-title">
+                        <h1>Panel de Administrador</h1>
+                        <p id="conjunto-name-display">Gestión de Votaciones en Tiempo Real</p>
+                    </div>
+                    
+                    <div class="admin-tabs">
+                        <button class="tab-button active" data-tab="estado">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 3v18h18"></path>
+                                <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"></path>
+                            </svg>
+                            Estado
+                        </button>
+                        <button class="tab-button" data-tab="votaciones">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"></path>
+                                <path d="M9 7V3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path>
+                            </svg>
+                            Votaciones
+                        </button>
+                        <button class="tab-button" data-tab="configuracion">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"></path>
+                            </svg>
+                            Configuración
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content">
+                <!-- TAB: ESTADO -->
+                <div class="tab-content active" id="tab-estado">
+                    <!-- Verificación de Participantes -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Verificación de Participantes</h3>
+                            <button class="btn btn-info" id="check-participants-btn">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M9 11l3 3L22 4"></path>
+                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                </svg>
+                                Verificar Participantes
+                            </button>
+                        </div>
+                        <div class="status-indicator" id="participants-status">
+                            <div class="status-circle" id="status-circle"></div>
+                            <span id="status-text">Estado: Sin verificar</span>
+                        </div>
+                    </div>
+
+                    <!-- Estado de la Asamblea -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Estado de la Asamblea</h3>
+                        </div>
+                        
+                        <div class="assembly-stats">
+                            <!-- Coeficiente Principal -->
+                            <div class="coefficient-panel" id="coefficient-panel">
+                                <div class="coefficient-header">
+                                    <h4 id="conjunto-name-small">Conjunto Residencial</h4>
+                                </div>
+                                <div class="coefficient-display">
+                                    <span class="coefficient-value" id="coefficient-percentage">-%</span>
+                                    <span class="coefficient-label">Aforo por Coeficiente</span>
+                                </div>
+                            </div>
+
+                            <!-- Estadísticas -->
+                            <div class="stats-grid">
+                                <div class="stat-card">
+                                    <div class="stat-number" id="total-participants">-</div>
+                                    <div class="stat-label">Registrados</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-number" id="present-count">-</div>
+                                    <div class="stat-label">Presentes</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-number" id="own-votes-count">-</div>
+                                    <div class="stat-label">Propietarios</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-number" id="power-votes-count">-</div>
+                                    <div class="stat-label">Con Poder</div>
+                                </div>
+                            </div>
+
+                            <!-- Estado del Quórum -->
+                            <div class="quorum-panel">
+                                <h4>Estado del Quórum</h4>
+                                <div class="quorum-status">
+                                    <div class="quorum-indicator" id="quorum-indicator">❓</div>
+                                    <div class="quorum-text" id="quorum-text">Calculando...</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: VOTACIONES -->
+                <div class="tab-content" id="tab-votaciones">
+                    <!-- Crear Nueva Votación -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Crear Nueva Votación</h3>
+                        </div>
+                        <div class="create-voting-form" id="create-voting-form">
+                            <!-- El formulario se cargará aquí -->
+                        </div>
+                    </div>
+
+                    <!-- Votaciones Activas -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Votaciones Activas</h3>
+                        </div>
+                        <div id="active-questions" class="active-questions">
+                            <div class="loading-state">
+                                <div class="spinner"></div>
+                                <p>Cargando preguntas...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: CONFIGURACIÓN -->
+                <div class="tab-content" id="tab-configuracion">
+                    <!-- Cargar Participantes -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Cargar Participantes</h3>
+                        </div>
+                        <div class="file-upload" id="file-upload-area">
+                            <input type="file" id="excel-file" accept=".xlsx,.xls" hidden>
+                            <div class="upload-content">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14,2 14,8 20,8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <polyline points="10,9 9,9 8,9"></polyline>
+                                </svg>
+                                <h4>Clic para cargar archivo Excel</h4>
+                                <p>El archivo debe contener las columnas: code, name, coefficient</p>
+                                <span class="file-formats">Formatos: .xlsx, .xls</span>
+                            </div>
+                        </div>
+                        <div id="upload-status" class="upload-status"></div>
+                    </div>
+
+                    <!-- Gestión de Participantes -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Gestión de Participantes</h3>
+                        </div>
+                        <button class="btn btn-warning" id="delete-code-btn">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="15" y1="9" x2="9" y2="15"></line>
+                                <line x1="9" y1="9" x2="15" y2="15"></line>
+                            </svg>
+                            Eliminar Código APTO
+                        </button>
+                    </div>
+
+                    <!-- Reportes y Configuración -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Reportes y Configuración</h3>
+                        </div>
+                        <div class="config-actions">
+                            <button class="btn btn-success" id="download-reports-btn">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7,10 12,15 17,10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                Descargar Reportes (PDF + Excel)
+                            </button>
+                            
+                            <button class="btn btn-danger" id="reset-database-btn">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 6h18"></path>
+                                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                </svg>
+                                Limpiar Base de Datos
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- COMPONENTES MODALES -->
+    <div id="modal-container"></div>
+
+    <!-- NOTIFICACIONES -->
+    <div class="notification-container" id="notification-container"></div>
+
+    <!-- SCRIPTS -->
+    <script src="components.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

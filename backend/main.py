@@ -1,32 +1,168 @@
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from pathlib import Path
-from .database import init_db
-from .routers import participants, voting, auth_routes, admin
-from .auth.auth import create_default_admin_from_env
 import os
 import logging
+import time
+from contextlib import asynccontextmanager
+
+# Importar módulos optimizados
+from .database import init_db, health_check, get_pool_status, query_cache
+from .routers import participants, voting, auth_routes, admin
+from .auth.auth import create_default_admin_from_env
+
+# Configurar logging optimizado
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Cargar variables de entorno
 env_path = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-app = FastAPI(title="Asambleas API")
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# ================================
+# CONFIGURACIÓN OPTIMIZADA
+# ================================
 
-# CORS
+# Configuración para 400+ usuarios simultáneos
+PERFORMANCE_CONFIG = {
+    'max_request_size': 16 * 1024 * 1024,  # 16MB
+    'timeout_keep_alive': 30,
+    'timeout_graceful_shutdown': 30,
+    'limit_concurrency': 400,  # Límite de concurrencia
+    'gzip_min_size': 1024,
+    'cache_control_max_age': 3600,
+}
+
+# Middleware de monitoreo de rendimiento
+class PerformanceMiddleware:
+    def __init__(self, app):
+        self.app = app
+        self.request_times = []
+        self.request_count = 0
+        
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            start_time = time.time()
+            
+            # Wrapper para capturar tiempo de respuesta
+            async def send_wrapper(message):
+                if message["type"] == "http.response.start":
+                    duration = time.time() - start_time
+                    self.request_times.append(duration)
+                    self.request_count += 1
+                    
+                    # Log requests lentas (>2 segundos)
+                    if duration > 2.0:
+                        logger.warning(f"Slow request: {scope.get('path', 'unknown')} took {duration:.2f}s")
+                    
+                    # Mantener solo últimas 1000 mediciones
+                    if len(self.request_times) > 1000:
+                        self.request_times = self.request_times[-500:]
+                
+                await send(message)
+            
+            await self.app(scope, receive, send_wrapper)
+        else:
+            await self.app(scope, receive, send)
+
+# Context manager para startup/shutdown
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Gestión del ciclo de vida de la aplicación"""
+    # Startup
+    logger.info("🚀 Iniciando aplicación de votación...")
+    
+    try:
+        # Inicializar base de datos
+        init_db()
+        
+        # Crear administrador por defecto
+        create_default_admin_from_env()
+        
+        # Verificar salud del sistema
+        health = health_check()
+        if health["status"] != "healthy":
+            logger.warning(f"Sistema iniciado con advertencias: {health}")
+        else:
+            logger.info("✅ Sistema de votación iniciado correctamente")
+            
+        # Log de configuración
+        pool_status = get_pool_status()
+        logger.info(f"Pool de conexiones: {pool_status}")
+        
+        yield
+        
+    except Exception as e:
+        logger.error(f"❌ Error durante el startup: {e}")
+        raise
+    
+    # Shutdown
+    logger.info("🔄 Cerrando aplicación de votación...")
+    try:
+        # Limpiar cache
+        query_cache.clear()
+        logger.info("✅ Aplicación cerrada correctamente")
+    except Exception as e:
+        logger.error(f"Error durante shutdown: {e}")
+
+# Crear aplicación FastAPI optimizada
+app = FastAPI(
+    title="Sistema de Votación - Asambleas",
+    description="Sistema completo de votación para asambleas de conjuntos residenciales",
+    version="2.0.0",
+    lifespan=lifespan,
+    docs_url="/docs" if os.getenv("DEBUG") == "1" else None,
+    redoc_url="/redoc" if os.getenv("DEBUG") == "1" else None,
+)
+
+# ================================
+# MIDDLEWARE OPTIMIZADO PARA ALTA CARGA
+# ================================
+
+# Seguridad - Trusted hosts
+if os.getenv("RAILWAY_ENVIRONMENT"):
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=[
+            "*.railway.app",
+            "*.up.railway.app", 
+            "web-production-b3d70.up.railway.app",
+            "localhost",
+            "127.0.0.1"
+        ]
+    )
+
+# Compresión GZIP para reducir ancho de banda
+app.add_middleware(
+    GZipMiddleware,
+    minimum_size=PERFORMANCE_CONFIG['gzip_min_size'],
+    compresslevel=6  # Balanceado entre CPU y compresión
+)
+
+# CORS optimizado
 if os.getenv("RAILWAY_ENVIRONMENT"):
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=[
+            "https://*.railway.app",
+            "https://*.up.railway.app",
+            "https://web-production-b3d70.up.railway.app"
+        ],
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["*"],
+        max_age=3600,  # Cache preflight por 1 hora
     )
 else:
+    # Desarrollo
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -35,32 +171,258 @@ else:
         allow_headers=["*"],
     )
 
-# Inicializar DB y admin
-init_db()
-create_default_admin_from_env()
+# Middleware de rendimiento personalizado
+performance_middleware = PerformanceMiddleware(app)
+app.add_middleware(type(performance_middleware), app=performance_middleware.app)
 
-# Endpoints API (antes de montar estáticos)
+# ================================
+# RUTAS DE SALUD Y MONITOREO
+# ================================
+
+@app.get("/health")
+async def health_endpoint():
+    """Endpoint de salud para monitoring y load balancers"""
+    health = health_check()
+    pool_status = get_pool_status()
+    cache_stats = query_cache.get_stats()
+    
+    # Estadísticas de rendimiento
+    if hasattr(performance_middleware, 'request_times') and performance_middleware.request_times:
+        avg_response_time = sum(performance_middleware.request_times) / len(performance_middleware.request_times)
+        max_response_time = max(performance_middleware.request_times)
+    else:
+        avg_response_time = 0
+        max_response_time = 0
+    
+    status_code = 200 if health["status"] == "healthy" else 503
+    
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": health["status"],
+            "timestamp": time.time(),
+            "database": health,
+            "connection_pool": pool_status,
+            "cache": cache_stats,
+            "performance": {
+                "requests_processed": performance_middleware.request_count,
+                "avg_response_time_ms": round(avg_response_time * 1000, 2),
+                "max_response_time_ms": round(max_response_time * 1000, 2)
+            },
+            "version": "2.0.0"
+        }
+    )
+
+@app.get("/metrics")
+async def metrics_endpoint():
+    """Endpoint de métricas para monitoreo avanzado"""
+    if not os.getenv("ENABLE_METRICS"):
+        raise HTTPException(status_code=404, detail="Metrics not enabled")
+    
+    return {
+        "database_pool": get_pool_status(),
+        "cache": query_cache.get_stats(),
+        "performance": {
+            "total_requests": performance_middleware.request_count,
+            "recent_response_times": performance_middleware.request_times[-10:] if performance_middleware.request_times else []
+        }
+    }
+
+# ================================
+# RUTAS DE LA API
+# ================================
+
+@app.get("/api")
+async def api_status():
+    """Status de la API"""
+    return {
+        "status": "API funcionando correctamente",
+        "version": "2.0.0",
+        "optimized_for": "400+ concurrent users"
+    }
+
+# Incluir routers optimizados
 app.include_router(auth_routes.router, prefix="/api")
 app.include_router(participants.router, prefix="/api")
 app.include_router(voting.router, prefix="/api")
-app.include_router(admin.router, prefix='/api')
+app.include_router(admin.router, prefix="/api")
 
-@app.get("/api")
-def api_status():
-    return {"status": "API funcionando correctamente"}
+# ================================
+# ARCHIVOS ESTÁTICOS OPTIMIZADOS
+# ================================
 
-# Ruta absoluta frontend
+# Ruta absoluta al frontend
 frontend_path = Path(__file__).resolve().parent.parent / "frontend"
 
-# Fallback para servir AsambleaWEB.html como raíz
-if frontend_path.exists():
-    app.mount("/static", StaticFiles(directory=frontend_path, html=True), name="static")
+# Headers de cache optimizados
+cache_headers = {
+    "Cache-Control": f"public, max-age={PERFORMANCE_CONFIG['cache_control_max_age']}",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "1; mode=block"
+}
 
+# Montar archivos estáticos con configuración optimizada
+if frontend_path.exists():
+    app.mount(
+        "/static", 
+        StaticFiles(directory=frontend_path, html=True),
+        name="static"
+    )
+    
     @app.get("/")
-    def read_root():
-        file_path = frontend_path / "AsambleaWEB.html"
+    async def read_root():
+        """Servir página principal con headers optimizados"""
+        file_path = frontend_path / "index.html"
         if file_path.exists():
-            return FileResponse(file_path)
-        return {"error": "Frontend file not found"}
+            return FileResponse(
+                file_path,
+                headers={
+                    **cache_headers,
+                    "Content-Type": "text/html; charset=utf-8"
+                }
+            )
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Frontend file not found"}
+        )
+    
+    # Servir archivos específicos con cache optimizado
+    @app.get("/styles.css")
+    async def serve_css():
+        file_path = frontend_path / "styles.css"
+        if file_path.exists():
+            return FileResponse(
+                file_path,
+                headers={
+                    **cache_headers,
+                    "Content-Type": "text/css; charset=utf-8"
+                }
+            )
+        raise HTTPException(status_code=404, detail="CSS file not found")
+    
+    @app.get("/app.js")
+    async def serve_js():
+        file_path = frontend_path / "app.js"
+        if file_path.exists():
+            return FileResponse(
+                file_path,
+                headers={
+                    **cache_headers,
+                    "Content-Type": "application/javascript; charset=utf-8"
+                }
+            )
+        raise HTTPException(status_code=404, detail="JS file not found")
+    
+    @app.get("/components.js")
+    async def serve_components_js():
+        file_path = frontend_path / "components.js"
+        if file_path.exists():
+            return FileResponse(
+                file_path,
+                headers={
+                    **cache_headers,
+                    "Content-Type": "application/javascript; charset=utf-8"
+                }
+            )
+        raise HTTPException(status_code=404, detail="Components JS file not found")
+
 else:
-    print(f"⚠️ Carpeta frontend no encontrada en {frontend_path}")
+    logger.warning(f"⚠️ Carpeta frontend no encontrada en {frontend_path}")
+    
+    @app.get("/")
+    async def fallback_root():
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "Frontend not available",
+                "message": "Los archivos del frontend no están disponibles"
+            }
+        )
+
+# ================================
+# MANEJO DE ERRORES OPTIMIZADO
+# ================================
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Manejo global de errores con logging"""
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    
+    # No exponer detalles en producción
+    if os.getenv("RAILWAY_ENVIRONMENT"):
+        detail = "Internal server error"
+    else:
+        detail = str(exc)
+    
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "Internal Server Error",
+            "detail": detail,
+            "timestamp": time.time()
+        }
+    )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Manejo optimizado de excepciones HTTP"""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": exc.detail,
+            "status_code": exc.status_code,
+            "timestamp": time.time()
+        }
+    )
+
+# ================================
+# EVENTS DE APLICACIÓN
+# ================================
+
+@app.on_event("startup")
+async def log_startup():
+    """Log adicional en startup"""
+    logger.info("=" * 60)
+    logger.info("🗳️  SISTEMA DE VOTACIÓN PARA ASAMBLEAS")
+    logger.info("=" * 60)
+    logger.info(f"Versión: 2.0.0")
+    logger.info(f"Entorno: {'Producción (Railway)' if os.getenv('RAILWAY_ENVIRONMENT') else 'Desarrollo'}")
+    logger.info(f"Optimizado para: {PERFORMANCE_CONFIG['limit_concurrency']}+ usuarios simultáneos")
+    logger.info(f"Pool de BD: {get_pool_status()}")
+    logger.info("=" * 60)
+
+# ================================
+# CONFIGURACIÓN DE SERVIDOR
+# ================================
+
+# Configuración específica para Railway
+if __name__ == "__main__":
+    import uvicorn
+    
+    port = int(os.getenv("PORT", 8000))
+    
+    # Configuración optimizada para producción
+    uvicorn_config = {
+        "host": "0.0.0.0",
+        "port": port,
+        "workers": 1,  # Railway funciona mejor con 1 worker
+        "loop": "uvloop",  # Loop más rápido
+        "http": "httptools",  # Parser HTTP más rápido
+        "limit_concurrency": PERFORMANCE_CONFIG['limit_concurrency'],
+        "timeout_keep_alive": PERFORMANCE_CONFIG['timeout_keep_alive'],
+        "timeout_graceful_shutdown": PERFORMANCE_CONFIG['timeout_graceful_shutdown'],
+        "access_log": False,  # Desactivar access log para mayor rendimiento
+        "server_header": False,  # No exponer información del servidor
+    }
+    
+    # Configuraciones adicionales para desarrollo
+    if not os.getenv("RAILWAY_ENVIRONMENT"):
+        uvicorn_config.update({
+            "reload": True,
+            "access_log": True,
+            "log_level": "debug"
+        })
+    
+    logger.info(f"🚀 Iniciando servidor en puerto {port}")
+    uvicorn.run("main:app", **uvicorn_config)
