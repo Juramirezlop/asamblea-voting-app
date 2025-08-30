@@ -1782,11 +1782,11 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    text-align: center;
     gap: 1rem;
     background: rgba(255, 255, 255, 0.5);
     padding: 1rem;
     border-radius: var(--radius-base);
+    text-align: center;
 }
 
 .config-label {

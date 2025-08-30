@@ -1147,7 +1147,9 @@ function showParticipantsModal(title, participants) {
     modals.hide = () => {
         delete window.changePage;
         delete window.filterParticipants;
-        modals.hide = originalHide;
+        if (originalHide) {
+            modals.hide = originalHide;
+        }
         originalHide();
     };
 }
@@ -1761,10 +1763,6 @@ async function resetDatabase() {
         setTimeout(() => {
             showScreen('welcome-screen');
         }, 1000);
-
-        setTimeout(async () => {
-            await showConjuntoModal();
-        }, 1500);
 
     } catch (error) {
         notifications.show(`Error: ${error.message}`, 'error');
