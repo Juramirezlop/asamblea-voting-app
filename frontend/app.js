@@ -359,6 +359,13 @@ async function registerAttendance() {
     try {
         notifications.show('Verificando código...', 'info');
         
+        // Verificar que hay participantes en la base
+        const dbCheck = await apiCall('/auth/check-database');
+        if (!dbCheck.has_participants) {
+            notifications.show('No hay participantes registrados en el sistema. El administrador debe cargar la base de datos primero.', 'error');
+            return;
+        }
+        
         // Verificar si ya está registrado
         const checkResponse = await apiCall(`/participants/check/${code}`);
         if (checkResponse.exists) {
@@ -404,6 +411,13 @@ async function accessVoting() {
 
     try {
         notifications.show('Verificando acceso a votaciones...', 'info');
+        
+        // Verificar que hay participantes en la base
+        const dbCheck = await apiCall('/auth/check-database');
+        if (!dbCheck.has_participants) {
+            notifications.show('No hay participantes registrados en el sistema. El administrador debe cargar la base de datos primero.', 'error');
+            return;
+        }
         
         const response = await apiCall('/auth/login/voter', {
             method: 'POST',
@@ -917,9 +931,9 @@ async function initializeAdminScreen() {
 async function checkConjuntoName() {
     try {
         const response = await apiCall('/participants/conjunto/nombre');
-        const nombreActual = response.nombre || '';
-        
-        if (!nombreActual) {
+        const nombreActual = response.nombre;
+
+        if (!nombreActual || nombreActual === '') {
             await showConjuntoModal();
         } else {
             updateConjuntoDisplay(nombreActual);
@@ -1063,8 +1077,22 @@ function showAdminTab(tabName) {
     });
     
     // Mostrar la pestaña seleccionada
-    document.getElementById(`tab-${tabName}`).classList.add('active');
-    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    const targetTab = document.getElementById(`tab-${tabName}`);
+    const targetButton = document.querySelector(`[data-tab="${tabName}"]`);
+    
+    if (targetTab && targetButton) {
+        targetTab.classList.add('active');
+        targetButton.classList.add('active');
+    } else {
+        console.error(`Tab ${tabName} not found`);
+        // Fallback: mostrar primera tab
+        const firstTab = document.querySelector('.tab-content');
+        const firstButton = document.querySelector('.tab-button');
+        if (firstTab && firstButton) {
+            firstTab.classList.add('active');
+            firstButton.classList.add('active');
+        }
+    }
 }
 
 async function loadAdminData() {
@@ -1288,13 +1316,11 @@ function showParticipantsModal(title, participants) {
     };
     
     // Limpiar funciones globales al cerrar el modal
-    const originalHide = modals.hide;
+    const originalHide = modals.hide.bind(modals);
     modals.hide = () => {
         delete window.changePage;
         delete window.filterParticipants;
-        if (originalHide) {
-            modals.hide = originalHide;
-        }
+        modals.hide = originalHide;
         originalHide();
     };
 }
@@ -1887,8 +1913,25 @@ async function showVoterManagementModal(code) {
                 </select>
                 
                 <div style="margin-top: 1rem; padding: 1rem; background: var(--gray-50); border-radius: 8px;">
-                    <strong>Votos registrados:</strong>
-                    ${votesHTML}
+                    <strong>Votos registrados:</strong><br>
+                    ${voterVotes.length > 0 ? 
+                        voterVotes.map(vote => `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid #eee;">
+                                <span>Pregunta ${vote.question_id}: ${vote.answer}</span>
+                                <div>
+                                    <button class="btn btn-warning" style="padding: 0.2rem 0.5rem; font-size: 0.8rem; margin-right: 0.5rem;" 
+                                            onclick="showEditVoteModal('${code}', ${vote.question_id}, '${vote.answer}')">
+                                        ✏️ Editar
+                                    </button>
+                                    <button class="btn btn-danger" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;" 
+                                            onclick="clearVoterVote('${code}', ${vote.question_id})">
+                                        🗑️ Borrar
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('') : 
+                        '<p>Sin votos registrados</p>'
+                    }
                 </div>
             `,
             actions: [
@@ -1921,6 +1964,111 @@ async function saveVoterChanges(code) {
         modals.hide();
         await loadAforoData(); // Refrescar estadísticas
         notifications.show('Votante actualizado correctamente', 'success');
+    } catch (error) {
+        notifications.show(`Error: ${error.message}`, 'error');
+    }
+}
+
+async function clearVoterVote(code, questionId) {
+    const confirmed = await modals.confirm(
+        `¿Eliminar el voto del código ${code} en la pregunta ${questionId}?`,
+        'Confirmar eliminación de voto'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+        await apiCall(`/admin/clear-vote/${code}/${questionId}`, {
+            method: 'DELETE'
+        });
+        
+        notifications.show('Voto eliminado correctamente', 'success');
+        // Refrescar el modal
+        modals.hide();
+        setTimeout(() => showVoterManagementModal(code), 500);
+        
+    } catch (error) {
+        notifications.show(`Error: ${error.message}`, 'error');
+    }
+}
+
+async function showEditVoteModal(code, questionId, currentAnswer) {
+    try {
+        // Obtener opciones de la pregunta
+        const questions = await apiCall('/voting/questions/active');
+        const question = questions.find(q => q.id === questionId);
+        
+        if (!question) {
+            notifications.show('Pregunta no encontrada', 'error');
+            return;
+        }
+        
+        let optionsHTML = '';
+        if (question.options && question.options.length > 0) {
+            optionsHTML = `
+                <label style="display: block; margin-bottom: 0.5rem;">Nueva respuesta:</label>
+                <select id="new-answer-select" class="modal-input">
+                    ${question.options.map(opt => `
+                        <option value="${opt.text}" ${opt.text === currentAnswer ? 'selected' : ''}>
+                            ${opt.text}
+                        </option>
+                    `).join('')}
+                </select>
+            `;
+        } else {
+            optionsHTML = `
+                <label style="display: block; margin-bottom: 0.5rem;">Nueva respuesta:</label>
+                <input type="text" id="new-answer-input" class="modal-input" 
+                       placeholder="Nueva respuesta" value="${currentAnswer}">
+            `;
+        }
+        
+        modals.show({
+            title: `✏️ Editar Voto - ${code}`,
+            content: `
+                <p><strong>Pregunta:</strong> ${question.text}</p>
+                <p><strong>Respuesta actual:</strong> ${currentAnswer}</p>
+                <hr style="margin: 1rem 0;">
+                ${optionsHTML}
+            `,
+            actions: [
+                {
+                    text: 'Cancelar',
+                    class: 'btn-secondary',
+                    handler: 'modals.hide()'
+                },
+                {
+                    text: 'Guardar Cambio',
+                    class: 'btn-primary',
+                    handler: `saveVoteEdit('${code}', ${questionId})`
+                }
+            ]
+        });
+        
+    } catch (error) {
+        notifications.show(`Error: ${error.message}`, 'error');
+    }
+}
+
+async function saveVoteEdit(code, questionId) {
+    const newAnswerSelect = document.getElementById('new-answer-select');
+    const newAnswerInput = document.getElementById('new-answer-input');
+    const newAnswer = newAnswerSelect ? newAnswerSelect.value : newAnswerInput.value.trim();
+    
+    if (!newAnswer) {
+        notifications.show('Debe seleccionar/ingresar una respuesta', 'error');
+        return;
+    }
+    
+    try {
+        await apiCall(`/admin/edit-vote/${code}/${questionId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ new_answer: newAnswer })
+        });
+        
+        modals.hide();
+        notifications.show('Voto actualizado correctamente', 'success');
+        
     } catch (error) {
         notifications.show(`Error: ${error.message}`, 'error');
     }

@@ -66,7 +66,7 @@ def obtener_nombre_conjunto():
             ("conjunto_nombre",),
             fetchone=True
         )
-        return {"nombre": result["value"] if result else ""}
+        return {"nombre": result["value"] if result else None}
     finally:
         close_db(conn)
 

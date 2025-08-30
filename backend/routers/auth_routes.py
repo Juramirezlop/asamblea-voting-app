@@ -57,11 +57,35 @@ def login_admin(form_data: OAuth2PasswordRequestForm = Depends()):
     token = create_access_token({"sub": user["username"], "role": "admin"})
     return {"access_token": token, "token_type": "bearer"}
 
+@router.post("/check-database")
+def check_database_status():
+    """Verificar si hay participantes en la base de datos"""
+    conn = get_db()
+    try:
+        result = execute_query(
+            conn,
+            "SELECT COUNT(*) as count FROM participants",
+            fetchone=True
+        )
+        return {"has_participants": result["count"] > 0, "count": result["count"]}
+    finally:
+        close_db(conn)
+
 # ---------- Voter login (code only) ----------
 @router.post("/login/voter")
 def login_voter(data: VoterLoginRequest):
     conn = get_db()
     
+    # Verificar que haya participantes en la base
+    total_participants = execute_query(
+        conn,
+        "SELECT COUNT(*) as count FROM participants",
+        fetchone=True
+    )
+
+    if total_participants["count"] == 0:
+        raise HTTPException(status_code=400, detail="No hay participantes registrados en el sistema")
+
     try:
         # 1. Validar que el participante existe Y ya tiene asistencia
         participant = execute_query(
@@ -101,6 +125,16 @@ def login_voter(data: VoterLoginRequest):
 async def register_attendance(data: VoterLoginRequest):
     conn = get_db()
     
+    # Verificar que haya participantes en la base
+    total_participants = execute_query(
+        conn,
+        "SELECT COUNT(*) as count FROM participants",
+        fetchone=True
+    )
+
+    if total_participants["count"] == 0:
+        raise HTTPException(status_code=400, detail="No hay participantes registrados en el sistema. Debe cargar la base de datos primero.")
+
     try:
         # 1. Validar que el participante existe
         participant = execute_query(
