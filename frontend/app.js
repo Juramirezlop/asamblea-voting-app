@@ -911,7 +911,6 @@ async function submitMultipleVote(questionId) {
 async function showAdminScreen() {
     showScreen('admin-screen');
     connectWebSocket();
-    await checkConjuntoName();
     await initializeAdminScreen();
 }
 
@@ -920,6 +919,7 @@ async function initializeAdminScreen() {
     document.getElementById('create-voting-form').innerHTML = AdminComponents.createVotingForm();
     setupAdminEventListeners();    
     await loadAdminData();
+    await checkConjuntoName();
 }
 
 async function checkConjuntoName() {

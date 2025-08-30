@@ -56,7 +56,7 @@ async def guardar_nombre_conjunto(request: ConjuntoRequest):
         close_db(conn)
 
 # Obtener nombre conjunto
-@router.get("/conjunto/nombre")
+@router.get("/conjunto/nombre", dependencies=[Depends(admin_required)])
 def obtener_nombre_conjunto():
     conn = get_db()
     try:
