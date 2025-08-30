@@ -438,7 +438,7 @@ class AdminComponents {
 
                 <!-- Configuración de timer para encuestas -->
                 <div class="form-section">
-                    <h3>⏰ Tiempo Límite (Opcional)</h3>
+                    <h3>⏰ Tiempo Límite</h3>
                     
                     <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
                         <input type="checkbox" id="enable-timer" style="transform: scale(1.2);">
