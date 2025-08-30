@@ -34,7 +34,7 @@ def listar_participantes():
 
 # Guardar nombre del conjunto
 @router.post("/conjunto/nombre", dependencies=[Depends(admin_required)])
-def guardar_nombre_conjunto(request: ConjuntoRequest):
+async def guardar_nombre_conjunto(request: ConjuntoRequest):
     conn = get_db()
     try:
         execute_query(
@@ -43,6 +43,14 @@ def guardar_nombre_conjunto(request: ConjuntoRequest):
             ("conjunto_nombre", request.nombre),
             commit=True
         )
+        
+        # WEBSOCKET: Notificar cambio de nombre del conjunto
+        from ..main import manager
+        await manager.broadcast_to_admins({
+            "type": "conjunto_name_updated",
+            "data": {"nombre": request.nombre}
+        })
+        
         return {"status": "ok"}
     finally:
         close_db(conn)
@@ -64,7 +72,7 @@ def obtener_nombre_conjunto():
 
 # Carga masiva desde JSON (formato que genera tu script: { "ASM-101": {...}, ... })
 @router.post("/bulk", dependencies=[Depends(admin_required)])
-def agregar_participantes(data: Dict[str, dict]):
+async def agregar_participantes(data: Dict[str, dict]):
     conn = get_db()
     count = 0
     try:
@@ -90,6 +98,13 @@ def agregar_participantes(data: Dict[str, dict]):
                 commit=True
             )
             count += 1
+        
+        # WEBSOCKET: Notificar carga masiva de participantes
+        from ..main import manager
+        await manager.broadcast_to_admins({
+            "type": "participants_bulk_loaded",
+            "data": {"count": count}
+        })
         
         return {"status": "ok", "cantidad": count}
     finally:
@@ -167,6 +182,13 @@ async def upload_xlsx(file: UploadFile = File(...)):
                 commit=True
             )
             inserted += 1
+        
+        # WEBSOCKET: Notificar carga desde Excel
+        from ..main import manager  
+        await manager.broadcast_to_admins({
+            "type": "excel_uploaded",
+            "data": {"inserted": inserted, "sheets_processed": len(xls.keys())}
+        })
         
         return {"status": "ok", "inserted": inserted, "sheets_processed": len(xls.keys())}
     finally:

@@ -22,9 +22,12 @@ class VoteIn(BaseModel):
     question_id: int
     answer: str | List[str]
 
+class ExtendTimeRequest(BaseModel):
+    extra_minutes: int
+
 # --- Crear pregunta (admin) ---
 @router.post("/questions", dependencies=[Depends(admin_required)])
-def crear_pregunta(payload: QuestionCreate):
+async def crear_pregunta(payload: QuestionCreate):
     typ = payload.type.lower()
     if typ not in ("yesno", "multiple"):
         raise HTTPException(status_code=400, detail="Tipo inválido (yesno|multiple)")
@@ -66,6 +69,17 @@ def crear_pregunta(payload: QuestionCreate):
             for opt in payload.options:
                 execute_query(conn, "INSERT INTO options (question_id, option_text) VALUES (?, ?)", (qid, opt), commit=True)
         
+        # WEBSOCKET: Notificar nueva votación
+        from ..main import manager
+        await manager.broadcast_to_voters({
+            "type": "new_question",
+            "data": {"question_id": qid, "text": payload.text, "type": typ}
+        })
+        await manager.broadcast_to_admins({
+            "type": "question_created", 
+            "data": {"question_id": qid, "text": payload.text}
+        })
+        
         return {
             "status": "ok", 
             "id": qid,
@@ -77,7 +91,7 @@ def crear_pregunta(payload: QuestionCreate):
 
 # AGREGAR endpoint para verificar votaciones expiradas
 @router.post("/questions/check-expired", dependencies=[Depends(admin_required)])
-def check_expired_questions():
+async def check_expired_questions():
     """Verificar y cerrar automáticamente votaciones que expiraron"""
     conn = get_db()
     try:
@@ -107,6 +121,19 @@ def check_expired_questions():
             expired_count += 1
             logger.info(f"Votación {question['id']} cerrada automáticamente por expiración")
         
+        # WEBSOCKET: Notificar votaciones cerradas por tiempo
+        if expired_count > 0:
+            from ..main import manager
+            for question in expired_questions:
+                await manager.broadcast_to_voters({
+                    "type": "question_expired",
+                    "data": {"question_id": question["id"], "text": question["text"]}
+                })
+            await manager.broadcast_to_admins({
+                "type": "questions_expired",
+                "data": {"count": expired_count, "questions": [dict(q) for q in expired_questions]}
+            })
+        
         return {
             "status": "ok",
             "expired_questions": expired_count,
@@ -115,6 +142,83 @@ def check_expired_questions():
         
     except Exception as e:
         logger.error(f"Error verificando votaciones expiradas: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
+    finally:
+        close_db(conn)
+
+@router.put("/questions/{question_id}/extend-time", dependencies=[Depends(admin_required)])
+async def extend_question_time(question_id: int, request: ExtendTimeRequest):
+    """Extender el tiempo de una votación activa"""
+    extra_minutes = request.extra_minutes
+    if extra_minutes <= 0 or extra_minutes > 120:  # Máximo 2 horas extra
+        raise HTTPException(status_code=400, detail="Los minutos extra deben estar entre 1 y 120")
+    
+    conn = get_db()
+    try:
+        # Verificar que la pregunta existe y está activa
+        question = execute_query(
+            conn,
+            "SELECT id, text, expires_at, closed, time_limit_minutes FROM questions WHERE id = ? AND active = 1",
+            (question_id,),
+            fetchone=True
+        )
+        
+        if not question:
+            raise HTTPException(status_code=404, detail="Pregunta no encontrada o no activa")
+        
+        if question["closed"]:
+            raise HTTPException(status_code=400, detail="No se puede extender tiempo de votación cerrada")
+        
+        if not question["expires_at"]:
+            raise HTTPException(status_code=400, detail="Esta votación no tiene límite de tiempo")
+        
+        # Calcular nueva hora de expiración
+        current_expires = datetime.fromisoformat(question["expires_at"])
+        new_expires = current_expires + timedelta(minutes=extra_minutes)
+        new_expires_iso = new_expires.isoformat()
+        
+        # Actualizar tiempo límite total y nueva expiración
+        new_total_minutes = (question["time_limit_minutes"] or 0) + extra_minutes
+        
+        execute_query(
+            conn,
+            "UPDATE questions SET expires_at = ?, time_limit_minutes = ? WHERE id = ?",
+            (new_expires_iso, new_total_minutes, question_id),
+            commit=True
+        )
+        
+        # WEBSOCKET: Notificar extensión de tiempo
+        from ..main import manager
+        await manager.broadcast_to_voters({
+            "type": "time_extended",
+            "data": {
+                "question_id": question_id,
+                "text": question["text"],
+                "extra_minutes": extra_minutes,
+                "new_expires_at": new_expires_iso,
+                "message": f"Se extendió el tiempo de votación por {extra_minutes} minutos adicionales"
+            }
+        })
+        
+        await manager.broadcast_to_admins({
+            "type": "time_extended",
+            "data": {
+                "question_id": question_id,
+                "extra_minutes": extra_minutes,
+                "new_total_minutes": new_total_minutes
+            }
+        })
+        
+        return {
+            "status": "tiempo extendido",
+            "question_id": question_id,
+            "extra_minutes": extra_minutes,
+            "new_expires_at": new_expires_iso,
+            "total_minutes": new_total_minutes
+        }
+        
+    except Exception as e:
+        logger.error(f"Error extendiendo tiempo de pregunta {question_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
     finally:
         close_db(conn)
@@ -181,7 +285,7 @@ def preguntas_activas():
 
 # --- Votar (votante) ---
 @router.post("/vote", dependencies=[Depends(voter_required)])
-def votar(vote: VoteIn, user=Depends(voter_required)):
+async def votar(vote: VoteIn, user=Depends(voter_required)):
     participant_code = user.get("code") or user.get("sub")
     if not participant_code:
         raise HTTPException(status_code=400, detail="Código de votante no encontrado en token")
@@ -267,6 +371,24 @@ def votar(vote: VoteIn, user=Depends(voter_required)):
                     commit=True
                 )
 
+        # WEBSOCKET: Notificar voto registrado
+        from ..main import manager
+        await manager.broadcast_to_admins({
+            "type": "vote_registered",
+            "data": {
+                "participant_code": participant_code, 
+                "question_id": vote.question_id,
+                "answer": answer_string,
+                "timestamp": timestamp
+            }
+        })
+        
+        # Notificar al votante específico
+        await manager.send_to_voter(participant_code, {
+            "type": "vote_confirmed",
+            "data": {"question_id": vote.question_id, "answers": answers}
+        })
+
         return {"status": "voto registrado", "answers": answers}
     finally:
         close_db(conn)
@@ -289,9 +411,21 @@ def mis_votos(user=Depends(voter_required)):
 
 # --- Pausar encuestas creadas ---
 @router.put("/questions/{question_id}/toggle", dependencies=[Depends(admin_required)])
-def toggle_question_status(question_id: int):
+async def toggle_question_status(question_id: int):
     conn = get_db()
     try:
+        # Obtener estado actual
+        current_status = execute_query(
+            conn,
+            "SELECT closed, text FROM questions WHERE id = ?",
+            (question_id,),
+            fetchone=True
+        )
+        
+        if not current_status:
+            raise HTTPException(status_code=404, detail="Pregunta no encontrada")
+        
+        # Cambiar estado
         execute_query(
             conn,
             "UPDATE questions SET closed = 1 - closed WHERE id = ?",
@@ -306,19 +440,37 @@ def toggle_question_status(question_id: int):
             (question_id,),
             fetchone=True
         )
-        return {"closed": bool(status["closed"]) if status else False}
+        
+        new_closed = bool(status["closed"]) if status else False
+        
+        # WEBSOCKET: Notificar cambio de estado
+        from ..main import manager
+        await manager.broadcast_to_voters({
+            "type": "question_status_changed",
+            "data": {
+                "question_id": question_id,
+                "closed": new_closed,
+                "text": current_status["text"]
+            }
+        })
+        await manager.broadcast_to_admins({
+            "type": "question_toggled",
+            "data": {"question_id": question_id, "closed": new_closed}
+        })
+        
+        return {"closed": new_closed}
     finally:
         close_db(conn)
 
 # --- Borrar encuestas ---
 @router.delete("/questions/{question_id}", dependencies=[Depends(admin_required)])
-def delete_question(question_id: int):
+async def delete_question(question_id: int):
     conn = get_db()
     try:
         # Verificar que existe
         question = execute_query(
             conn,
-            "SELECT id FROM questions WHERE id = ?",
+            "SELECT id, text FROM questions WHERE id = ?",
             (question_id,),
             fetchone=True
         )
@@ -330,19 +482,30 @@ def delete_question(question_id: int):
         execute_query(conn, "DELETE FROM options WHERE question_id = ?", (question_id,), commit=True)
         execute_query(conn, "DELETE FROM questions WHERE id = ?", (question_id,), commit=True)
         
+        # WEBSOCKET: Notificar eliminación de pregunta
+        from ..main import manager
+        await manager.broadcast_to_voters({
+            "type": "question_deleted",
+            "data": {"question_id": question_id, "text": question["text"]}
+        })
+        await manager.broadcast_to_admins({
+            "type": "question_deleted",
+            "data": {"question_id": question_id}
+        })
+        
         return {"status": "pregunta eliminada"}
     finally:
         close_db(conn)
 
 # --- Editar pregunta cerrada (admin) ---
 @router.put("/questions/{question_id}", dependencies=[Depends(admin_required)])
-def editar_pregunta(question_id: int, payload: dict):
+async def editar_pregunta(question_id: int, payload: dict):
     conn = get_db()
     try:
         # Verificar que la pregunta existe y está cerrada
         question = execute_query(
             conn,
-            "SELECT id, type, closed FROM questions WHERE id = ?",
+            "SELECT id, type, closed, text FROM questions WHERE id = ?",
             (question_id,),
             fetchone=True
         )
@@ -386,6 +549,14 @@ def editar_pregunta(question_id: int, payload: dict):
                 (payload["max_selections"], question_id),
                 commit=True
             )
+        
+        # WEBSOCKET: Notificar edición de pregunta
+        from ..main import manager
+        updated_text = payload.get("text", question["text"])
+        await manager.broadcast_to_admins({
+            "type": "question_edited",
+            "data": {"question_id": question_id, "text": updated_text}
+        })
         
         return {"status": "pregunta actualizada"}
     
@@ -559,7 +730,7 @@ def get_aforo(user=Depends(admin_required)):
 
 # --- Reset DB (solo admin): borra preguntas, opciones, votos y resetea participantes ---
 @router.delete("/admin/reset", dependencies=[Depends(admin_required)])
-def reset_db():
+async def reset_db():
     conn = get_db()
     try:
         # Solo resetear votos y preguntas, NO config
@@ -570,6 +741,17 @@ def reset_db():
         
         # Resetear estado de participantes sin borrarlos
         execute_query(conn, "UPDATE participants SET present = 0, has_voted = 0, is_power = null, login_time = null", commit=True)
+        
+        # WEBSOCKET: Notificar reset completo
+        from ..main import manager
+        await manager.broadcast_to_voters({
+            "type": "system_reset",
+            "data": {"message": "La asamblea ha sido reiniciada por el administrador"}
+        })
+        await manager.broadcast_to_admins({
+            "type": "system_reset",
+            "data": {"message": "Base de datos reiniciada exitosamente"}
+        })
         
         return {"status": "votaciones y asistencias reseteadas"}
     finally:

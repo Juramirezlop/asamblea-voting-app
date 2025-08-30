@@ -537,6 +537,12 @@ class AdminComponents {
                     <button class="btn btn-info" onclick="viewVotingResults(${question.id})">
                         📊 Ver Resultados
                     </button>
+
+                    ${!question.closed && question.expires_at ? `
+                        <button class="btn btn-warning" onclick="showExtendTimeModal(${question.id}, '${question.text}')">
+                            ⏰ Extender Tiempo
+                        </button>
+                    ` : ''}
                     
                     ${question.closed ? `
                         <button class="btn btn-secondary" onclick="editVoting(${question.id})">

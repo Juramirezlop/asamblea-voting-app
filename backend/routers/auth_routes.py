@@ -98,7 +98,7 @@ def login_voter(data: VoterLoginRequest):
 
 # ---------- Nuevas dependencias de login ----------
 @router.post("/register-attendance")
-def register_attendance(data: VoterLoginRequest):
+async def register_attendance(data: VoterLoginRequest):
     conn = get_db()
     
     try:
@@ -126,6 +126,18 @@ def register_attendance(data: VoterLoginRequest):
             (data.is_power, login_timestamp, data.code),
             commit=True
         )
+
+        # WEBSOCKET: Notificar nueva asistencia registrada
+        from ..main import manager
+        await manager.broadcast_to_admins({
+            "type": "attendance_registered",
+            "data": {
+                "code": data.code,
+                "name": participant.get("name", ""),
+                "is_power": data.is_power,
+                "timestamp": login_timestamp
+            }
+        })
 
         # 4. Retornar datos de confirmación
         return {

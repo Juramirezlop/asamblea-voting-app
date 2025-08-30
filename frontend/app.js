@@ -10,6 +10,10 @@ let adminToken = null;
 let voterToken = null;
 let currentUser = null;
 let isAdmin = false;
+let adminWebSocket = null;
+let voterWebSocket = null;
+let wsReconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
 let updateInterval = null;
 let lastUpdateTimestamp = 0;
 
@@ -104,6 +108,183 @@ async function apiCall(endpoint, options = {}) {
 }
 
 // ================================
+// WEBSOCKET MANAGEMENT
+// ================================
+
+function connectWebSocket() {
+    if (isAdmin && !adminWebSocket) {
+        connectAdminWebSocket();
+    } else if (currentUser && currentUser.code && !voterWebSocket) {
+        connectVoterWebSocket(currentUser.code);
+    }
+}
+
+function connectAdminWebSocket() {
+    try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/admin`;
+        
+        adminWebSocket = new WebSocket(wsUrl);
+        
+        adminWebSocket.onopen = () => {
+            console.log('Admin WebSocket conectado');
+            wsReconnectAttempts = 0;
+            notifications.show('Conexión en tiempo real activada', 'success', 3000);
+        };
+        
+        adminWebSocket.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                handleAdminWebSocketMessage(message);
+            } catch (error) {
+                console.error('Error procesando mensaje admin:', error);
+            }
+        };
+        
+        adminWebSocket.onclose = () => {
+            console.log('Admin WebSocket desconectado');
+            adminWebSocket = null;
+            attemptWebSocketReconnect('admin');
+        };
+        
+        adminWebSocket.onerror = (error) => {
+            console.error('Error en Admin WebSocket:', error);
+        };
+        
+    } catch (error) {
+        console.error('Error conectando Admin WebSocket:', error);
+    }
+}
+
+function connectVoterWebSocket(voterCode) {
+    try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/voter/${voterCode}`;
+        
+        voterWebSocket = new WebSocket(wsUrl);
+        
+        voterWebSocket.onopen = () => {
+            console.log('Voter WebSocket conectado');
+            wsReconnectAttempts = 0;
+            notifications.show('Conectado en tiempo real', 'success', 3000);
+        };
+        
+        voterWebSocket.onmessage = (event) => {
+            try {
+                const message = JSON.parse(event.data);
+                handleVoterWebSocketMessage(message);
+            } catch (error) {
+                console.error('Error procesando mensaje voter:', error);
+            }
+        };
+        
+        voterWebSocket.onclose = () => {
+            console.log('Voter WebSocket desconectado');
+            voterWebSocket = null;
+            attemptWebSocketReconnect('voter');
+        };
+        
+        voterWebSocket.onerror = (error) => {
+            console.error('Error en Voter WebSocket:', error);
+        };
+        
+    } catch (error) {
+        console.error('Error conectando Voter WebSocket:', error);
+    }
+}
+
+function handleAdminWebSocketMessage(message) {
+    switch (message.type) {
+        case 'attendance_registered':
+            loadAforoData();
+            notifications.show(`Nueva asistencia: ${message.data.code} - ${message.data.name}`, 'info', 5000);
+            break;
+        case 'vote_registered':
+            loadAforoData();
+            loadActiveQuestions();
+            break;
+        case 'question_created':
+            loadActiveQuestions();
+            notifications.show('Nueva votación creada', 'success', 4000);
+            break;
+        case 'participant_removed':
+            loadAforoData();
+            notifications.show(`Código eliminado: ${message.data.code}`, 'warning', 4000);
+            break;
+        case 'excel_uploaded':
+            loadAforoData();
+            notifications.show(`Excel cargado: ${message.data.inserted} participantes`, 'success', 6000);
+            break;
+        case 'notification':
+            notifications.show(message.data.text || 'Notificación del sistema', message.data.type || 'info', message.data.duration || 5000);
+            break;
+    }
+}
+
+function handleVoterWebSocketMessage(message) {
+    switch (message.type) {
+        case 'new_question':
+            loadVotingQuestions();
+            notifications.show(`📋 Nueva votación: ${message.data.text}`, 'info', 8000);
+            break;
+        case 'question_status_changed':
+            loadVotingQuestions();
+            const status = message.data.closed ? 'cerrada' : 'abierta';
+            notifications.show(`📊 Votación ${status}: ${message.data.text}`, 'info', 6000);
+            break;
+        case 'question_deleted':
+            loadVotingQuestions();
+            notifications.show(`🗑️ Votación eliminada: ${message.data.text}`, 'warning', 6000);
+            break;
+        case 'time_extended':
+            loadVotingQuestions();
+            notifications.show(`⏰ ${message.data.message}`, 'success', 10000);
+            break;
+        case 'admin_message':
+            notifications.show(`📢 ${message.data.text}`, message.data.type, message.data.duration);
+            break;
+        case 'system_reset':
+            notifications.show('🔄 La asamblea ha sido reiniciada', 'warning', 10000);
+            setTimeout(() => window.location.reload(), 3000);
+            break;
+        case 'force_disconnect':
+            notifications.show(message.data.message, 'error', 10000);
+            setTimeout(() => logout(), 2000);
+            break;
+    }
+}
+
+function attemptWebSocketReconnect(type) {
+    if (wsReconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        wsReconnectAttempts++;
+        const delay = Math.min(1000 * Math.pow(2, wsReconnectAttempts), 30000);
+        
+        setTimeout(() => {
+            console.log(`Reintentando conexión WebSocket ${type} (intento ${wsReconnectAttempts})`);
+            if (type === 'admin' && isAdmin) {
+                connectAdminWebSocket();
+            } else if (type === 'voter' && currentUser) {
+                connectVoterWebSocket(currentUser.code);
+            }
+        }, delay);
+    } else {
+        notifications.show('Conexión perdida. Recargue la página.', 'warning', 15000);
+    }
+}
+
+function disconnectWebSocket() {
+    if (adminWebSocket) {
+        adminWebSocket.close();
+        adminWebSocket = null;
+    }
+    if (voterWebSocket) {
+        voterWebSocket.close(); 
+        voterWebSocket = null;
+    }
+    wsReconnectAttempts = 0;
+}
+
+// ================================
 // NAVEGACIÓN ENTRE PANTALLAS
 // ================================
 
@@ -129,6 +310,7 @@ function showScreen(screenId) {
 function logout() {
     // Limpiar tokens y variables
     clearTokens();
+    disconnectWebSocket();
     adminToken = null;
     voterToken = null;
     currentUser = null;
@@ -397,6 +579,7 @@ function showPowerQuestion() {
 
 async function showVoterScreen() {
     showScreen('voter-screen');
+    connectWebSocket();
     
     // Actualizar información del usuario
     document.getElementById('voter-code').textContent = currentUser.code;
@@ -433,7 +616,6 @@ async function showVoterScreen() {
     }
     
     await loadVotingQuestions();
-    startVotingPolling();
 }
 
 async function loadVotingQuestions() {
@@ -586,28 +768,6 @@ async function checkUserVotes() {
     }
 }
 
-function startVotingPolling() {
-    if (isAdmin) return;
-    
-    let votingPollInterval = setInterval(async () => {
-        if (document.getElementById('voter-screen').classList.contains('hidden')) {
-            clearInterval(votingPollInterval);
-            return;
-        }
-        
-        // Solo actualizar si no hay selecciones activas
-        const hasSelectedOptions = document.querySelectorAll('.multiple-option.selected, input[type="checkbox"]:checked').length > 0;
-        
-        if (!hasSelectedOptions) {
-            try {
-                await loadVotingQuestions();
-            } catch (error) {
-                console.log('Polling error:', error);
-            }
-        }
-    }, 3000); // Cada 3 segundos
-}
-
 // ================================
 // FUNCIONES DE VOTACIÓN
 // ================================
@@ -736,8 +896,8 @@ async function submitMultipleVote(questionId) {
 
 async function showAdminScreen() {
     showScreen('admin-screen');
+    connectWebSocket();
     await initializeAdminScreen();
-    startAdminPolling();
 }
 
 async function initializeAdminScreen() {
@@ -991,21 +1151,6 @@ function renderActiveQuestions(questions) {
     }
 
     container.innerHTML = questions.map(q => AdminComponents.createActiveVotingCard(q)).join('');
-}
-
-function startAdminPolling() {
-    if (updateInterval) {
-        clearInterval(updateInterval);
-    }
-
-    updateInterval = setInterval(async () => {
-        if (document.getElementById('admin-screen').classList.contains('hidden')) {
-            clearInterval(updateInterval);
-            return;
-        }
-        
-        await loadAforoData();
-    }, 5000);
 }
 
 // ================================
@@ -1423,6 +1568,118 @@ async function deleteVoting(questionId) {
         await apiCall(`/voting/questions/${questionId}`, { method: 'DELETE' });
         await loadActiveQuestions();
         notifications.show('Encuesta eliminada', 'success');
+    } catch (error) {
+        notifications.show(`Error: ${error.message}`, 'error');
+    }
+}
+
+function showExtendTimeModal(questionId, questionText) {
+    modals.show({
+        title: '⏰ Extender Tiempo de Votación',
+        content: `
+            <p style="margin-bottom: 1rem;"><strong>Pregunta:</strong> ${questionText}</p>
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Minutos adicionales:</label>
+            <input type="number" id="extend-minutes-input" class="modal-input" 
+                   placeholder="15" min="1" max="120" value="15">
+            <p style="color: var(--gray-600); font-size: 0.9rem; margin-top: 0.5rem;">
+                Máximo 120 minutos adicionales
+            </p>
+        `,
+        actions: [
+            {
+                text: 'Cancelar',
+                class: 'btn-secondary',
+                handler: 'modals.hide()'
+            },
+            {
+                text: 'Extender Tiempo',
+                class: 'btn-warning',
+                handler: `extendVotingTime(${questionId})`
+            }
+        ]
+    });
+}
+
+async function extendVotingTime(questionId) {
+    const minutes = parseInt(document.getElementById('extend-minutes-input').value);
+    
+    if (!minutes || minutes < 1 || minutes > 120) {
+        notifications.show('Ingrese entre 1 y 120 minutos', 'error');
+        return;
+    }
+    
+    try {
+        notifications.show('Extendiendo tiempo...', 'info');
+        
+        await apiCall(`/voting/questions/${questionId}/extend-time`, {
+            method: 'PUT',
+            body: JSON.stringify({ extra_minutes: minutes })
+        });
+        
+        modals.hide();
+        notifications.show(`⏰ Tiempo extendido por ${minutes} minutos`, 'success');
+        
+    } catch (error) {
+        notifications.show(`Error: ${error.message}`, 'error');
+    }
+}
+
+function showBroadcastModal() {
+    modals.show({
+        title: '📢 Mensaje a Votantes',
+        content: `
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Mensaje:</label>
+            <textarea id="broadcast-message" class="modal-input" 
+                      style="min-height: 100px; resize: vertical;" 
+                      placeholder="Escriba el mensaje para todos los votantes..."></textarea>
+            
+            <label style="display: block; margin-bottom: 0.5rem; margin-top: 1rem; font-weight: 500;">Tipo:</label>
+            <select id="broadcast-type" class="modal-input">
+                <option value="info">Información</option>
+                <option value="success">Éxito</option>
+                <option value="warning">Advertencia</option>
+                <option value="error">Error</option>
+            </select>
+        `,
+        actions: [
+            {
+                text: 'Cancelar',
+                class: 'btn-secondary',
+                handler: 'modals.hide()'
+            },
+            {
+                text: 'Enviar Mensaje',
+                class: 'btn-primary',
+                handler: 'sendBroadcastMessage()'
+            }
+        ]
+    });
+}
+
+async function sendBroadcastMessage() {
+    const message = document.getElementById('broadcast-message').value.trim();
+    const type = document.getElementById('broadcast-type').value;
+    
+    if (!message) {
+        notifications.show('Escriba un mensaje', 'error');
+        return;
+    }
+    
+    try {
+        notifications.show('Enviando mensaje...', 'info');
+        
+        const response = await apiCall('/admin/broadcast-message', {
+            method: 'POST',
+            body: JSON.stringify({
+                text: message,
+                type: type,
+                duration: 10000
+            })
+        });
+        
+        modals.hide();
+        notifications.show(`📢 Mensaje enviado a ${response.recipients} votantes`, 'success');
+        
     } catch (error) {
         notifications.show(`Error: ${error.message}`, 'error');
     }
