@@ -738,10 +738,8 @@ async def reset_db():
         execute_query(conn, "DELETE FROM options", commit=True) 
         execute_query(conn, "DELETE FROM questions", commit=True)
         execute_query(conn, "DELETE FROM participants", commit=True)
-        
-        # Resetear estado de participantes sin borrarlos
-        execute_query(conn, "UPDATE participants SET present = 0, has_voted = 0, is_power = null, login_time = null", commit=True)
-        
+        execute_query(conn, "DELETE FROM config", commit=True)
+
         # WEBSOCKET: Notificar reset completo
         from ..main import manager
         await manager.broadcast_to_voters({
