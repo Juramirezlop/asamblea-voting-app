@@ -255,8 +255,10 @@ class VotingComponents {
                 <div class="question-header">
                     <div class="question-title">${question.text}</div>
                     <div class="question-meta">
-                    ${question.time_remaining_seconds ? `
-                        <div class="question-timer">⏰ ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')} restantes</div>
+                    ${question.time_remaining_seconds !== null && question.time_remaining_seconds !== undefined ? `
+                        <div class="question-timer" data-question-id="${question.id}" data-remaining="${question.time_remaining_seconds}">
+                            ⏰ ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')} restantes
+                        </div>
                     ` : ''}
                         <div class="meta-item">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -304,8 +306,10 @@ class VotingComponents {
                 <div class="question-header">
                     <div class="question-title">${question.text}</div>
                     <div class="question-meta">
-                    ${question.time_remaining_seconds ? `
-                        <div class="question-timer">⏰ ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')} restantes</div>
+                    ${question.time_remaining_seconds !== null && question.time_remaining_seconds !== undefined ? `
+                        <div class="question-timer" data-question-id="${question.id}" data-remaining="${question.time_remaining_seconds}">
+                            ⏰ ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')} restantes
+                        </div>
                     ` : ''}
                         <div class="meta-item">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -430,6 +434,25 @@ class AdminComponents {
                            class="form-input" 
                            id="question-text" 
                            placeholder="¿Aprueba la propuesta de mejoras en las zonas comunes?">
+                </div>
+
+                <!-- Configuración de timer para encuestas -->
+                <div class="form-section">
+                    <h3>⏰ Tiempo Límite (Opcional)</h3>
+                    
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <input type="checkbox" id="enable-timer" style="transform: scale(1.2);">
+                        <label for="enable-timer" style="font-weight: 500;">Establecer tiempo límite para esta votación</label>
+                    </div>
+                    
+                    <div id="timer-config" style="display: none; padding: 1rem; background: rgba(245, 158, 11, 0.1); border-radius: 8px;">
+                        <label class="form-label">Minutos disponibles para votar:</label>
+                        <input type="number" id="time-limit-minutes" class="form-input" 
+                               value="15" min="1" max="180" style="width: 120px;">
+                        <p style="color: var(--gray-600); font-size: 0.9rem; margin-top: 0.5rem;">
+                            La votación se cerrará automáticamente después de este tiempo
+                        </p>
+                    </div>
                 </div>
 
                 <!-- Configuración para Múltiples Opciones -->

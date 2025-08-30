@@ -417,7 +417,7 @@ if __name__ == "__main__":
         "workers": 1,  # Railway funciona mejor con 1 worker
         "loop": "uvloop",  # Loop más rápido
         "http": "httptools",  # Parser HTTP más rápido
-        "limit_concurrency": 400,
+        "limit_concurrency": 500,
         "timeout_keep_alive": 30,
         "timeout_graceful_shutdown": 30,
         "access_log": False,  # Desactivar access log para mayor rendimiento

@@ -1046,7 +1046,12 @@ function setupVotingFormListeners() {
             setSelectionMode(mode);
         });
     });
-    
+
+    // Timer checkbox
+    document.getElementById('enable-timer').addEventListener('change', (e) => {
+        const timerConfig = document.getElementById('timer-config');
+        timerConfig.style.display = e.target.checked ? 'block' : 'none';
+    });
 }
 
 function showAdminTab(tabName) {
@@ -1080,7 +1085,8 @@ function showAdminTab(tabName) {
 async function loadAdminData() {
     await Promise.all([
         loadAforoData(),
-        loadActiveQuestions()
+        loadActiveQuestions(),
+        refreshConnectedUsers()
     ]);
 }
 
@@ -1141,6 +1147,61 @@ async function loadActiveQuestions() {
         document.getElementById('active-questions').innerHTML = 
             '<p style="color: var(--danger-color); padding: 1rem;">Error cargando preguntas activas</p>';
     }
+}
+
+async function refreshConnectedUsers() {
+    try {
+        const users = await apiCall('/admin/connected-users');
+        renderConnectedUsers(users);
+    } catch (error) {
+        console.error('Error loading connected users:', error);
+        document.getElementById('connected-users-display').innerHTML = 
+            '<p style="color: var(--danger-color);">Error cargando usuarios conectados</p>';
+    }
+}
+
+function renderConnectedUsers(data) {
+    const container = document.getElementById('connected-users-display');
+    
+    const adminCount = data.admin_connections || 0;
+    const voterCount = data.voter_connections || 0;
+    const connectedVoters = data.connected_voters || [];
+    
+    container.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <div class="stat-card">
+                <div class="stat-number">${adminCount}</div>
+                <div class="stat-label">Admins</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${voterCount}</div>
+                <div class="stat-label">Votantes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${data.total_connected || 0}</div>
+                <div class="stat-label">Total</div>
+            </div>
+        </div>
+        
+        ${connectedVoters.length > 0 ? `
+            <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--gray-300); border-radius: 12px;">
+                <div style="background: var(--gray-100); padding: 0.8rem; font-weight: 600; border-bottom: 1px solid var(--gray-300);">
+                    Votantes Conectados
+                </div>
+                ${connectedVoters.map(voter => `
+                    <div style="padding: 0.8rem; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <strong>${voter.code}</strong> - ${voter.name}
+                            <span style="color: var(--primary-color); margin-left: 0.5rem;">${voter.coefficient}%</span>
+                        </div>
+                        <span style="background: ${voter.is_power ? 'var(--warning-color)' : 'var(--success-color)'}; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">
+                            ${voter.is_power ? 'Poder' : 'Propio'}
+                        </span>
+                    </div>
+                `).join('')}
+            </div>
+        ` : '<p style="text-align: center; color: var(--gray-600); padding: 2rem;">No hay votantes conectados</p>'}
+    `;
 }
 
 function renderActiveQuestions(questions) {
@@ -1479,6 +1540,15 @@ async function createNewVoting() {
 
         questionData.allow_multiple = allowMultiple;
         questionData.max_selections = maxSelections;
+
+        // Verificar tiempo límite
+        const enableTimer = document.getElementById('enable-timer').checked;
+        if (enableTimer) {
+            const timeLimit = parseInt(document.getElementById('time-limit-minutes').value);
+            if (timeLimit && timeLimit > 0) {
+                questionData.time_limit_minutes = timeLimit;
+            }
+        }
         
         if (maxSelections > options.length) {
             notifications.show('El máximo de selecciones no puede ser mayor al número de opciones', 'error');
@@ -2254,3 +2324,33 @@ function setupVisualEffects() {
         });
     });
 }
+
+// Sistema de cronómetros en tiempo real
+function startTimerUpdates() {
+    setInterval(() => {
+        document.querySelectorAll('.question-timer').forEach(timer => {
+            const remaining = parseInt(timer.getAttribute('data-remaining'));
+            if (remaining > 0) {
+                const newRemaining = remaining - 1;
+                timer.setAttribute('data-remaining', newRemaining);
+                const minutes = Math.floor(newRemaining / 60);
+                const seconds = newRemaining % 60;
+                timer.textContent = `⏰ ${minutes}:${String(seconds).padStart(2, '0')} restantes`;
+                
+                // Cambiar color cuando quedan menos de 2 minutos
+                if (newRemaining < 120) {
+                    timer.style.background = 'linear-gradient(135deg, var(--danger-color), var(--danger-dark))';
+                    timer.style.animation = 'pulse 2s infinite';
+                }
+            } else {
+                timer.textContent = '⏰ Tiempo agotado';
+                timer.style.background = 'linear-gradient(135deg, var(--danger-color), var(--danger-dark))';
+            }
+        });
+    }, 1000);
+}
+
+// Iniciar cronómetros cuando se carga la página de votante
+document.addEventListener('DOMContentLoaded', () => {
+    startTimerUpdates();
+});

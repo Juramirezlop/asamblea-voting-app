@@ -287,20 +287,32 @@
                         <div id="upload-status" class="upload-status"></div>
                     </div>
 
+                    <!-- Usuarios Conectados -->
+                    <div class="panel">
+                        <div class="panel-header">
+                            <h3>Usuarios Conectados</h3>
+                            <button class="btn btn-info" onclick="refreshConnectedUsers()">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23,4 23,10 17,10"></polyline>
+                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                                </svg>
+                                Actualizar
+                            </button>
+                        </div>
+                        <div id="connected-users-display">
+                            <div class="loading-state">
+                                <div class="spinner"></div>
+                                <p>Cargando usuarios...</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Gestión de Participantes -->
                     <div class="panel">
                         <div class="panel-header">
                             <h3>Gestión de Participantes</h3>
                         </div>
-                        <button class="btn btn-secondary" onclick="showConjuntoModal()">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                                <polyline points="9,22 9,12 15,12 15,22"></polyline>
-                            </svg>
-                            Configurar Nombre del Conjunto
-                        </button>
-
-                        <button class="btn btn-warning" id="delete-code-btn">
+                        <button class="btn btn-danger" id="delete-code-btn">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <circle cx="12" cy="12" r="10"></circle>
                                 <line x1="15" y1="9" x2="9" y2="15"></line>
@@ -339,6 +351,14 @@
                                     <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                                 </svg>
                                 Mensaje a Votantes
+                            </button>
+
+                            <button class="btn btn-secondary" onclick="showConjuntoModal()">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                    <polyline points="9,22 9,12 15,12 15,22"></polyline>
+                                </svg>
+                                Configurar Nombre del Conjunto
                             </button>
                         </div>
                     </div>
