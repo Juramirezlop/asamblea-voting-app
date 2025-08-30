@@ -891,9 +891,6 @@ function setupVotingFormListeners() {
         });
     });
     
-    // Agregar opciones iniciales
-    addNewOption('Juan Pérez Martínez');
-    addNewOption('María García López');
 }
 
 function showAdminTab(tabName) {
@@ -1220,12 +1217,12 @@ function selectVotingType(type) {
         multipleConfig.classList.add('active');
         optionsSection.classList.add('active');
         questionInput.placeholder = 'Elija el nuevo representante de la Junta Directiva';
-        questionInput.value = 'Elija el nuevo representante de la Junta Directiva';
+        questionInput.value = '';
     } else {
         multipleConfig.classList.remove('active');
         optionsSection.classList.remove('active');
         questionInput.placeholder = '¿Aprueba la propuesta de mejoras en las zonas comunes?';
-        questionInput.value = '¿Aprueba la propuesta de mejoras en las zonas comunes?';
+        questionInput.value = '';
     }
 }
 
@@ -1236,14 +1233,22 @@ function setSelectionMode(mode) {
     });
     document.querySelector(`[data-mode="${mode}"]`).classList.add('active');
 
-    // Configurar input de máximo selecciones
+    // Mostrar/ocultar configuración de máximo selecciones
+    const maxSelectionsRow = document.getElementById('max-selections-row');
     const maxInput = document.getElementById('max-selections');
+    
     if (mode === 'single') {
         maxInput.value = 1;
         maxInput.disabled = true;
+        if (maxSelectionsRow) {
+            maxSelectionsRow.style.display = 'none';
+        }
     } else {
         maxInput.value = 2;
         maxInput.disabled = false;
+        if (maxSelectionsRow) {
+            maxSelectionsRow.style.display = 'flex';
+        }
     }
 }
 
@@ -1338,10 +1343,6 @@ async function createNewVoting() {
         document.getElementById('question-text').value = '';
         document.getElementById('options-list').innerHTML = '';
         document.getElementById('max-selections').value = '1';
-        
-        // Agregar opciones por defecto
-        addNewOption('Juan Pérez Martínez');
-        addNewOption('María García López');
 
         notifications.show('Votación creada y activada', 'success');
         await loadActiveQuestions();
@@ -1760,6 +1761,10 @@ async function resetDatabase() {
         setTimeout(() => {
             showScreen('welcome-screen');
         }, 1000);
+
+        setTimeout(async () => {
+            await showConjuntoModal();
+        }, 1500);
 
     } catch (error) {
         notifications.show(`Error: ${error.message}`, 'error');

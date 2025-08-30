@@ -179,7 +179,7 @@ class ModalSystem {
     }
 
     hide() {
-        if (this.activeModal) {
+        if (this.activeModal && this.activeModal.parentNode) {
             this.activeModal.classList.remove('show');
             setTimeout(() => {
                 if (this.activeModal && this.activeModal.parentNode) {
@@ -445,7 +445,7 @@ class AdminComponents {
                         </button>
                     </div>
 
-                    <div class="config-row">
+                    <div class="config-row" id="max-selections-row" style="display: none;">
                         <span class="config-label">Máximo selecciones:</span>
                         <input type="number" 
                                class="config-input" 
