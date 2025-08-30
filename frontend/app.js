@@ -909,42 +909,32 @@ async function submitMultipleVote(questionId) {
 // ================================
 
 async function showAdminScreen() {
-    // PRIMERO verificar conjunto antes de mostrar nada
-    try {
-        const response = await apiCall('/participants/conjunto/nombre');
-        if (!response.nombre) {
-            await showConjuntoModal();
-        }
-    } catch (error) {
-        await showConjuntoModal();
-    }
-    
-    // DESPUÉS cargar todo lo demás
+    // PRIMERO mostrar la pantalla
     showScreen('admin-screen');
     connectWebSocket();
     document.getElementById('create-voting-form').innerHTML = AdminComponents.createVotingForm();
     setupAdminEventListeners();
-    await loadAdminData();
     
-    // Actualizar display si ya existe el nombre
+    // DESPUÉS verificar conjunto y mostrar modal si es necesario
     try {
         const response = await apiCall('/participants/conjunto/nombre');
-        if (response.nombre) {
+        if (!response.nombre) {
+            // Esperar un poco para que la pantalla se renderice completamente
+            setTimeout(async () => {
+                await showConjuntoModal();
+            }, 500);
+        } else {
             updateConjuntoDisplay(response.nombre);
         }
     } catch (error) {
-        console.log('Error actualizando display nombre');
+        // Si hay error, también mostrar el modal después de un delay
+        setTimeout(async () => {
+            await showConjuntoModal();
+        }, 500);
     }
-}
-
-async function checkConjuntoName() {
-    const response = await apiCall('/participants/conjunto/nombre');
     
-    if (!response.nombre) {
-        await showConjuntoModal();
-    } else {
-        updateConjuntoDisplay(response.nombre);
-    }
+    // Cargar datos al final
+    await loadAdminData();
 }
 
 function showConjuntoModal() {
@@ -1655,7 +1645,7 @@ async function extendVotingTime(questionId) {
 
 function showBroadcastModal() {
     modals.show({
-        title: '📢 Mensaje a Votantes',
+        title: 'Mensaje a Votantes',
         content: `
             <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Mensaje:</label>
             <textarea id="broadcast-message" class="modal-input" 
