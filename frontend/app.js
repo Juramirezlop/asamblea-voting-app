@@ -909,32 +909,21 @@ async function submitMultipleVote(questionId) {
 // ================================
 
 async function showAdminScreen() {
-    // PRIMERO mostrar la pantalla
     showScreen('admin-screen');
     connectWebSocket();
     document.getElementById('create-voting-form').innerHTML = AdminComponents.createVotingForm();
     setupAdminEventListeners();
+    await loadAdminData();
     
-    // DESPUÉS verificar conjunto y mostrar modal si es necesario
+    // Solo actualizar display si ya existe el nombre
     try {
         const response = await apiCall('/participants/conjunto/nombre');
-        if (!response.nombre) {
-            // Esperar un poco para que la pantalla se renderice completamente
-            setTimeout(async () => {
-                await showConjuntoModal();
-            }, 500);
-        } else {
+        if (response.nombre) {
             updateConjuntoDisplay(response.nombre);
         }
     } catch (error) {
-        // Si hay error, también mostrar el modal después de un delay
-        setTimeout(async () => {
-            await showConjuntoModal();
-        }, 500);
+        console.log('No se pudo cargar nombre del conjunto');
     }
-    
-    // Cargar datos al final
-    await loadAdminData();
 }
 
 function showConjuntoModal() {
