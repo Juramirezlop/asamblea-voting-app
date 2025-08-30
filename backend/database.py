@@ -179,9 +179,6 @@ def execute_query(conn, query, params=(), fetchone=False, fetchall=False, commit
         # Convertir placeholders SQLite a PostgreSQL si es necesario
         postgres_query = query.replace("?", "%s")
         
-        # Optimizaciones específicas de queries
-        postgres_query = optimize_query(postgres_query)
-        
         cur = conn.cursor()
         
         # Log solo en desarrollo
@@ -237,25 +234,6 @@ def execute_query(conn, query, params=(), fetchone=False, fetchall=False, commit
                 cur.close()
             except:
                 pass
-
-def optimize_query(query):
-    """Aplicar optimizaciones específicas a queries comunes"""
-    # Optimización para consultas de aforo (muy frecuentes)
-    if "COUNT(*) as" in query and "participants" in query:
-        # PostgreSQL usa booleanos reales
-        if "present = 1" in query:
-            query = query.replace("present = 1", "present = true")
-        if "is_power = FALSE" in query:
-            pass  # Ya está correcto
-        elif "is_power = TRUE" in query:
-            pass  # Ya está correcto
-    
-    # Optimización para consultas de resultados de votación
-    if "votes" in query and "participants" in query and "JOIN" in query:
-        # Asegurar que use índices en claves foráneas
-        pass
-    
-    return query
 
 def init_db():
     """Inicializar base de datos PostgreSQL con índices optimizados"""
