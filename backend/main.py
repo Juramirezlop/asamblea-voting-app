@@ -15,7 +15,7 @@ import time
 from contextlib import asynccontextmanager
 
 # Importar módulos optimizados
-from .database import init_db, health_check, get_pool_status
+from .database import init_db, health_check, get_pool_status, DB_CONFIG, query_cache
 from .routers import participants, voting, auth_routes, admin
 from .auth.auth import create_default_admin_from_env, admin_required
 
@@ -270,6 +270,68 @@ app.include_router(auth_routes.router, prefix="/api")
 app.include_router(participants.router, prefix="/api")
 app.include_router(voting.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+
+@app.get("/api/monitoring/server-status", dependencies=[Depends(admin_required)])
+async def get_server_status():
+    """Estado completo del servidor para monitoreo administrativo"""
+    try:
+        # Health check de la base de datos
+        db_health = health_check()
+        pool_status = get_pool_status()
+        
+        # Información de conexiones WebSocket
+        websocket_info = {
+            "admin_connections": len(manager.admin_connections),
+            "voter_connections": len(manager.voter_connections),
+            "total_connections": len(manager.admin_connections) + len(manager.voter_connections)
+        }
+        
+        # Memoria y cache stats
+        cache_stats = query_cache.get_stats() if 'query_cache' in globals() else {"entries": 0, "memory_usage": "0 chars"}
+        
+        # Calcular "load" basado en conexiones
+        max_connections = 500  # El límite que configuramos
+        current_load = websocket_info["total_connections"]
+        load_percentage = (current_load / max_connections) * 100
+        
+        # Determinar estado general
+        if load_percentage > 90:
+            status = "critical"
+            status_text = "🔴 Sobrecarga Crítica"
+        elif load_percentage > 70:
+            status = "warning"
+            status_text = "🟡 Carga Alta"
+        elif load_percentage > 40:
+            status = "moderate"
+            status_text = "🟠 Carga Moderada"
+        else:
+            status = "healthy"
+            status_text = "🟢 Funcionando Normal"
+        
+        return {
+            "status": status,
+            "status_text": status_text,
+            "load_percentage": round(load_percentage, 2),
+            "database": db_health,
+            "connection_pool": pool_status,
+            "websockets": websocket_info,
+            "cache": cache_stats,
+            "limits": {
+                "max_connections": max_connections,
+                "pool_max": DB_CONFIG['maxconn'],
+                "pool_min": DB_CONFIG['minconn']
+            },
+            "timestamp": time.time()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in server monitoring: {e}")
+        return {
+            "status": "error",
+            "status_text": "❌ Error de Monitoreo",
+            "error": str(e),
+            "timestamp": time.time()
+        }
 
 # ================================
 # ARCHIVOS ESTÁTICOS OPTIMIZADOS

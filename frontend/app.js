@@ -198,22 +198,27 @@ function handleAdminWebSocketMessage(message) {
         case 'attendance_registered':
             loadAforoData();
             notifications.show(`Nueva asistencia: ${message.data.code} - ${message.data.name}`, 'info', 5000);
+            addActivityLog(`Nueva asistencia: ${message.data.code} - ${message.data.name}`, 'success');
             break;
         case 'vote_registered':
             loadAforoData();
             loadActiveQuestions();
+            addActivityLog(`Voto registrado: ${message.data.participant_code}`, 'info');
             break;
         case 'question_created':
             loadActiveQuestions();
             notifications.show('Nueva votación creada', 'success', 4000);
+            addActivityLog('Nueva votación creada', 'success');
             break;
         case 'participant_removed':
             loadAforoData();
             notifications.show(`Código eliminado: ${message.data.code}`, 'warning', 4000);
+            addActivityLog(`Código eliminado: ${message.data.code}`, 'warning');
             break;
         case 'excel_uploaded':
             loadAforoData();
             notifications.show(`Excel cargado: ${message.data.inserted} participantes`, 'success', 6000);
+            addActivityLog(`Excel cargado: ${message.data.inserted} participantes`, 'success');
             break;
         case 'notification':
             notifications.show(message.data.text || 'Notificación del sistema', message.data.type || 'info', message.data.duration || 5000);
@@ -321,6 +326,8 @@ function logout() {
         clearInterval(updateInterval);
         updateInterval = null;
     }
+    
+    stopMonitoring();
 
     // Limpiar formularios
     const accessCode = document.getElementById('access-code');
@@ -924,6 +931,8 @@ async function showAdminScreen() {
     } catch (error) {
         console.log('No se pudo cargar nombre del conjunto');
     }
+    
+    startMonitoring();
 }
 
 function showConjuntoModal() {
@@ -2354,3 +2363,143 @@ function startTimerUpdates() {
 document.addEventListener('DOMContentLoaded', () => {
     startTimerUpdates();
 });
+
+// ================================
+// SISTEMA DE MONITOREO
+// ================================
+
+let monitoringInterval = null;
+let activityLog = [];
+
+async function refreshServerStatus() {
+    try {
+        const status = await apiCall('/monitoring/server-status');
+        renderServerStatus(status);
+        renderDatabaseMetrics(status);
+    } catch (error) {
+        console.error('Error loading server status:', error);
+        document.getElementById('server-status-display').innerHTML = 
+            '<p style="color: var(--danger-color);">❌ Error obteniendo estado del servidor</p>';
+    }
+}
+
+function renderServerStatus(data) {
+    const container = document.getElementById('server-status-display');
+    const statusColor = {
+        'healthy': 'var(--success-color)',
+        'moderate': 'var(--warning-color)',
+        'warning': 'var(--danger-color)',
+        'critical': 'var(--danger-color)',
+        'error': 'var(--danger-color)'
+    }[data.status] || 'var(--gray-500)';
+    
+    container.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+            <div class="stat-card" style="border-left: 4px solid ${statusColor};">
+                <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">${data.status_text}</div>
+                <div class="stat-label">Estado General</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${data.load_percentage || 0}%</div>
+                <div class="stat-label">Carga del Sistema</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${data.websockets?.total_connections || 0}</div>
+                <div class="stat-label">Conexiones Activas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${data.limits?.max_connections || 0}</div>
+                <div class="stat-label">Límite Máximo</div>
+            </div>
+        </div>
+        
+        ${data.load_percentage > 80 ? `
+            <div style="background: linear-gradient(135deg, var(--danger-color), var(--danger-dark)); color: white; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+                <strong>⚠️ Advertencia de Sobrecarga:</strong>
+                <p>El servidor está cerca de su capacidad máxima. Considere limitar nuevos accesos.</p>
+            </div>
+        ` : ''}
+        
+        <div style="font-size: 0.9rem; color: var(--gray-600); margin-top: 1rem;">
+            Última actualización: ${new Date().toLocaleTimeString('es-CO')}
+        </div>
+    `;
+}
+
+function renderDatabaseMetrics(data) {
+    const container = document.getElementById('database-metrics');
+    
+    container.innerHTML = `
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem;">
+            <div class="stat-card">
+                <div class="stat-number">${data.connection_pool?.status === 'healthy' ? '🟢' : '🔴'}</div>
+                <div class="stat-label">Pool BD</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${data.limits?.pool_max || 0}</div>
+                <div class="stat-label">Pool Máximo</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${data.cache?.entries || 0}</div>
+                <div class="stat-label">Cache Entradas</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">${data.database?.status === 'healthy' ? '✅' : '❌'}</div>
+                <div class="stat-label">Estado BD</div>
+            </div>
+        </div>
+    `;
+}
+
+function startMonitoring() {
+    if (monitoringInterval) return;
+    
+    monitoringInterval = setInterval(async () => {
+        if (isAdmin && document.querySelector('.tab-button[data-tab="monitoreo"].active')) {
+            await refreshServerStatus();
+        }
+    }, 5000); // Actualizar cada 5 segundos
+}
+
+function stopMonitoring() {
+    if (monitoringInterval) {
+        clearInterval(monitoringInterval);
+        monitoringInterval = null;
+    }
+}
+
+function addActivityLog(message, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString('es-CO');
+    const color = {
+        'info': 'var(--info-color)',
+        'warning': 'var(--warning-color)',
+        'error': 'var(--danger-color)',
+        'success': 'var(--success-color)'
+    }[type] || 'var(--gray-600)';
+    
+    activityLog.unshift({ message, type, timestamp, color });
+    
+    // Mantener solo los últimos 50 logs
+    if (activityLog.length > 50) {
+        activityLog = activityLog.slice(0, 50);
+    }
+    
+    updateActivityDisplay();
+}
+
+function updateActivityDisplay() {
+    const container = document.getElementById('activity-log');
+    if (!container) return;
+    
+    if (activityLog.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--gray-600);">Esperando actividad...</p>';
+        return;
+    }
+    
+    container.innerHTML = activityLog.map(log => `
+        <div style="padding: 0.5rem; border-bottom: 1px solid var(--gray-300); display: flex; justify-content: space-between; align-items: center;">
+            <span style="color: ${log.color};">${log.message}</span>
+            <span style="color: var(--gray-500); font-size: 0.8rem;">${log.timestamp}</span>
+        </div>
+    `).join('');
+}
