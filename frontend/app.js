@@ -911,20 +911,14 @@ async function submitMultipleVote(questionId) {
 async function showAdminScreen() {
     showScreen('admin-screen');
     connectWebSocket();
+    await checkConjuntoName();
     await initializeAdminScreen();
 }
 
 async function initializeAdminScreen() {
-    // Verificar y solicitar nombre del conjunto si es necesario
-    await checkConjuntoName();
-    
     // Cargar formulario de creación
     document.getElementById('create-voting-form').innerHTML = AdminComponents.createVotingForm();
-    
-    // Configurar event listeners
-    setupAdminEventListeners();
-    
-    // Cargar datos iniciales
+    setupAdminEventListeners();    
     await loadAdminData();
 }
 
@@ -933,13 +927,15 @@ async function checkConjuntoName() {
         const response = await apiCall('/participants/conjunto/nombre');
         const nombreActual = response.nombre;
 
-        if (!nombreActual || nombreActual === '') {
+        // Si no hay nombre O es null/undefined/empty, solicitar
+        if (!nombreActual || nombreActual === '' || nombreActual === null) {
             await showConjuntoModal();
         } else {
             updateConjuntoDisplay(nombreActual);
         }
     } catch (error) {
         console.error('Error obteniendo nombre conjunto:', error);
+        // Si hay error de conexión, también solicitar
         await showConjuntoModal();
     }
 }
@@ -2161,9 +2157,14 @@ async function resetDatabase() {
         document.getElementById('access-code').value = '';
         document.getElementById('upload-status').innerHTML = '';
 
+        // Limpiar displays de conjunto
+        document.querySelectorAll('#conjunto-name-display, #conjunto-name-small').forEach(el => {
+            if (el) el.textContent = '';
+        });
+
         // Cerrar modales activos
         modals.hide();
-        
+
         // Volver a pantalla inicial
         setTimeout(() => {
             showScreen('welcome-screen');

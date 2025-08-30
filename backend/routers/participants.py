@@ -56,7 +56,7 @@ async def guardar_nombre_conjunto(request: ConjuntoRequest):
         close_db(conn)
 
 # Obtener nombre conjunto
-@router.get("/conjunto/nombre", dependencies=[Depends(admin_required)])
+@router.get("/conjunto/nombre")
 def obtener_nombre_conjunto():
     conn = get_db()
     try:
@@ -66,7 +66,9 @@ def obtener_nombre_conjunto():
             ("conjunto_nombre",),
             fetchone=True
         )
-        return {"nombre": result["value"] if result else None}
+        # Verificar específicamente que no sea None, vacío, o "Prueba"
+        nombre = result["value"] if result and result["value"] not in [None, "", "Prueba"] else None
+        return {"nombre": nombre}
     finally:
         close_db(conn)
 
