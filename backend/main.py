@@ -97,20 +97,6 @@ async def lifespan(app: FastAPI):
         else:
             logger.info("✅ Sistema de votación iniciado correctamente")
             
-        # Log de configuración
-        pool_status = get_pool_status()
-        logger.info(f"Pool de conexiones: {pool_status}")
-        
-        # Log adicional de startup
-        logger.info("=" * 60)
-        logger.info("🗳️  SISTEMA DE VOTACIÓN PARA ASAMBLEAS")
-        logger.info("=" * 60)
-        logger.info(f"Versión: 2.0.0")
-        logger.info(f"Entorno: {'Producción (Railway)' if os.getenv('RAILWAY_ENVIRONMENT') else 'Desarrollo'}")
-        logger.info(f"Optimizado para: {PERFORMANCE_CONFIG['limit_concurrency']}+ usuarios simultáneos")
-        logger.info(f"Pool de BD: {get_pool_status()}")
-        logger.info("=" * 60)
-        
         yield
         
     except Exception as e:

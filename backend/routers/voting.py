@@ -534,7 +534,7 @@ def get_aforo(user=Depends(admin_required)):
         # Usar booleanos PostgreSQL
         voted_data = execute_query(
             conn,
-            "SELECT COUNT(*) as voted_count FROM participants WHERE present = true AND has_voted = 1",
+            "SELECT COUNT(*) as voted_count FROM participants WHERE present = 1 AND has_voted = 1",
             fetchone=True
         )
         voted_count = voted_data["voted_count"] or 0
@@ -569,7 +569,7 @@ def reset_db():
         execute_query(conn, "DELETE FROM participants", commit=True)
         
         # Resetear estado de participantes sin borrarlos
-        execute_query(conn, "UPDATE participants SET present = false, has_voted = 0, is_power = null, login_time = null", commit=True)
+        execute_query(conn, "UPDATE participants SET present = 0, has_voted = 0, is_power = null, login_time = null", commit=True)
         
         return {"status": "votaciones y asistencias reseteadas"}
     finally:
