@@ -66,9 +66,7 @@ def obtener_nombre_conjunto():
             ("conjunto_nombre",),
             fetchone=True
         )
-        # Verificar específicamente que no sea None, vacío, o "Prueba"
-        nombre = result["value"] if result and result["value"] not in [None, "", "Prueba"] else None
-        return {"nombre": nombre}
+        return {"nombre": result["value"] if result and result["value"] else None}
     finally:
         close_db(conn)
 

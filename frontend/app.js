@@ -909,34 +909,41 @@ async function submitMultipleVote(questionId) {
 // ================================
 
 async function showAdminScreen() {
+    // PRIMERO verificar conjunto antes de mostrar nada
+    try {
+        const response = await apiCall('/participants/conjunto/nombre');
+        if (!response.nombre) {
+            await showConjuntoModal();
+        }
+    } catch (error) {
+        await showConjuntoModal();
+    }
+    
+    // DESPUÉS cargar todo lo demás
     showScreen('admin-screen');
     connectWebSocket();
-    await initializeAdminScreen();
-}
-
-async function initializeAdminScreen() {
-    // Cargar formulario de creación
     document.getElementById('create-voting-form').innerHTML = AdminComponents.createVotingForm();
-    setupAdminEventListeners();    
+    setupAdminEventListeners();
     await loadAdminData();
-    await checkConjuntoName();
+    
+    // Actualizar display si ya existe el nombre
+    try {
+        const response = await apiCall('/participants/conjunto/nombre');
+        if (response.nombre) {
+            updateConjuntoDisplay(response.nombre);
+        }
+    } catch (error) {
+        console.log('Error actualizando display nombre');
+    }
 }
 
 async function checkConjuntoName() {
-    try {
-        const response = await apiCall('/participants/conjunto/nombre');
-        const nombreActual = response.nombre;
-
-        // Si no hay nombre O es null/undefined/empty, solicitar
-        if (!nombreActual || nombreActual === '' || nombreActual === null) {
-            await showConjuntoModal();
-        } else {
-            updateConjuntoDisplay(nombreActual);
-        }
-    } catch (error) {
-        console.error('Error obteniendo nombre conjunto:', error);
-        // Si hay error de conexión, también solicitar
+    const response = await apiCall('/participants/conjunto/nombre');
+    
+    if (!response.nombre) {
         await showConjuntoModal();
+    } else {
+        updateConjuntoDisplay(response.nombre);
     }
 }
 
