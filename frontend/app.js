@@ -390,8 +390,34 @@ async function registerAttendance() {
             })
         });
 
-        showAttendanceModal(response);
-        notifications.show('Asistencia registrada correctamente', 'success');
+        // Mostrar modal de confirmación en lugar de notificación simple
+        modals.show({
+            title: '✅ Registro Exitoso',
+            content: `
+                <div style="text-align: center; padding: 1rem;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">🎉</div>
+                    <h3 style="color: var(--success-color); margin-bottom: 1rem;">Asistencia Registrada</h3>
+                    
+                    <div style="background: var(--gray-50); padding: 1.5rem; border-radius: 12px; margin: 1rem 0;">
+                        <p><strong>Código:</strong> ${response.code}</p>
+                        <p><strong>Nombre:</strong> ${response.name}</p>
+                        <p><strong>Tipo:</strong> ${response.is_power ? 'Votación con Poder' : 'Propietario Directo'}</p>
+                    </div>
+                    
+                    <p style="color: var(--gray-600); font-size: 0.9rem;">
+                        Ya puede acceder a las votaciones usando el botón "Acceder a Votaciones"
+                    </p>
+                </div>
+            `,
+            actions: [
+                {
+                    text: 'Entendido',
+                    class: 'btn-success',
+                    handler: 'modals.hide()'
+                }
+            ]
+        });
+
     } catch (error) {
         console.error('Error en registro:', error);
         
@@ -778,14 +804,18 @@ async function checkUserVotes() {
 
 async function voteYesNo(questionId, answer) {
     if (currentUser && currentUser.code === CODIGO_PRUEBA) {
-        notifications.show(`✅ Voto demo registrado: ${answer}`, 'success');
+        notifications.show(`Voto demo registrado: ${answer}`, 'success');
         
-        // Simular confirmación realista
+        // Simular que ya votó - cambiar solo esa votación específica
         setTimeout(() => {
-            notifications.show('Su voto ha sido procesado correctamente', 'info');
-            // Recargar para mostrar el estado "ya votado"
-            loadDemoVotingQuestions();
-        }, 1500);
+            const votingCard = document.querySelector(`[data-question-id="${questionId}"]`);
+            if (votingCard) {
+                votingCard.innerHTML = VotingComponents.createVotedStatus({
+                    id: questionId,
+                    text: votingCard.querySelector('.question-title').textContent
+                }, answer);
+            }
+        }, 1000);
         return;
     }
 
@@ -832,10 +862,10 @@ function selectMultipleOption(element, questionId, maxSelections, allowMultiple)
             countDisplay.textContent = nowSelected.length;
         }
         
-        // Actualizar números de selección
-        nowSelected.forEach((option, index) => {
+        // Mostrar checkmark en lugar de números
+        nowSelected.forEach((option) => {
             const indicator = option.querySelector('.option-indicator');
-            indicator.textContent = index + 1;
+            indicator.textContent = '✓';
         });
         
         // Actualizar botón
@@ -877,14 +907,26 @@ async function submitMultipleVote(questionId) {
     );
     
     if (currentUser && currentUser.code === CODIGO_PRUEBA) {
-        notifications.show(`✅ Voto demo registrado: ${answer}`, 'success');
+        // Obtener respuestas seleccionadas correctamente
+        const container = document.querySelector(`[data-question-id="${questionId}"]`);
+        const selectedOptions = container.querySelectorAll('.multiple-option.selected');
+        const answers = Array.from(selectedOptions).map(option => 
+            option.getAttribute('data-option') || option.querySelector('.option-text').textContent
+        );
         
-        // Simular confirmación realista
+        const answerText = answers.length === 1 ? answers[0] : answers.join(', ');
+        notifications.show(`Votos demo registrados: ${answerText}`, 'success');
+        
+        // Simular que ya votó - mostrar estado votado
         setTimeout(() => {
-            notifications.show('Su voto ha sido procesado correctamente', 'info');
-            // Recargar para mostrar el estado "ya votado"
-            loadDemoVotingQuestions();
-        }, 1500);
+            const votingCard = container.closest('.voting-card');
+            if (votingCard) {
+                votingCard.innerHTML = VotingComponents.createVotedStatus({
+                    id: questionId,
+                    text: votingCard.querySelector('.question-title').textContent
+                }, answerText);
+            }
+        }, 1000);
         return;
     }
 
