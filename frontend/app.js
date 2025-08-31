@@ -406,18 +406,31 @@ async function accessVoting() {
     }
 
     if (code === CODIGO_PRUEBA) {
-        console.log('Creando usuario de prueba...');
-        currentUser = {
+        console.log('Detectado código de prueba:', code);
+        
+        // Crear usuario de prueba con window para hacerlo global
+        window.currentUser = {
             code: CODIGO_PRUEBA,
             name: 'Usuario de Prueba',
             id: 'test',
             coefficient: 1.00
         };
-
+        
+        // También asignar a la variable local
+        currentUser = window.currentUser;
         isAdmin = false;
-        console.log('currentUser creado:', currentUser);
+        
+        console.log('Usuario creado - currentUser:', currentUser);
+        console.log('Usuario creado - window.currentUser:', window.currentUser);
+        
         notifications.show('Acceso de prueba activado', 'success');
-        showVoterScreen();
+        
+        // Usar setTimeout para asegurar que la asignación se complete
+        setTimeout(() => {
+            console.log('Antes de showVoterScreen - currentUser:', currentUser);
+            showVoterScreen();
+        }, 100);
+        
         return;
     }
 
@@ -604,26 +617,31 @@ function showPowerQuestion() {
 // ================================
 
 async function showVoterScreen() {
-    console.log('showVoterScreen llamada, currentUser:', currentUser);
+    // Usar window.currentUser como fallback si currentUser es null
+    const user = currentUser || window.currentUser;
+    console.log('showVoterScreen - currentUser:', currentUser);
+    console.log('showVoterScreen - window.currentUser:', window.currentUser);
+    console.log('showVoterScreen - user final:', user);
     
-    // VERIFICAR que currentUser existe antes de usarlo
-    if (!currentUser || !currentUser.code) {
-        console.error('currentUser es null o no tiene code:', currentUser);
+    if (!user || !user.code) {
+        console.error('No hay usuario válido');
         notifications.show('Error: Usuario no inicializado correctamente', 'error');
         showScreen('welcome-screen');
         return;
     }
-
+    
+    // Asegurar que currentUser esté sincronizado
+    currentUser = user;
     showScreen('voter-screen');
     
-    // Solo conectar WebSocket si no es usuario de prueba
-    if (currentUser.code !== CODIGO_PRUEBA) {
+    // Solo conectar WebSocket si NO es usuario de prueba
+    if (user.code !== CODIGO_PRUEBA) {
         connectWebSocket();
     }
     
-    // Actualizar información del usuario
-    document.getElementById('voter-code').textContent = currentUser.code;
-    document.getElementById('voter-name').textContent = `Bienvenido/a, ${currentUser.name}`;
+    // Usar 'user' en lugar de 'currentUser' para el resto
+    document.getElementById('voter-code').textContent = user.code;
+    document.getElementById('voter-name').textContent = `Bienvenido/a, ${user.name}`;
     
     // Mostrar coeficiente si está disponible
     if (currentUser.coefficient) {
