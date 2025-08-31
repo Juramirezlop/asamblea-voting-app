@@ -407,7 +407,7 @@ class AdminComponents {
         return `
             <div class="create-form">
                 <div class="form-header">
-                    <h2>✨ Nueva Votación</h2>
+                    <h2>⚙️ Nueva Votación</h2>
                     <p>Crea una nueva votación para la asamblea</p>
                 </div>
 

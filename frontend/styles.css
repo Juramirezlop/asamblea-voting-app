@@ -148,7 +148,7 @@ body {
 
 .header-content {
     padding: 2rem;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background: linear-gradient(135deg, var(--gray-800), var(--gray-700)); /* Cambiar esta línea */
     color: white;
     position: relative;
     z-index: 1;
@@ -755,10 +755,7 @@ body {
 .stat-number {
     font-size: 2rem;
     font-weight: 700;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--dark-color);
     margin-bottom: 0.5rem;
 }
 
@@ -1640,7 +1637,7 @@ body {
     font-weight: 700;
     color: var(--dark-color);
     margin-bottom: 0.8rem;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background: linear-gradient(135deg, var(--gray-700), var(--gray-800)); /* Cambiar colores */
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
