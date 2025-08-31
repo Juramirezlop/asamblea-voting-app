@@ -418,26 +418,45 @@ async function accessVoting() {
     }
 
     if (code === CODIGO_PRUEBA) {
+        // Usuario de prueba - configuración completa
         currentUser = {
             code: CODIGO_PRUEBA,
-            name: 'Usuario de Prueba',
-            id: 'test',
+            name: 'Usuario de Demostración',
+            id: 'demo_user',
             coefficient: 1.00
         };
         isAdmin = false;
         
-        notifications.show('Modo demostración activado', 'success');
-        showTestUserModal();  
+        // Ir directo a la pantalla de votante
+        showScreen('voter-screen');
         
-        // Actualizar info del usuario directamente
+        // Configurar interfaz sin llamar backend
         document.getElementById('voter-code').textContent = currentUser.code;
         document.getElementById('voter-name').textContent = `Bienvenido/a, ${currentUser.name}`;
         
-        // Cargar votaciones de prueba
+        // Mostrar coeficiente
+        const userMeta = document.querySelector('.user-meta');
+        if (userMeta && !document.getElementById('voter-coefficient')) {
+            const coeffElement = document.createElement('span');
+            coeffElement.id = 'voter-coefficient';
+            coeffElement.textContent = `Coeficiente: ${currentUser.coefficient}%`;
+            userMeta.appendChild(coeffElement);
+        }
+        
+        // Mostrar conjunto de prueba
+        if (userMeta && !document.getElementById('voter-conjunto')) {
+            const conjuntoElement = document.createElement('span');
+            conjuntoElement.id = 'voter-conjunto';
+            conjuntoElement.textContent = 'Conjunto Demo - Votación de Prueba';
+            userMeta.appendChild(conjuntoElement);
+        }
+        
+        // Cargar votaciones de demostración
         setTimeout(() => {
-            loadVotingQuestions();
+            loadDemoVotingQuestions();
         }, 500);
         
+        notifications.show('🧪 Modo demostración activado - Votaciones de prueba cargadas', 'success');
         return;
     }
 
@@ -795,45 +814,6 @@ function renderVotingQuestions(questions, votedQuestions = new Set()) {
     container.innerHTML = html;
 }
 
-function getSimulatedTestQuestions() {
-    return [
-        {
-            id: 9991,
-            text: "[PRUEBA] ¿Aprueba la propuesta de mejoras?",
-            type: "yesno",
-            closed: false,
-            options: [{text: 'SÍ'}, {text: 'No'}]
-        },
-        {
-            id: 9992, 
-            text: "[PRUEBA] Elija el representante de la junta",
-            type: "multiple",
-            closed: false,
-            allow_multiple: false,
-            max_selections: 1,
-            options: [
-                {text: "Juan Pérez"}, 
-                {text: "María García"}, 
-                {text: "Carlos López"}
-            ]
-        },
-        {
-            id: 9993,
-            text: "[PRUEBA] Seleccione mejoras prioritarias (máximo 2)",
-            type: "multiple", 
-            closed: false,
-            allow_multiple: true,
-            max_selections: 2,
-            options: [
-                {text: "Piscina"}, 
-                {text: "Gimnasio"}, 
-                {text: "Jardines"}, 
-                {text: "Parqueaderos"}
-            ]
-        }
-    ];
-}
-
 async function checkUserVotes() {
     try {
         if (currentUser && currentUser.code === CODIGO_PRUEBA) {
@@ -854,8 +834,14 @@ async function checkUserVotes() {
 
 async function voteYesNo(questionId, answer) {
     if (currentUser && currentUser.code === CODIGO_PRUEBA) {
-        notifications.show(`Voto de prueba registrado: ${answer}`, 'success');
-        setTimeout(() => loadVotingQuestions(), 1000);
+        notifications.show(`✅ Voto demo registrado: ${answer}`, 'success');
+        
+        // Simular confirmación realista
+        setTimeout(() => {
+            notifications.show('Su voto ha sido procesado correctamente', 'info');
+            // Recargar para mostrar el estado "ya votado"
+            loadDemoVotingQuestions();
+        }, 1500);
         return;
     }
 
@@ -947,11 +933,17 @@ async function submitMultipleVote(questionId) {
     );
     
     if (currentUser && currentUser.code === CODIGO_PRUEBA) {
-        notifications.show(`Votos de prueba registrados: ${answers.join(', ')}`, 'success');
-        setTimeout(() => loadVotingQuestions(), 1000);
+        notifications.show(`✅ Voto demo registrado: ${answer}`, 'success');
+        
+        // Simular confirmación realista
+        setTimeout(() => {
+            notifications.show('Su voto ha sido procesado correctamente', 'info');
+            // Recargar para mostrar el estado "ya votado"
+            loadDemoVotingQuestions();
+        }, 1500);
         return;
     }
-
+    
     try {
         notifications.show('Registrando votos...', 'info');
         
@@ -2561,4 +2553,56 @@ function updateActivityDisplay() {
             <span style="color: var(--gray-500); font-size: 0.8rem;">${log.timestamp}</span>
         </div>
     `).join('');
+}
+
+function loadDemoVotingQuestions() {
+    const demoQuestions = [
+        {
+            id: 9996,
+            text: "[DEMO] ¿Aprueba usted la propuesta de mejoras en las zonas comunes del conjunto?",
+            type: "yesno",
+            closed: false,
+            options: [{text: 'SÍ'}, {text: 'No'}]
+        },
+        {
+            id: 9997,
+            text: "[DEMO] Elija el nuevo representante de la Junta Directiva (una sola opción)",
+            type: "multiple",
+            closed: false,
+            allow_multiple: false,
+            max_selections: 1,
+            options: [
+                {text: "Ana María López - Apto 1-201"},
+                {text: "Carlos Rodríguez - Apto 2-305"},
+                {text: "Diana Torres - Apto 3-102"},
+                {text: "Miguel Ángel Ruiz - Apto 1-405"}
+            ]
+        },
+        {
+            id: 9998,
+            text: "[DEMO] Seleccione las mejoras prioritarias para el próximo año (máximo 3 opciones)",
+            type: "multiple",
+            closed: false,
+            allow_multiple: true,
+            max_selections: 3,
+            options: [
+                {text: "Remodelación de la piscina"},
+                {text: "Nuevo gimnasio"},
+                {text: "Mejora en jardines y zonas verdes"},
+                {text: "Ampliación del parqueadero"},
+                {text: "Salón social más grande"},
+                {text: "Cancha de tenis"}
+            ]
+        },
+        {
+            id: 9999,
+            text: "[DEMO] ¿Está de acuerdo con el aumento del 8% en la administración?",
+            type: "yesno",
+            closed: true, // Esta aparece como cerrada para mostrar el estado
+            options: [{text: 'SÍ'}, {text: 'No'}]
+        }
+    ];
+    
+    // Renderizar las votaciones demo
+    renderVotingQuestions(demoQuestions, new Set()); // Set vacío = no ha votado en ninguna
 }
