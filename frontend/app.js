@@ -406,15 +406,18 @@ async function accessVoting() {
     }
 
     if (code === CODIGO_PRUEBA) {
+        // CREAR usuario ANTES de mostrar pantalla
         currentUser = {
             code: CODIGO_PRUEBA,
             name: 'Usuario de Prueba',
             id: 'test',
-            coefficient: 1.00  // ← Agregar esta línea
+            coefficient: 1.00
         };
         isAdmin = false;
-        showVoterScreen();
-        notifications.show('Acceso de prueba activado', 'success'); // ← Agregar notificación
+        
+        // MOSTRAR notificación y pantalla DESPUÉS
+        notifications.show('Acceso de prueba activado', 'success');
+        await showVoterScreen();
         return;
     }
 
@@ -601,6 +604,13 @@ function showPowerQuestion() {
 // ================================
 
 async function showVoterScreen() {
+    // VERIFICAR que currentUser existe antes de usarlo
+    if (!currentUser) {
+        notifications.show('Error: Usuario no inicializado', 'error');
+        showScreen('welcome-screen');
+        return;
+    }
+
     showScreen('voter-screen');
     connectWebSocket();
     
@@ -608,31 +618,38 @@ async function showVoterScreen() {
     document.getElementById('voter-code').textContent = currentUser.code;
     document.getElementById('voter-name').textContent = `Bienvenido/a, ${currentUser.name}`;
     
-    // AÑADIR: Mostrar coeficiente si está disponible
+    // Mostrar coeficiente si está disponible
     if (currentUser.coefficient) {
-        // Crear elemento para coeficiente si no existe
         let coeffElement = document.getElementById('voter-coefficient');
         if (!coeffElement) {
             const userMeta = document.querySelector('.user-meta');
-            coeffElement = document.createElement('span');
-            coeffElement.id = 'voter-coefficient';
-            userMeta.appendChild(coeffElement);
+            if (userMeta) {  // ← Verificar que existe
+                coeffElement = document.createElement('span');
+                coeffElement.id = 'voter-coefficient';
+                userMeta.appendChild(coeffElement);
+                coeffElement.textContent = `Coeficiente: ${currentUser.coefficient}%`;
+            }
+        } else {
+            coeffElement.textContent = `Coeficiente: ${currentUser.coefficient}%`;
         }
-        coeffElement.textContent = `Coeficiente: ${currentUser.coefficient}%`;
     }
     
-    // AÑADIR: Mostrar nombre del conjunto
+    // Mostrar nombre del conjunto
     try {
         const conjuntoData = await apiCall('/participants/conjunto/nombre');
-        if (conjuntoData.nombre) {
+        if (conjuntoData && conjuntoData.nombre) {
             let conjuntoElement = document.getElementById('voter-conjunto');
             if (!conjuntoElement) {
                 const userMeta = document.querySelector('.user-meta');
-                conjuntoElement = document.createElement('span');
-                conjuntoElement.id = 'voter-conjunto';
-                userMeta.appendChild(conjuntoElement);
+                if (userMeta) {  // ← Verificar que existe
+                    conjuntoElement = document.createElement('span');
+                    conjuntoElement.id = 'voter-conjunto';
+                    userMeta.appendChild(conjuntoElement);
+                }
             }
-            conjuntoElement.textContent = conjuntoData.nombre;
+            if (conjuntoElement) {
+                conjuntoElement.textContent = conjuntoData.nombre;
+            }
         }
     } catch (error) {
         console.log('No se pudo cargar nombre del conjunto');
