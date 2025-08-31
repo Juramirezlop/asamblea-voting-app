@@ -359,7 +359,7 @@ async function registerAttendance() {
     }
 
     if (code === CODIGO_PRUEBA) {
-        showTestUserModal();
+        notifications.show('🧪 Usuario de demostración: Use "Acceder a Votaciones" para ver el sistema en funcionamiento', 'info', 6000);
         return;
     }
 
@@ -418,45 +418,7 @@ async function accessVoting() {
     }
 
     if (code === CODIGO_PRUEBA) {
-        // Usuario de prueba - configuración completa
-        currentUser = {
-            code: CODIGO_PRUEBA,
-            name: 'Usuario de Demostración',
-            id: 'demo_user',
-            coefficient: 1.00
-        };
-        isAdmin = false;
-        
-        // Ir directo a la pantalla de votante
-        showScreen('voter-screen');
-        
-        // Configurar interfaz sin llamar backend
-        document.getElementById('voter-code').textContent = currentUser.code;
-        document.getElementById('voter-name').textContent = `Bienvenido/a, ${currentUser.name}`;
-        
-        // Mostrar coeficiente
-        const userMeta = document.querySelector('.user-meta');
-        if (userMeta && !document.getElementById('voter-coefficient')) {
-            const coeffElement = document.createElement('span');
-            coeffElement.id = 'voter-coefficient';
-            coeffElement.textContent = `Coeficiente: ${currentUser.coefficient}%`;
-            userMeta.appendChild(coeffElement);
-        }
-        
-        // Mostrar conjunto de prueba
-        if (userMeta && !document.getElementById('voter-conjunto')) {
-            const conjuntoElement = document.createElement('span');
-            conjuntoElement.id = 'voter-conjunto';
-            conjuntoElement.textContent = 'Conjunto Demo - Votación de Prueba';
-            userMeta.appendChild(conjuntoElement);
-        }
-        
-        // Cargar votaciones de demostración
-        setTimeout(() => {
-            loadDemoVotingQuestions();
-        }, 500);
-        
-        notifications.show('🧪 Modo demostración activado - Votaciones de prueba cargadas', 'success');
+        showTestUserAdminLogin();
         return;
     }
 
@@ -583,24 +545,6 @@ async function validateAdminCredentials() {
 // ================================
 // MODALES AUXILIARES
 // ================================
-
-function showTestUserModal() {
-    modals.show({
-        title: '🧪 Usuario de Prueba',
-        content: `
-            <p><strong>Código:</strong> ${CODIGO_PRUEBA}</p>
-            <p><strong>Tipo:</strong> Demostración</p>
-            <p style="color: var(--gray-700); font-size: 0.9rem;">Este usuario no afecta estadísticas reales</p>
-        `,
-        actions: [
-            {
-                text: 'Ir a Votaciones de Prueba',
-                class: 'btn-primary',
-                handler: 'modals.hide(); showVoterScreen();'
-            }
-        ]
-    });
-}
 
 function showAttendanceModal(userData) {
     modals.show({
@@ -943,7 +887,7 @@ async function submitMultipleVote(questionId) {
         }, 1500);
         return;
     }
-    
+
     try {
         notifications.show('Registrando votos...', 'info');
         
@@ -2605,4 +2549,126 @@ function loadDemoVotingQuestions() {
     
     // Renderizar las votaciones demo
     renderVotingQuestions(demoQuestions, new Set()); // Set vacío = no ha votado en ninguna
+}
+
+function showTestUserAdminLogin() {
+    modals.show({
+        title: '🔐 Acceso de Demostración',
+        content: `
+            <div style="background: rgba(255, 193, 7, 0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid #ffc107;">
+                <strong>⚠️ Usuario de Prueba Detectado</strong>
+                <p style="margin: 0.5rem 0 0 0; color: #856404;">
+                    Por seguridad, ingrese las credenciales de administrador para acceder al modo demostración.
+                </p>
+            </div>
+            
+            <input type="text" id="demo-admin-username" class="modal-input" placeholder="Usuario administrador" />
+            <input type="password" id="demo-admin-password" class="modal-input" placeholder="Contraseña administrador" />
+        `,
+        actions: [
+            {
+                text: 'Cancelar',
+                class: 'btn-secondary',
+                handler: 'modals.hide()'
+            },
+            {
+                text: 'Acceder a Demo',
+                class: 'btn-warning',
+                handler: 'validateTestUserAdmin()'
+            }
+        ]
+    });
+    
+    // Focus y Enter en los inputs
+    setTimeout(() => {
+        const usernameInput = document.getElementById('demo-admin-username');
+        const passwordInput = document.getElementById('demo-admin-password');
+        
+        [usernameInput, passwordInput].forEach(input => {
+            if (input) {
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        validateTestUserAdmin();
+                    }
+                });
+            }
+        });
+        
+        if (usernameInput) usernameInput.focus();
+    }, 100);
+}
+
+async function validateTestUserAdmin() {
+    const username = document.getElementById('demo-admin-username').value.trim();
+    const password = document.getElementById('demo-admin-password').value.trim();
+    
+    if (!username || !password) {
+        notifications.show('Complete usuario y contraseña del administrador', 'error');
+        return;
+    }
+
+    try {
+        notifications.show('Verificando credenciales...', 'info');
+        
+        // Verificar credenciales de admin
+        const formData = new URLSearchParams();
+        formData.append('username', username);
+        formData.append('password', password);
+
+        const response = await apiCall('/auth/login/admin', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: formData
+        });
+
+        // Credenciales válidas - activar modo demo
+        modals.hide();
+        
+        // Configurar usuario de prueba
+        currentUser = {
+            code: CODIGO_PRUEBA,
+            name: 'Usuario de Demostración',
+            id: 'demo_user',
+            coefficient: 1.00
+        };
+        isAdmin = false; // Importante: NO es admin, solo validó credenciales
+        
+        // Ir a votaciones
+        showScreen('voter-screen');
+        
+        // Configurar interfaz
+        document.getElementById('voter-code').textContent = currentUser.code;
+        document.getElementById('voter-name').textContent = `Bienvenido/a, ${currentUser.name}`;
+        
+        // Agregar info demo
+        const userMeta = document.querySelector('.user-meta');
+        if (userMeta) {
+            // Limpiar elementos previos
+            const prevElements = userMeta.querySelectorAll('#voter-coefficient, #voter-conjunto');
+            prevElements.forEach(el => el.remove());
+            
+            // Agregar nuevos
+            const coeffElement = document.createElement('span');
+            coeffElement.id = 'voter-coefficient';
+            coeffElement.textContent = `Coeficiente: ${currentUser.coefficient}%`;
+            userMeta.appendChild(coeffElement);
+            
+            const conjuntoElement = document.createElement('span');
+            conjuntoElement.id = 'voter-conjunto';
+            conjuntoElement.textContent = '🧪 MODO DEMOSTRACIÓN';
+            userMeta.appendChild(conjuntoElement);
+        }
+        
+        // Cargar votaciones demo
+        setTimeout(() => {
+            loadDemoVotingQuestions();
+        }, 500);
+        
+        notifications.show('🧪 Modo demostración activado con credenciales válidas', 'success');
+        
+    } catch (error) {
+        notifications.show('Credenciales de administrador incorrectas', 'error');
+    }
 }
