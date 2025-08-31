@@ -393,7 +393,19 @@ async function registerAttendance() {
         showAttendanceModal(response);
         notifications.show('Asistencia registrada correctamente', 'success');
     } catch (error) {
-        notifications.show(`Error: ${error.message}`, 'error');
+        console.error('Error en registro:', error);
+        
+        if (error.message.includes('405') || error.message.includes('Method Not Allowed')) {
+            notifications.show('Error técnico del sistema. Por favor contacte al administrador.', 'error');
+        } else if (error.message.includes('404') || error.message.includes('not found')) {
+            notifications.show('Su código no está registrado en el sistema. Consulte con la administración del conjunto.', 'error');
+        } else if (error.message.includes('400') || error.message.includes('already registered')) {
+            notifications.show('Su asistencia ya fue registrada previamente.', 'warning');
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+            notifications.show('Error de conexión. Verifique su internet y reintente.', 'error');
+        } else {
+            notifications.show('Ocurrió un problema técnico. Por favor consulte con el administrador de la asamblea.', 'error');
+        }
     }
 }
 
@@ -406,30 +418,25 @@ async function accessVoting() {
     }
 
     if (code === CODIGO_PRUEBA) {
-        console.log('Detectado código de prueba:', code);
-        
-        // Crear usuario de prueba con window para hacerlo global
-        window.currentUser = {
+        currentUser = {
             code: CODIGO_PRUEBA,
             name: 'Usuario de Prueba',
             id: 'test',
             coefficient: 1.00
         };
-        
-        // También asignar a la variable local
-        currentUser = window.currentUser;
         isAdmin = false;
         
-        console.log('Usuario creado - currentUser:', currentUser);
-        console.log('Usuario creado - window.currentUser:', window.currentUser);
+        notifications.show('Modo demostración activado', 'success');
+        showTestUserModal();  
         
-        notifications.show('Acceso de prueba activado', 'success');
+        // Actualizar info del usuario directamente
+        document.getElementById('voter-code').textContent = currentUser.code;
+        document.getElementById('voter-name').textContent = `Bienvenido/a, ${currentUser.name}`;
         
-        // Usar setTimeout para asegurar que la asignación se complete
+        // Cargar votaciones de prueba
         setTimeout(() => {
-            console.log('Antes de showVoterScreen - currentUser:', currentUser);
-            showVoterScreen();
-        }, 100);
+            loadVotingQuestions();
+        }, 500);
         
         return;
     }
@@ -462,12 +469,20 @@ async function accessVoting() {
         showVoterScreen();
         notifications.show('Acceso a votaciones autorizado', 'success');
     } catch (error) {
+        console.error('Error en acceso:', error);
+
         if (error.message.includes('401') || error.message.includes('not found') || error.message.includes('Invalid credentials')) {
             notifications.show('Código no encontrado o no registrado. Use "Registro" primero.', 'error');
+        } else if (error.message.includes('403') || error.message.includes('asistencia primero')) {
+        notifications.show('Debe registrar su asistencia antes de acceder a las votaciones.', 'info');
+        } else if (error.message.includes('404') || error.message.includes('not found')) {
+            notifications.show('Su código no está en el sistema o no ha registrado asistencia. Consulte con la administración.', 'error');
+        } else if (error.message.includes('No hay participantes')) {
+            notifications.show('El sistema aún no ha sido configurado. Consulte con el administrador de la asamblea.', 'error');
         } else {
             notifications.show(`Error: ${error.message}`, 'error');
+            }
         }
-    }
 }
 
 function showAdminLogin() {

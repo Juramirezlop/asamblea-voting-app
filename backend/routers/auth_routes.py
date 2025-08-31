@@ -57,7 +57,7 @@ def login_admin(form_data: OAuth2PasswordRequestForm = Depends()):
     token = create_access_token({"sub": user["username"], "role": "admin"})
     return {"access_token": token, "token_type": "bearer"}
 
-@router.post("/check-database")
+@router.get("/check-database")
 def check_database_status():
     """Verificar si hay participantes en la base de datos"""
     conn = get_db()
