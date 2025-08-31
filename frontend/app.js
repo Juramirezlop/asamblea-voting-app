@@ -989,6 +989,11 @@ async function showAdminScreen() {
         const response = await apiCall('/participants/conjunto/nombre');
         if (response.nombre) {
             updateConjuntoDisplay(response.nombre);
+            // También actualizar display de estado
+            const estadoDisplay = document.getElementById('conjunto-display-estado');
+            if (estadoDisplay) {
+                estadoDisplay.textContent = response.nombre;
+            }
         }
     } catch (error) {
         console.log('No se pudo cargar nombre del conjunto');
@@ -1031,6 +1036,10 @@ function showConjuntoModal() {
                     body: JSON.stringify({ nombre: nombre })
                 });
                 
+                const estadoDisplay = document.getElementById('conjunto-display-estado');
+                if (estadoDisplay) {
+                    estadoDisplay.textContent = nombre;
+                }
                 updateConjuntoDisplay(nombre);
                 modals.hide();
                 delete window.saveConjuntoName;
