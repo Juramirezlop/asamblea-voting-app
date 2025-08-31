@@ -142,6 +142,9 @@ class ModalSystem {
 
         const modal = document.createElement('div');
         modal.className = `modal-overlay ${size}`;
+        if (size === 'large') {
+            modal.style.padding = '2rem';
+        }
 
         const actionsHTML = actions.map(action => 
             `<button class="btn ${action.class || 'btn-secondary'}" 

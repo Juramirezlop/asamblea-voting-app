@@ -1278,12 +1278,11 @@ function renderConnectedUsers(data) {
                     Votantes Conectados
                 </div>
                 ${connectedVoters.map(voter => `
-                    <div style="padding: 0.8rem; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center;">
-                        <div>
-                            <strong>${voter.code}</strong> - ${voter.name}
-                            <span style="color: var(--primary-color); margin-left: 0.5rem;">${voter.coefficient}%</span>
-                        </div>
-                        <span style="background: ${voter.is_power ? 'var(--warning-color)' : 'var(--success-color)'}; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.8rem;">
+                    <div style="padding: 0.8rem; border-bottom: 1px solid var(--gray-200); display: grid; grid-template-columns: auto 1fr auto auto; gap: 1rem; align-items: center;">
+                        <strong style="color: var(--dark-color);">${voter.code}</strong>
+                        <span style="overflow: hidden; text-overflow: ellipsis;">${voter.name}</span>
+                        <span style="color: var(--primary-color); font-weight: 600;">${voter.coefficient.toFixed(2)}%</span>
+                        <span style="background: ${voter.is_power ? 'var(--warning-color)' : 'var(--success-color)'}; color: white; padding: 0.3rem 0.8rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
                             ${voter.is_power ? 'Poder' : 'Propio'}
                         </span>
                     </div>
@@ -1415,13 +1414,6 @@ function showParticipantsModal(title, participants) {
                 ${renderPage()}
             </div>
         `,
-        actions: [
-            {
-                text: 'Cerrar',
-                class: 'btn-secondary',
-                handler: 'modals.hide()'
-            }
-        ]
     });
     
     // Funciones locales del modal

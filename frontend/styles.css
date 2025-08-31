@@ -1254,6 +1254,19 @@ body {
     transition: var(--transition-base);
 }
 
+.modal-overlay.large .modal-content {
+    max-width: 90vw;
+    max-height: 90vh;
+    width: 1000px;
+    overflow-y: auto;
+}
+
+@media (max-width: 1200px) {
+    .modal-overlay.large .modal-content {
+        width: 95vw;
+    }
+}
+
 .modal-overlay.show .modal-content {
     transform: scale(1) translateY(0);
 }
