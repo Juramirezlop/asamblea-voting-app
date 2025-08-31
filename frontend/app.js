@@ -166,7 +166,6 @@ function connectVoterWebSocket(voterCode) {
         voterWebSocket.onopen = () => {
             console.log('Voter WebSocket conectado');
             wsReconnectAttempts = 0;
-            notifications.show('Conectado en tiempo real', 'success', 3000);
         };
         
         voterWebSocket.onmessage = (event) => {
@@ -416,7 +415,7 @@ async function registerAttendance() {
             })
         });
 
-        // Mostrar modal de confirmación en lugar de notificación simple
+        // Mostrar modal de confirmación y mantener código para votación
         modals.show({
             title: '✅ Registro Exitoso',
             content: `
@@ -431,14 +430,19 @@ async function registerAttendance() {
                     </div>
                     
                     <p style="color: var(--gray-600); font-size: 0.9rem;">
-                        Ya puede acceder a las votaciones usando el botón "Acceder a Votaciones"
+                        Su código permanecerá en el campo para que pueda acceder fácilmente a las votaciones
                     </p>
                 </div>
             `,
             actions: [
                 {
-                    text: 'Entendido',
+                    text: 'Acceder a Votaciones Ahora',
                     class: 'btn-success',
+                    handler: 'modals.hide(); accessVoting();'
+                },
+                {
+                    text: 'Entendido',
+                    class: 'btn-secondary', 
                     handler: 'modals.hide()'
                 }
             ]
@@ -500,7 +504,6 @@ async function accessVoting() {
         isAdmin = false;
         
         showVoterScreen();
-        notifications.show('Acceso a votaciones autorizado', 'success');
     } catch (error) {
         console.error('Error en acceso:', error);
 
@@ -636,7 +639,9 @@ function showPowerQuestion() {
         
         window.resolvePowerQuestion = (isPower) => {
             modals.hide();
-            delete window.resolvePowerQuestion;
+            setTimeout(() => {
+                delete window.resolvePowerQuestion;
+            }, 100);
             resolve(isPower);
         };
     });
@@ -682,10 +687,10 @@ async function showVoterScreen() {
                 coeffElement = document.createElement('span');
                 coeffElement.id = 'voter-coefficient';
                 userMeta.appendChild(coeffElement);
-                coeffElement.textContent = `Coeficiente: ${currentUser.coefficient}%`;
+                coeffElement.textContent = `Coeficiente: ${parseFloat(currentUser.coefficient || 0).toFixed(2)}%`;
             }
         } else {
-            coeffElement.textContent = `Coeficiente: ${currentUser.coefficient}%`;
+            coeffElement.textContent = `Coeficiente: ${parseFloat(currentUser.coefficient || 0).toFixed(2)}%`;
         }
     }
     
@@ -1175,8 +1180,30 @@ async function loadAdminData() {
     await Promise.all([
         loadAforoData(),
         loadActiveQuestions(),
-        refreshConnectedUsers()
+        refreshConnectedUsers(),
+        loadParticipantsStatus()
     ]);
+}
+
+async function loadParticipantsStatus() {
+    try {
+        const response = await apiCall('/participants/');
+        const statusCircle = document.getElementById('status-circle');
+        const statusText = document.getElementById('status-text');
+        
+        if (response.length === 0) {
+            statusCircle.className = 'status-circle error';
+            statusText.textContent = 'Sin participantes registrados';
+        } else {
+            statusCircle.className = 'status-circle success';
+            statusText.textContent = `${response.length} participantes registrados`;
+        }
+    } catch (error) {
+        const statusCircle = document.getElementById('status-circle');
+        const statusText = document.getElementById('status-text');
+        statusCircle.className = 'status-circle error';
+        statusText.textContent = 'Error al verificar';
+    }
 }
 
 async function loadAforoData() {
