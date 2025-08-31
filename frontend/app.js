@@ -409,10 +409,12 @@ async function accessVoting() {
         currentUser = {
             code: CODIGO_PRUEBA,
             name: 'Usuario de Prueba',
-            id: 'test'
+            id: 'test',
+            coefficient: 1.00  // ← Agregar esta línea
         };
         isAdmin = false;
         showVoterScreen();
+        notifications.show('Acceso de prueba activado', 'success'); // ← Agregar notificación
         return;
     }
 
