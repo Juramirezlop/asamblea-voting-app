@@ -359,7 +359,33 @@ async function registerAttendance() {
     }
 
     if (code === CODIGO_PRUEBA) {
-        notifications.show('🧪 Usuario de demostración: Use "Acceder a Votaciones" para ver el sistema en funcionamiento', 'info', 6000);
+        // Modal similar al de usuarios reales
+        modals.show({
+            title: '🧪 Registro de Demostración',
+            content: `
+                <div style="text-align: center; padding: 1rem;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">🎭</div>
+                    <h3 style="color: var(--info-color); margin-bottom: 1rem;">Usuario de Prueba Detectado</h3>
+                    
+                    <div style="background: var(--gray-50); padding: 1.5rem; border-radius: 12px; margin: 1rem 0;">
+                        <p><strong>Código:</strong> ${code}</p>
+                        <p><strong>Nombre:</strong> Usuario de Demostración</p>
+                        <p><strong>Tipo:</strong> Modo Prueba</p>
+                    </div>
+                    
+                    <p style="color: var(--gray-600); font-size: 0.9rem;">
+                        Use "Acceder a Votaciones" para ver el sistema en funcionamiento completo
+                    </p>
+                </div>
+            `,
+            actions: [
+                {
+                    text: 'Entendido',
+                    class: 'btn-info',
+                    handler: 'modals.hide()'
+                }
+            ]
+        });
         return;
     }
 
@@ -855,18 +881,17 @@ function selectMultipleOption(element, questionId, maxSelections, allowMultiple)
         
         element.classList.toggle('selected');
         
+        // Limpiar todos los indicators
+        container.querySelectorAll('.option-indicator').forEach(indicator => {
+            indicator.textContent = '';
+        });
+        
         // Actualizar contadores
-        const nowSelected = container.querySelectorAll('.multiple-option.selected');
+        const nowSelected = container.querySelectorAll('.multiple-option.selected'); // <- AGREGAR ESTA LÍNEA
         const countDisplay = container.querySelector('.selected-count');
         if (countDisplay) {
             countDisplay.textContent = nowSelected.length;
         }
-        
-        // Mostrar checkmark en lugar de números
-        nowSelected.forEach((option) => {
-            const indicator = option.querySelector('.option-indicator');
-            indicator.textContent = '✓';
-        });
         
         // Actualizar botón
         if (nowSelected.length > 0) {
@@ -885,7 +910,7 @@ function selectMultipleOption(element, questionId, maxSelections, allowMultiple)
         
         // Marcar el seleccionado
         element.classList.add('selected');
-        element.querySelector('.option-indicator').textContent = '✓';
+        element.querySelector('.option-indicator').textContent = '';
         
         // Habilitar botón
         submitBtn.disabled = false;
