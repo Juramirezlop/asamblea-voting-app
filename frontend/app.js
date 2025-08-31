@@ -406,18 +406,18 @@ async function accessVoting() {
     }
 
     if (code === CODIGO_PRUEBA) {
-        // CREAR usuario ANTES de mostrar pantalla
+        console.log('Creando usuario de prueba...');
         currentUser = {
             code: CODIGO_PRUEBA,
             name: 'Usuario de Prueba',
             id: 'test',
             coefficient: 1.00
         };
+
         isAdmin = false;
-        
-        // MOSTRAR notificación y pantalla DESPUÉS
+        console.log('currentUser creado:', currentUser);
         notifications.show('Acceso de prueba activado', 'success');
-        await showVoterScreen();
+        showVoterScreen();
         return;
     }
 
@@ -604,15 +604,22 @@ function showPowerQuestion() {
 // ================================
 
 async function showVoterScreen() {
+    console.log('showVoterScreen llamada, currentUser:', currentUser);
+    
     // VERIFICAR que currentUser existe antes de usarlo
-    if (!currentUser) {
-        notifications.show('Error: Usuario no inicializado', 'error');
+    if (!currentUser || !currentUser.code) {
+        console.error('currentUser es null o no tiene code:', currentUser);
+        notifications.show('Error: Usuario no inicializado correctamente', 'error');
         showScreen('welcome-screen');
         return;
     }
 
     showScreen('voter-screen');
-    connectWebSocket();
+    
+    // Solo conectar WebSocket si no es usuario de prueba
+    if (currentUser.code !== CODIGO_PRUEBA) {
+        connectWebSocket();
+    }
     
     // Actualizar información del usuario
     document.getElementById('voter-code').textContent = currentUser.code;
