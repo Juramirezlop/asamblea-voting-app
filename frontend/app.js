@@ -982,6 +982,7 @@ async function showAdminScreen() {
     connectWebSocket();
     document.getElementById('create-voting-form').innerHTML = AdminComponents.createVotingForm();
     setupAdminEventListeners();
+    showAdminTab('estado');
     await loadAdminData();
     
     // Solo actualizar display si ya existe el nombre
@@ -989,16 +990,24 @@ async function showAdminScreen() {
         const response = await apiCall('/participants/conjunto/nombre');
         if (response.nombre) {
             updateConjuntoDisplay(response.nombre);
-            // También actualizar display de estado
             const estadoDisplay = document.getElementById('conjunto-display-estado');
             if (estadoDisplay) {
                 estadoDisplay.textContent = response.nombre;
             }
+        } else {
+            // Si no hay nombre configurado
+            const estadoDisplay = document.getElementById('conjunto-display-estado');
+            if (estadoDisplay) {
+                estadoDisplay.textContent = 'Configurar Nombre del Conjunto';
+            }
         }
     } catch (error) {
         console.log('No se pudo cargar nombre del conjunto');
+        const estadoDisplay = document.getElementById('conjunto-display-estado');
+        if (estadoDisplay) {
+            estadoDisplay.textContent = 'Configurar Nombre del Conjunto';
+        }
     }
-    
     startMonitoring();
 }
 
@@ -2295,8 +2304,14 @@ async function resetDatabase() {
 
         // Limpiar displays de conjunto
         document.querySelectorAll('#conjunto-name-display, #conjunto-name-small').forEach(el => {
-            if (el) el.textContent = '';
+            if (el) el.textContent = 'Conjunto Residencial';
         });
+
+        // También limpiar el botón de estado
+        const estadoDisplay = document.getElementById('conjunto-display-estado');
+        if (estadoDisplay) {
+            estadoDisplay.textContent = 'Configurar Nombre del Conjunto';
+        }
 
         // Cerrar modales activos
         modals.hide();
