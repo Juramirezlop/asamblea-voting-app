@@ -396,7 +396,7 @@ async function registerAttendance() {
     }
 
     if (code === CODIGO_PRUEBA) {
-        // Modal similar al de usuarios reales
+        // Modal para usuario de prueba
         modals.show({
             title: '🧪 Registro de Demostración',
             content: `
@@ -441,8 +441,10 @@ async function registerAttendance() {
             return;
         }
         
+        // Preguntar tipo de participación
         const isPower = await showPowerQuestion();
         
+        // Registrar asistencia
         const response = await apiCall('/auth/register-attendance', {
             method: 'POST',
             body: JSON.stringify({ 
@@ -451,7 +453,17 @@ async function registerAttendance() {
             })
         });
 
-        // Mostrar modal de confirmación y mantener código para votación
+        console.log('Registro exitoso:', response); // Debug
+        
+        // Actualizar currentUser globalmente para que accessVoting() lo encuentre
+        window.currentUser = {
+            code: response.code,
+            name: response.name,
+            coefficient: response.coefficient,
+            is_power: response.is_power
+        };
+
+        // Mostrar modal de confirmación
         modals.show({
             title: '✅ Registro Exitoso',
             content: `
@@ -463,6 +475,7 @@ async function registerAttendance() {
                         <p><strong>Código:</strong> ${response.code}</p>
                         <p><strong>Nombre:</strong> ${response.name}</p>
                         <p><strong>Tipo:</strong> ${response.is_power ? 'Votación con Poder' : 'Propietario Directo'}</p>
+                        <p><strong>Coeficiente:</strong> ${response.coefficient}%</p>
                     </div>
                     
                     <p style="color: var(--gray-600); font-size: 0.9rem;">
@@ -487,16 +500,12 @@ async function registerAttendance() {
     } catch (error) {
         console.error('Error en registro:', error);
         
-        if (error.message.includes('405') || error.message.includes('Method Not Allowed')) {
-            notifications.show('Error técnico del sistema. Por favor contacte al administrador.', 'error');
-        } else if (error.message.includes('404') || error.message.includes('not found')) {
+        if (error.message.includes('404') || error.message.includes('not found')) {
             notifications.show('Su código no está registrado en el sistema. Consulte con la administración del conjunto.', 'error');
         } else if (error.message.includes('400') || error.message.includes('already registered')) {
             notifications.show('Su asistencia ya fue registrada previamente.', 'warning');
-        } else if (error.message.includes('network') || error.message.includes('fetch')) {
-            notifications.show('Error de conexión. Verifique su internet y reintente.', 'error');
         } else {
-            notifications.show('Ocurrió un problema técnico. Por favor consulte con el administrador de la asamblea.', 'error');
+            notifications.show(`Error: ${error.message}`, 'error');
         }
     }
 }
@@ -522,39 +531,45 @@ async function accessVoting() {
             return;
         }
         
+        // Intentar hacer login
         const response = await apiCall('/auth/login/voter', {
             method: 'POST',
             body: JSON.stringify({ code: code })
         });
 
+        console.log('Login exitoso:', response); // Debug
+
+        // Configurar tokens y usuario
         voterToken = response.access_token;
         saveToken('voter', voterToken);
-        currentUser = {
+        
+        // Asegurar currentUser global
+        currentUser = window.currentUser = {
             code: code,
             name: response.name || 'Usuario',
-            id: response.user_id || null,
-            coefficient: response.coefficient || 1.00
+            coefficient: response.coefficient || 1.00,
+            is_power: response.is_power || false
         };
+        
         isAdmin = false;
         
-        showVoterScreen();
+        console.log('Usuario configurado:', currentUser); // Debug
+        
+        // Ir a pantalla de votante
+        await showVoterScreen();
+        
     } catch (error) {
         console.error('Error en acceso:', error);
 
-        if (error.message.includes('401') || error.message.includes('not found') || error.message.includes('Invalid credentials')) {
-            notifications.show('Código no encontrado o no registrado. Use "Registro" primero.', 'error');
-        } else if (error.message.includes('403') || error.message.includes('asistencia primero')) {
-        notifications.show('Debe registrar su asistencia antes de acceder a las votaciones.', 'info');
+        if (error.message.includes('403') || error.message.includes('asistencia primero')) {
+            notifications.show('Debe registrar su asistencia antes de acceder a las votaciones.', 'info');
         } else if (error.message.includes('404') || error.message.includes('not found')) {
-            notifications.show('Su código no está en el sistema o no ha registrado asistencia. Consulte con la administración.', 'error');
-        } else if (error.message.includes('No hay participantes')) {
-            notifications.show('El sistema aún no ha sido configurado. Consulte con el administrador de la asamblea.', 'error');
+            notifications.show('Su código no está en el sistema o no ha registrado asistencia. Use "Registro de Asistencia" primero.', 'error');
         } else {
             notifications.show(`Error: ${error.message}`, 'error');
-            }
         }
+    }
 }
-
 function showAdminLogin() {
     modals.show({
         title: '🔐 Acceso Administrador',
@@ -652,18 +667,41 @@ function showAttendanceModal(userData) {
 
 function showPowerQuestion() {
     return new Promise((resolve) => {
+        // Limpiar callback previo
+        if (window.powerResolveCallback) {
+            delete window.powerResolveCallback;
+        }
+        
         window.powerResolveCallback = resolve;
         
         modals.show({
-            title: 'Información del Apartamento',
+            title: '🏠 Información del Apartamento',
             content: `
-                <p style="margin-bottom: 1.5rem;">¿Este apartamento es suyo o tiene poder para votar por él?</p>
-                <div style="display: flex; gap: 1rem; justify-content: center;">
-                    <button class="btn btn-success" onclick="window.modalResolvePower(false)" style="flex: 1;">
-                        Soy propietario
+                <div style="text-align: center; padding: 1rem;">
+                    <div style="font-size: 2.5rem; margin-bottom: 1rem;">🤔</div>
+                    <h3 style="margin-bottom: 1.5rem; color: var(--dark-color);">¿Cómo va a votar?</h3>
+                    <p style="margin-bottom: 2rem; color: var(--gray-600);">
+                        Seleccione la opción que corresponde a su situación:
+                    </p>
+                </div>
+                
+                <div style="display: grid; gap: 1rem;">
+                    <button class="btn btn-success btn-large" onclick="window.modalResolvePower(false)" 
+                            style="display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem;">
+                        <span style="font-size: 1.5rem;">🏠</span>
+                        <div>
+                            <div style="font-weight: 600;">Soy Propietario</div>
+                            <div style="font-size: 0.9rem; opacity: 0.8;">Voto por mi apartamento</div>
+                        </div>
                     </button>
-                    <button class="btn btn-warning" onclick="window.modalResolvePower(true)" style="flex: 1;">
-                        Tengo poder
+                    
+                    <button class="btn btn-warning btn-large" onclick="window.modalResolvePower(true)" 
+                            style="display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem;">
+                        <span style="font-size: 1.5rem;">📋</span>
+                        <div>
+                            <div style="font-weight: 600;">Tengo Poder</div>
+                            <div style="font-size: 0.9rem; opacity: 0.8;">Represento a otro propietario</div>
+                        </div>
                     </button>
                 </div>
             `,
@@ -1409,13 +1447,19 @@ function renderActiveQuestions(questions) {
     }
 
     container.innerHTML = questions.map(q => {
+        console.log('Renderizando pregunta:', q); // Debug
+        
         const typeText = q.type === 'yesno' ? 'Sí/No' : 
                         (q.allow_multiple ? 'Selección múltiple' : 'Selección única');
+        
+        // Asegurar que las opciones existan
+        const options = q.options || [];
+        console.log('Opciones para pregunta', q.id, ':', options); // Debug
         
         return `
             <div class="voting-card admin-card" data-question-id="${q.id}">
                 <div class="voting-header">
-                    <div class="voting-title">${q.text}</div>
+                    <div class="voting-title">${q.text || 'Sin título'}</div>
                     <div class="voting-status ${q.closed ? 'closed' : 'open'}">
                         ${q.closed ? '🔒 Cerrada' : '🟢 Abierta'}
                     </div>
@@ -1445,9 +1489,9 @@ function renderActiveQuestions(questions) {
                 <div class="voting-options-preview">
                     <h4>Opciones:</h4>
                     <div class="options-tags">
-                        ${q.options ? q.options.map(opt => 
-                            `<span class="option-tag">${opt.text || opt.option_text}</span>`
-                        ).join('') : ''}
+                        ${options.length > 0 ? options.map(opt => 
+                            `<span class="option-tag">${opt.text || opt.option_text || 'Opción'}</span>`
+                        ).join('') : '<span class="option-tag" style="background: var(--gray-200); color: var(--gray-600);">Sin opciones</span>'}
                     </div>
                 </div>
 
