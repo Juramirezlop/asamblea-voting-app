@@ -1704,7 +1704,7 @@ function renderActiveQuestions(questions) {
                     <h4>Opciones:</h4>
                     <div class="options-tags">
                         ${options.length > 0 ? options.map(opt => 
-                            `<span class="option-tag">${opt.text || opt.option_text || 'Opción'}</span>`
+                            `<span class="option-tag">${opt.text}</span>`
                         ).join('') : '<span class="option-tag" style="background: var(--gray-200); color: var(--gray-600);">Sin opciones</span>'}
                     </div>
                 </div>
@@ -2543,22 +2543,9 @@ function showEditVotingModal(question) {
 
 async function showDeleteCodeModal() {
     try {
-        // Obtener lista de participantes registrados
         const participants = await apiCall('/participants/');
         const registeredUsers = participants.filter(p => p.present);
         
-        const usersList = registeredUsers.length > 0 ? 
-            registeredUsers.map(user => `
-                <div style="display: flex; justify-content: space-between; padding: 0.5rem; border: 1px solid var(--gray-300); border-radius: 6px; margin-bottom: 0.25rem; background: white;">
-                    <span><strong>${user.code}</strong> - ${user.name}</span>
-                    <button onclick="document.getElementById('delete-code-input').value='${user.code}'" 
-                            style="background: var(--primary-color); color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
-                        Seleccionar
-                    </button>
-                </div>
-            `).join('') : 
-            '<p style="color: var(--gray-600); text-align: center;">No hay usuarios registrados</p>';
-
         modals.show({
             title: '🚫 Eliminar Código',
             content: `
@@ -2567,18 +2554,25 @@ async function showDeleteCodeModal() {
                 </p>
                 
                 <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Código a eliminar:</label>
-                <input type="text" id="delete-code-input" class="modal-input" placeholder="1-201" 
-                    style="text-transform: uppercase; margin-bottom: 1rem;">
+                <input type="text" id="delete-code-input" class="modal-input" placeholder="Escriba para buscar..." 
+                    style="text-transform: uppercase; margin-bottom: 0.5rem;" autocomplete="off">
+                <div id="code-suggestions" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--gray-300); border-radius: 6px; display: none;"></div>
                 
-                <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--gray-300); border-radius: 8px; padding: 0.5rem;">
-                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--gray-700);">Usuarios Registrados:</h4>
-                    ${usersList}
+                <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--gray-300); border-radius: 8px; padding: 0.5rem; margin-top: 1rem;">
+                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--gray-700);">Usuarios Registrados (${registeredUsers.length}):</h4>
+                    ${registeredUsers.map(user => `
+                        <div onclick="document.getElementById('delete-code-input').value='${user.code}'; document.getElementById('code-suggestions').style.display='none';" 
+                             style="display: flex; justify-content: space-between; padding: 0.5rem; border: 1px solid var(--gray-300); border-radius: 6px; margin-bottom: 0.25rem; background: white; cursor: pointer;" 
+                             onmouseover="this.style.background='var(--gray-100)'" onmouseout="this.style.background='white'">
+                            <span><strong>${user.code}</strong> - ${user.name}</span>
+                        </div>
+                    `).join('')}
                 </div>
             `,
             actions: [
                 {
                     text: 'Cancelar',
-                    class: 'btn-secondary',
+                    class: 'btn-secondary', 
                     handler: 'modals.hide()'
                 },
                 {
@@ -2588,31 +2582,40 @@ async function showDeleteCodeModal() {
                 }
             ]
         });
+        
+        // Autocompletado
+        setTimeout(() => {
+            const input = document.getElementById('delete-code-input');
+            const suggestions = document.getElementById('code-suggestions');
+            
+            input.addEventListener('input', (e) => {
+                const query = e.target.value.toUpperCase();
+                if (query.length === 0) {
+                    suggestions.style.display = 'none';
+                    return;
+                }
+                
+                const matches = registeredUsers.filter(user => 
+                    user.code.toUpperCase().includes(query)
+                ).slice(0, 5);
+                
+                if (matches.length > 0) {
+                    suggestions.innerHTML = matches.map(user => `
+                        <div onclick="document.getElementById('delete-code-input').value='${user.code}'; this.parentElement.style.display='none';" 
+                             style="padding: 0.5rem; cursor: pointer; border-bottom: 1px solid var(--gray-200);" 
+                             onmouseover="this.style.background='var(--gray-100)'" onmouseout="this.style.background='white'">
+                            <strong>${user.code}</strong> - ${user.name}
+                        </div>
+                    `).join('');
+                    suggestions.style.display = 'block';
+                } else {
+                    suggestions.style.display = 'none';
+                }
+            });
+        }, 100);
+        
     } catch (error) {
-        // Fallback si no puede cargar la lista
-        modals.show({
-            title: '🚫 Eliminar Código',
-            content: `
-                <p style="color: var(--gray-700); margin-bottom: 1rem; text-align: center;">
-                    Esta acción eliminará el registro de asistencia del código especificado.
-                </p>
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Código a eliminar:</label>
-                <input type="text" id="delete-code-input" class="modal-input" placeholder="1-201" 
-                    style="text-transform: uppercase; margin-bottom: 1.5rem;">
-            `,
-            actions: [
-                {
-                    text: 'Cancelar',
-                    class: 'btn-secondary',
-                    handler: 'modals.hide()'
-                },
-                {
-                    text: 'Eliminar',
-                    class: 'btn-danger',
-                    handler: 'window.processDeleteCode()'
-                }
-            ]
-        });
+        notifications.show('Error cargando usuarios', 'error');
     }
 }
 
