@@ -1659,7 +1659,7 @@ function renderActiveQuestions(questions) {
         container.innerHTML = `
             <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 1rem; opacity: 0.5;">
-                    <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"></path>
+                    <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"></path>
                     <path d="M9 7V3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path>
                 </svg>
                 <h3 style="margin-bottom: 0.5rem; color: var(--gray-700);">No hay votaciones creadas</h3>
@@ -1669,7 +1669,7 @@ function renderActiveQuestions(questions) {
         return;
     }
 
-    container.innerHTML = questions.map(q => {
+    const questionsHTML = questions.map(q => {
         console.log('Renderizando pregunta:', q); // Debug
         
         const typeText = q.type === 'yesno' ? 'Sí/No' : 
@@ -1704,7 +1704,7 @@ function renderActiveQuestions(questions) {
                     ${q.time_limit_minutes ? `
                         <div class="meta-item">
                             <span>⏰</span>
-                            <span>Tiempo límite: ${q.time_limit_minutes} min</span>
+                            <span>Límite: ${q.time_limit_minutes} min</span>
                         </div>
                     ` : ''}
                 </div>
@@ -1712,9 +1712,9 @@ function renderActiveQuestions(questions) {
                 <div class="voting-options-preview">
                     <h4>Opciones:</h4>
                     <div class="options-tags">
-                        ${options.length > 0 ? options.map(opt => 
+                        ${options.map(opt => 
                             `<span class="option-tag">${opt.text}</span>`
-                        ).join('') : '<span class="option-tag" style="background: var(--gray-200); color: var(--gray-600);">Sin opciones</span>'}
+                        ).join('')}
                     </div>
                 </div>
 
@@ -1747,6 +1747,8 @@ function renderActiveQuestions(questions) {
             </div>
         `;
     }).join('');
+    
+    container.innerHTML = questionsHTML;
 }
 
 async function updateVoteCountsForActiveQuestions() {
