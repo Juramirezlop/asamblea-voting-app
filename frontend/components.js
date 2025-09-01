@@ -447,7 +447,7 @@ class AdminComponents {
         return `
             <div class="create-form">
                 <div class="form-header">
-                    <h2>⚙️ Nueva Votación</h2>
+                    <h2>Nueva Votación</h2>
                     <p>Crea una nueva votación para la asamblea</p>
                 </div>
 
@@ -485,7 +485,7 @@ class AdminComponents {
                             <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">¿Establecer límite de tiempo?</label>
                             <div style="display: flex; gap: 0.5rem;">
                                 <button type="button" id="timer-no-btn" class="timer-toggle-btn active" data-enabled="false"
-                                        style="flex: 1; padding: 0.75rem; border: 2px solid var(--gray-400); border-radius: 8px; background: var(--gray-100); font-weight: 600; cursor: pointer;">
+                                        style="flex: 1; padding: 0.75rem; border: 2px solid var(--danger-color); border-radius: 8px; background: var(--danger-color); color: white; font-weight: 600; cursor: pointer;">
                                     No
                                 </button>
                                 <button type="button" id="timer-yes-btn" class="timer-toggle-btn" data-enabled="true"
@@ -505,7 +505,7 @@ class AdminComponents {
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Configuración para Múltiples Opciones -->
                 <div class="selection-config" id="multiple-config">
                     <h3>⚙️ Configuración de Selección</h3>
@@ -1161,13 +1161,6 @@ document.head.appendChild(rippleStyle);
 
 // Agregar efectos de ripple a todos los botones
 document.addEventListener('DOMContentLoaded', () => {
-    // Agregar ripple effect a botones
-    document.addEventListener('click', (e) => {
-        if (e.target.matches('.btn, .option-btn, .multiple-option')) {
-            Utils.createRippleEffect(e.target, e);
-        }
-    });
-
     // Validación en tiempo real para input de código
     const accessInput = document.getElementById('access-code');
     if (accessInput) {
@@ -1192,14 +1185,25 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // Auto-crear opciones con Enter - AGREGAR AQUÍ
+    document.addEventListener('keypress', (e) => {
+        if (e.target.classList.contains('option-text') && e.key === 'Enter') {
+            e.preventDefault();
+            const currentValue = e.target.value.trim();
+            if (currentValue) {
+                addNewOption();
+                // Focus en la nueva opción
+                setTimeout(() => {
+                    const options = document.querySelectorAll('.option-text');
+                    const lastOption = options[options.length - 1];
+                    if (lastOption) lastOption.focus();
+                }, 100);
+            }
+        }
+    });
 });
 
-// Exportar para uso en otros archivos
-window.VotingComponents = VotingComponents;
-window.AdminComponents = AdminComponents;
-window.Utils = Utils;
-window.FormValidator = FormValidator;
-window.StateManager = StateManager;
 // Función global para limpiar estado de modales
 window.cleanupModalFunctions = function() {
     const functionsToClean = [
@@ -1230,3 +1234,10 @@ window.debugState = function() {
         }
     });
 };
+
+// Exportar para uso en otros archivos
+window.VotingComponents = VotingComponents;
+window.AdminComponents = AdminComponents;
+window.Utils = Utils;
+window.FormValidator = FormValidator;
+window.StateManager = StateManager;
