@@ -677,97 +677,102 @@ function showPowerQuestion() {
 // ================================
 
 async function showVoterScreen() {
-    // Usar window.currentUser como fallback si currentUser es null
-    const user = currentUser || window.currentUser;
+    // Limpiar intervalos previos
+    if (window.timerInterval) {
+        clearInterval(window.timerInterval);
+        window.timerInterval = null;
+    }
     
-    if (!user || !user.code) {
-        console.error('No hay usuario válido');
-        notifications.show('Error: Usuario no inicializado correctamente', 'error');
-        showScreen('welcome-screen');
+    // Asegurar que currentUser esté definido
+    if (!currentUser || !currentUser.code) {
+        console.error('No hay usuario válido para showVoterScreen');
+        notifications.show('Error: Usuario no inicializado', 'error');
+        logout();
         return;
     }
     
-    // Asegurar que currentUser esté sincronizado
-    currentUser = user;
+    console.log('Mostrando pantalla de votante para:', currentUser.code);
     showScreen('voter-screen');
     
     // Solo conectar WebSocket si NO es usuario de prueba
-    if (user.code !== CODIGO_PRUEBA) {
+    if (currentUser.code !== CODIGO_PRUEBA) {
         connectWebSocket();
     }
     
-    // Usar 'user' en lugar de 'currentUser' para el resto
-    document.getElementById('voter-code').textContent = user.code;
-    document.getElementById('voter-name').textContent = `Bienvenido/a, ${user.name}`;
+    // Actualizar interfaz
+    document.getElementById('voter-code').textContent = currentUser.code;
+    document.getElementById('voter-name').textContent = `Bienvenido/a, ${currentUser.name}`;
     
-    // Mostrar coeficiente si está disponible
-    if (currentUser.coefficient) {
-        let coeffElement = document.getElementById('voter-coefficient');
-        if (!coeffElement) {
-            const userMeta = document.querySelector('.user-meta');
-            if (userMeta) {  // ← Verificar que existe
-                coeffElement = document.createElement('span');
-                coeffElement.id = 'voter-coefficient';
-                userMeta.appendChild(coeffElement);
-                coeffElement.textContent = `Coeficiente: ${parseFloat(currentUser.coefficient || 0).toFixed(2)}%`;
-            }
-        } else {
-            coeffElement.textContent = `Coeficiente: ${parseFloat(currentUser.coefficient || 0).toFixed(2)}%`;
+    updateVoterInterface();
+    
+    // Cargar preguntas con timeout de seguridad
+    setTimeout(async () => {
+        try {
+            await loadVotingQuestions();
+        } catch (error) {
+            console.error('Error cargando votaciones:', error);
+            notifications.show('Error cargando votaciones. Reintentando...', 'warning');
+            setTimeout(() => loadVotingQuestions(), 2000);
         }
+    }, 100);
+}
+
+function updateVoterInterface() {
+    const userMeta = document.querySelector('.user-meta');
+    if (!userMeta) return;
+    
+    // Limpiar elementos previos
+    const oldElements = userMeta.querySelectorAll('#voter-coefficient, #voter-conjunto');
+    oldElements.forEach(el => el.remove());
+    
+    // Agregar coeficiente
+    if (currentUser.coefficient) {
+        const coeffElement = document.createElement('span');
+        coeffElement.id = 'voter-coefficient';
+        coeffElement.textContent = `Coeficiente: ${parseFloat(currentUser.coefficient || 0).toFixed(2)}%`;
+        userMeta.appendChild(coeffElement);
     }
     
-    // Mostrar nombre del conjunto
+    // Agregar nombre del conjunto o info de demo
+    loadConjuntoName();
+}
+
+async function loadConjuntoName() {
     try {
-        const conjuntoData = await apiCall('/participants/conjunto/nombre');
-        if (conjuntoData && conjuntoData.nombre) {
-            let conjuntoElement = document.getElementById('voter-conjunto');
-            if (!conjuntoElement) {
-                const userMeta = document.querySelector('.user-meta');
-                if (userMeta) {  // ← Verificar que existe
-                    conjuntoElement = document.createElement('span');
-                    conjuntoElement.id = 'voter-conjunto';
-                    userMeta.appendChild(conjuntoElement);
-                }
-            }
-            if (conjuntoElement) {
-                conjuntoElement.textContent = conjuntoData.nombre;
-            }
+        const userMeta = document.querySelector('.user-meta');
+        if (!userMeta) return;
+        
+        let conjuntoElement = document.getElementById('voter-conjunto');
+        if (!conjuntoElement) {
+            conjuntoElement = document.createElement('span');
+            conjuntoElement.id = 'voter-conjunto';
+            userMeta.appendChild(conjuntoElement);
+        }
+        
+        if (currentUser.code === CODIGO_PRUEBA) {
+            conjuntoElement.textContent = '🧪 MODO DEMOSTRACIÓN';
+        } else {
+            const conjuntoData = await apiCall('/participants/conjunto/nombre');
+            conjuntoElement.textContent = conjuntoData?.nombre || 'Conjunto Residencial';
         }
     } catch (error) {
         console.log('No se pudo cargar nombre del conjunto');
-    }
-    
-    await loadVotingQuestions();
-
-    // Iniciar actualización de timers
-    if (!window.timerInterval) {
-        window.timerInterval = setInterval(updateTimers, 1000);
-    }
-
-    function updateTimers() {
-        document.querySelectorAll('.question-timer').forEach(timer => {
-            const remaining = parseInt(timer.getAttribute('data-remaining'));
-            if (remaining > 0) {
-                const newRemaining = remaining - 1;
-                timer.setAttribute('data-remaining', newRemaining);
-                const minutes = Math.floor(newRemaining / 60);
-                const seconds = newRemaining % 60;
-                timer.textContent = `⏰ ${minutes}:${String(seconds).padStart(2, '0')} restantes`;
-            }
-        });
     }
 }
 
 async function loadVotingQuestions() {
     const container = document.getElementById('voting-questions');
+    if (!container) {
+        console.error('Container voting-questions no encontrado');
+        return;
+    }
     
     try {
+        console.log('Cargando votaciones para usuario:', currentUser?.code);
+        
         if (currentUser && currentUser.code === CODIGO_PRUEBA) {
-            const testQuestions = getSimulatedTestQuestions();
+            const testQuestions = loadDemoVotingQuestions();
             renderVotingQuestions(testQuestions);
-            if (!window.timerInterval) {
-                window.timerInterval = setInterval(updateVotingTimers, 1000);
-            }
             return;
         }
 
@@ -776,18 +781,29 @@ async function loadVotingQuestions() {
             return;
         }
 
-        const questions = await apiCall('/voting/questions/active');
-        const userVotes = await apiCall('/voting/user-votes');
+        // Cargar preguntas y votos del usuario
+        const [questions, userVotes] = await Promise.all([
+            apiCall('/voting/questions/active'),
+            apiCall('/voting/my-votes').catch(() => []) // Si falla, array vacío
+        ]);
+        
         const votedQuestions = new Set(userVotes.map(vote => vote.question_id));
         
+        console.log('Preguntas cargadas:', questions.length);
         renderVotingQuestions(questions, votedQuestions);
-        if (!window.timerInterval) {
-            window.timerInterval = setInterval(updateVotingTimers, 1000);
-        }
 
     } catch (error) {
         console.error('Error cargando votaciones:', error);
-        container.innerHTML = `<div class="panel"><p style="color: var(--danger-color); text-align: center;">Error: ${error.message}</p></div>`;
+        container.innerHTML = `
+            <div class="panel">
+                <p style="color: var(--danger-color); text-align: center;">
+                    Error cargando votaciones: ${error.message}
+                </p>
+                <button class="btn btn-primary" onclick="loadVotingQuestions()" style="margin-top: 1rem;">
+                    🔄 Reintentar
+                </button>
+            </div>
+        `;
     }
 }
 
@@ -1534,6 +1550,9 @@ window.closeParticipantsModal = function() {
 };
 
 function showParticipantsModal(title, participants) {
+    // Limpiar funciones globales previas
+    cleanupModalFunctions();
+    
     const participantsPerPage = 25;
     let currentPage = 1;
     let filteredParticipants = [...participants];
@@ -1553,7 +1572,7 @@ function showParticipantsModal(title, participants) {
         
         const paginationHTML = totalPages > 1 ? `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding: 1rem; background: var(--gray-100); border-radius: 8px;">
-                <button onclick="changePage(${currentPage - 1})" 
+                <button onclick="window.changePage(${currentPage - 1})" 
                         ${currentPage === 1 ? 'disabled' : ''} 
                         class="btn btn-secondary" style="padding: 0.5rem 1rem;">
                     ← Anterior
@@ -1561,7 +1580,7 @@ function showParticipantsModal(title, participants) {
                 <span style="color: var(--gray-700); font-size: 0.9rem;">
                     Página ${currentPage} de ${totalPages} (${filteredParticipants.length} resultados)
                 </span>
-                <button onclick="changePage(${currentPage + 1})" 
+                <button onclick="window.changePage(${currentPage + 1})" 
                         ${currentPage === totalPages ? 'disabled' : ''} 
                         class="btn btn-secondary" style="padding: 0.5rem 1rem;">
                     Siguiente →
@@ -1574,20 +1593,22 @@ function showParticipantsModal(title, participants) {
             `<div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--gray-300); border-radius: 12px;">
                 ${pageParticipants.map(p => `
                     <div style="padding: 1rem; border-bottom: 1px solid var(--gray-300); display: grid; grid-template-columns: 80px 1fr 60px 90px; gap: 1rem; align-items: center;">
-                        <span style="font-weight: 600;">${p.code}</span>
+                        <span style="font-weight: 600; color: ${p.present ? 'var(--success-color)' : 'var(--gray-500)'};">${p.code}</span>
                         <span style="overflow: hidden; text-overflow: ellipsis;">${p.name || 'Sin nombre'}</span>
                         <span style="color: var(--primary-color); font-weight: 500; text-align: right;">${p.coefficient || 0}%</span>
-                        <button class="btn btn-info" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="showVoterManagementModal('${p.code}'); modals.hide();">
-                            👤 Gestionar
-                        </button>
+                        ${p.present ? `
+                            <button class="btn btn-info" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" 
+                                    onclick="closeParticipantsModal(); setTimeout(() => showVoterManagementModal('${p.code}'), 300);">
+                                👤 Gestionar
+                            </button>
+                        ` : `
+                            <span style="color: var(--gray-400); font-size: 0.8rem;">No presente</span>
+                        `}
                     </div>
                 `).join('')}
             </div>`;
         
-        return `
-            ${paginationHTML}
-            ${participantsList}
-        `;
+        return `${paginationHTML}${participantsList}`;
     }
     
     modals.show({
@@ -1596,7 +1617,7 @@ function showParticipantsModal(title, participants) {
         content: `
             <input type="text" id="participant-search" placeholder="Buscar por código o nombre..." 
                    style="width: 100%; padding: 0.8rem; margin-bottom: 1rem; border: 2px solid var(--gray-300); border-radius: 8px;"
-                   oninput="filterParticipants(this.value)">
+                   oninput="window.filterParticipants(this.value)">
             <div id="participants-content">
                 ${renderPage()}
             </div>
@@ -1610,12 +1631,15 @@ function showParticipantsModal(title, participants) {
         ]
     });
     
-    // Funciones locales del modal
+    // Funciones del modal con namespace seguro
     window.changePage = (newPage) => {
         const totalPages = Math.ceil(filteredParticipants.length / participantsPerPage);
         if (newPage >= 1 && newPage <= totalPages) {
             currentPage = newPage;
-            document.getElementById('participants-content').innerHTML = renderPage();
+            const content = document.getElementById('participants-content');
+            if (content) {
+                content.innerHTML = renderPage();
+            }
         }
     };
     
@@ -1630,9 +1654,26 @@ function showParticipantsModal(title, participants) {
             );
         }
         currentPage = 1;
-        document.getElementById('participants-content').innerHTML = renderPage();
+        const content = document.getElementById('participants-content');
+        if (content) {
+            content.innerHTML = renderPage();
+        }
     };
 }
+
+function cleanupModalFunctions() {
+    // Limpiar funciones globales previas
+    delete window.changePage;
+    delete window.filterParticipants;
+    delete window.saveConjuntoName;
+    delete window.modalResolve;
+    delete window.powerResolveCallback;
+}
+
+window.closeParticipantsModal = function() {
+    cleanupModalFunctions();
+    modals.hide();
+};
 
 async function uploadExcel() {
     const fileInput = document.getElementById('excel-file');
@@ -1661,9 +1702,7 @@ async function uploadExcel() {
         const result = await response.json();
         const statusDiv = document.getElementById('upload-status');
         statusDiv.innerHTML = `<div style="color: var(--success-color); margin-top: 1rem;">✅ ${result.inserted} participantes cargados correctamente</div>`;
-        
-        notifications.show(`Archivo cargado: ${result.inserted} participantes`, 'success');
-        
+                
         if (result.inserted > 0) {
             const statusCircle = document.getElementById('status-circle');
             const statusText = document.getElementById('status-text');
@@ -2570,18 +2609,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function setupMainEventListeners() {
-    // Botón de logout
-    document.getElementById('logout-button').addEventListener('click', logout);
+    // Limpiar listeners previos
+    const buttons = ['logout-button', 'register-btn', 'voting-btn', 'admin-btn'];
+    buttons.forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            // Clonar elemento para remover todos los listeners
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+        }
+    });
     
-    // Botones de la pantalla principal
-    document.getElementById('register-btn').addEventListener('click', registerAttendance);
-    document.getElementById('voting-btn').addEventListener('click', accessVoting);
-    document.getElementById('admin-btn').addEventListener('click', showAdminLogin);
+    // Agregar listeners limpios
+    document.getElementById('logout-button').addEventListener('click', logout);
+    document.getElementById('register-btn').addEventListener('click', safeExecute(registerAttendance));
+    document.getElementById('voting-btn').addEventListener('click', safeExecute(accessVoting));
+    document.getElementById('admin-btn').addEventListener('click', safeExecute(showAdminLogin));
     
     // Input de código con Enter
-    document.getElementById('access-code').addEventListener('keypress', (e) => {
+    const accessCode = document.getElementById('access-code');
+    accessCode.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
-            accessVoting();
+            safeExecute(accessVoting)();
         }
     });
     
@@ -2589,6 +2638,17 @@ function setupMainEventListeners() {
     document.addEventListener('submit', (e) => {
         e.preventDefault();
     });
+}
+
+function safeExecute(fn) {
+    return async function(...args) {
+        try {
+            await fn.apply(this, args);
+        } catch (error) {
+            console.error('Error ejecutando función:', error);
+            notifications.show('Ha ocurrido un error. Por favor reintente.', 'error');
+        }
+    };
 }
 
 async function tryRestoreAdminSession() {

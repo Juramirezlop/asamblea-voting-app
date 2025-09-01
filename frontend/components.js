@@ -184,6 +184,10 @@ class ModalSystem {
     hide() {
         if (this.activeModal && this.activeModal.parentNode) {
             this.activeModal.classList.remove('show');
+            
+            // Limpiar funciones globales del modal
+            cleanupModalFunctions();
+            
             setTimeout(() => {
                 if (this.activeModal && this.activeModal.parentNode) {
                     this.activeModal.parentNode.removeChild(this.activeModal);
@@ -1152,3 +1156,33 @@ window.AdminComponents = AdminComponents;
 window.Utils = Utils;
 window.FormValidator = FormValidator;
 window.StateManager = StateManager;
+// Función global para limpiar estado de modales
+window.cleanupModalFunctions = function() {
+    const functionsToClean = [
+        'changePage', 'filterParticipants', 'saveConjuntoName', 
+        'modalResolve', 'powerResolveCallback', 'saveEditedVoting',
+        'saveVoterChanges', 'saveVoteEdit'
+    ];
+    
+    functionsToClean.forEach(fn => {
+        if (window[fn]) {
+            delete window[fn];
+        }
+    });
+};
+
+// Debugging helper
+window.debugState = function() {
+    console.log('Estado actual:', {
+        currentUser: window.currentUser,
+        isAdmin: window.isAdmin,
+        adminToken: !!window.adminToken,
+        voterToken: !!window.voterToken,
+        activeModals: !!window.modals?.activeModal,
+        intervals: {
+            timerInterval: !!window.timerInterval,
+            updateInterval: !!window.updateInterval,
+            usersRefreshInterval: !!window.usersRefreshInterval
+        }
+    });
+};
