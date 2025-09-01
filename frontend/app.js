@@ -224,43 +224,37 @@ function connectVoterWebSocket(voterCode) {
 }
 
 function handleAdminWebSocketMessage(message) {
-    console.log('Admin WebSocket mensaje:', message.type); // Debug
+    console.log('Admin WebSocket mensaje:', message.type);
     
     switch (message.type) {
         case 'attendance_registered':
-            loadAforoData();
+            setTimeout(() => loadAforoData(), 500);
             addActivityLog(`Nueva asistencia: ${message.data.code} - ${message.data.name}`, 'success');
             break;
         case 'vote_registered':
-            loadAforoData();
-            // NO recargar preguntas aquí, solo actualizar conteos
-            updateVoteCountsForActiveQuestions();
+            setTimeout(() => {
+                loadAforoData();
+                updateVoteCountsForActiveQuestions();
+            }, 300);
             addActivityLog(`Voto registrado: ${message.data.participant_code}`, 'info');
             break;
         case 'question_created':
-            // Solo recargar si estamos en la tab de votaciones
+            // Solo recargar si estamos viendo la tab de votaciones
             const activeTab = document.querySelector('.tab-button.active');
             if (activeTab && activeTab.getAttribute('data-tab') === 'votaciones') {
-                loadActiveQuestions();
+                setTimeout(() => loadActiveQuestions(), 800);
             }
             notifications.show('Nueva votación creada', 'success', 4000);
             addActivityLog('Nueva votación creada', 'success');
             break;
         case 'participant_removed':
-            loadAforoData();
+            setTimeout(() => loadAforoData(), 500);
             notifications.show(`Código eliminado: ${message.data.code}`, 'warning', 4000);
             addActivityLog(`Código eliminado: ${message.data.code}`, 'warning');
             break;
-        case 'excel_uploaded':
-            loadAforoData();
-            notifications.show(`Excel cargado: ${message.data.inserted} participantes`, 'success', 6000);
-            addActivityLog(`Excel cargado: ${message.data.inserted} participantes`, 'success');
-            break;
-        case 'notification':
-            notifications.show(message.data.text || 'Notificación del sistema', message.data.type || 'info', message.data.duration || 5000);
-            break;
         default:
-            console.log('Mensaje WebSocket no manejado:', message.type);
+            // Solo log para mensajes no críticos
+            console.log('Mensaje WebSocket:', message.type);
     }
 }
 
@@ -517,7 +511,11 @@ function showAttendanceConfirmModal(participantInfo) {
 // Función global para el modal
 window.confirmAttendanceRegistration = async function(code) {
     try {
-        modals.hide();
+        // Cerrar modal inmediatamente para evitar trabas
+        if (modals.activeModal) {
+            modals.activeModal.style.display = 'none';
+        }
+        
         notifications.show('Registrando asistencia...', 'info', 3000);
         
         // Preguntar tipo de participación
@@ -534,7 +532,7 @@ window.confirmAttendanceRegistration = async function(code) {
 
         console.log('Registro exitoso:', response);
         
-        // Configurar usuario global
+        // Configurar usuario global CORRECTAMENTE
         window.currentUser = currentUser = {
             code: response.code,
             name: response.name,
@@ -542,45 +540,73 @@ window.confirmAttendanceRegistration = async function(code) {
             is_power: response.is_power
         };
 
-        // Modal de éxito
-        modals.show({
-            title: '🎉 Registro Completado',
-            content: `
-                <div style="text-align: center; padding: 1rem;">
-                    <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
-                    <h3 style="color: var(--success-color); margin-bottom: 1rem;">Asistencia Registrada</h3>
-                    
-                    <div style="background: var(--success-color); background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05)); padding: 1.5rem; border-radius: 12px; margin: 1rem 0; border: 1px solid var(--success-color);">
-                        <p><strong>Código:</strong> ${response.code}</p>
-                        <p><strong>Nombre:</strong> ${response.name}</p>
-                        <p><strong>Tipo:</strong> ${response.is_power ? '📋 Votación con Poder' : '🏠 Propietario Directo'}</p>
-                        <p><strong>Coeficiente:</strong> ${response.coefficient}%</p>
-                    </div>
-                    
-                    <p style="color: var(--gray-600); font-size: 0.9rem;">
-                        ¡Ya puede participar en las votaciones de la asamblea!
-                    </p>
-                </div>
-            `,
-            actions: [
-                {
-                    text: 'Acceder a Votaciones',
-                    class: 'btn-success btn-large',
-                    handler: 'modals.hide(); accessVoting();'
-                },
-                {
-                    text: 'Cerrar',
-                    class: 'btn-secondary',
-                    handler: 'modals.hide()'
-                }
-            ]
-        });
-        
         notifications.show('✅ Asistencia registrada correctamente', 'success');
+        
+        // Mostrar modal de éxito SIN trabas
+        setTimeout(() => {
+            modals.show({
+                title: '🎉 Registro Completado',
+                content: `
+                    <div style="text-align: center; padding: 1rem;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
+                        <h3 style="color: var(--success-color); margin-bottom: 1rem;">¡Listo para votar!</h3>
+                        
+                        <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05)); padding: 1.5rem; border-radius: 12px; margin: 1rem 0; border: 1px solid var(--success-color);">
+                            <p><strong>Código:</strong> ${response.code}</p>
+                            <p><strong>Nombre:</strong> ${response.name}</p>
+                            <p><strong>Tipo:</strong> ${response.is_power ? '📋 Con Poder' : '🏠 Propietario'}</p>
+                            <p><strong>Coeficiente:</strong> ${response.coefficient}%</p>
+                        </div>
+                    </div>
+                `,
+                actions: [
+                    {
+                        text: 'Ir a Votaciones',
+                        class: 'btn-success btn-large',
+                        handler: 'modals.hide(); setTimeout(() => directAccessVoting(), 100);'
+                    },
+                    {
+                        text: 'Cerrar',
+                        class: 'btn-secondary',
+                        handler: 'modals.hide()'
+                    }
+                ]
+            });
+        }, 500);
         
     } catch (error) {
         console.error('Error registrando asistencia:', error);
+        modals.hide();
         notifications.show(`Error en registro: ${error.message}`, 'error');
+    }
+};
+
+// Nueva función para acceso directo después del registro
+window.directAccessVoting = async function() {
+    try {
+        if (!currentUser || !currentUser.code) {
+            notifications.show('Error: Usuario no configurado', 'error');
+            return;
+        }
+
+        // Usar los datos del usuario ya registrado para hacer login
+        const response = await apiCall('/auth/login/voter', {
+            method: 'POST',
+            body: JSON.stringify({ code: currentUser.code })
+        });
+
+        voterToken = response.access_token;
+        saveToken('voter', voterToken);
+        isAdmin = false;
+        
+        console.log('Login directo exitoso para:', currentUser.code);
+        
+        // Ir a pantalla de votante
+        await showVoterScreen();
+        
+    } catch (error) {
+        console.error('Error en acceso directo:', error);
+        notifications.show('Error accediendo a votaciones. Use "Acceder a Votaciones" manualmente.', 'error');
     }
 };
 

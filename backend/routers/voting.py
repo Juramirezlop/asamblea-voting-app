@@ -231,10 +231,17 @@ def preguntas_activas():
     try:
         current_time = datetime.utcnow().isoformat()
         
+        # Consulta mejorada que incluye las opciones
         qs = execute_query(
             conn,
-            """SELECT id, text, type, closed, allow_multiple, max_selections, 
-                      time_limit_minutes, expires_at FROM questions WHERE active = 1""",
+            """
+            SELECT DISTINCT
+                q.id, q.text, q.type, q.closed, q.allow_multiple, q.max_selections, 
+                q.time_limit_minutes, q.expires_at
+            FROM questions q 
+            WHERE q.active = 1
+            ORDER BY q.id DESC
+            """,
             fetchall=True
         )
         
@@ -260,14 +267,16 @@ def preguntas_activas():
                 else:
                     time_remaining = int((expires_at - current_dt).total_seconds())
             
+            # SIEMPRE obtener opciones
             options = execute_query(
                 conn,
-                "SELECT option_text FROM options WHERE question_id = ?",
+                "SELECT option_text FROM options WHERE question_id = ? ORDER BY id",
                 (q["id"],),
                 fetchall=True
             )
             
-            out.append({
+            # Crear objeto de pregunta con TODAS las opciones
+            question_data = {
                 "id": q["id"],
                 "text": q["text"],
                 "type": q["type"],
@@ -278,8 +287,11 @@ def preguntas_activas():
                 "expires_at": q["expires_at"],
                 "time_remaining_seconds": time_remaining,
                 "is_expired": is_expired,
-                "options": [{"text": o["option_text"]} for o in options]
-            })
+                "options": [{"text": o["option_text"]} for o in options] if options else []
+            }
+            
+            out.append(question_data)
+            
         return out
     finally:
         close_db(conn)

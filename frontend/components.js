@@ -195,20 +195,24 @@ class ModalSystem {
         }
     }
 
-    cleanupModalState() {
-        // Limpiar solo si no hay resolvers pendientes importantes
-        const functionsToClean = [
-            'changePage', 'filterParticipants', 'saveConjuntoName',
-            'confirmAttendanceRegistration', 'saveEditedVoting',
-            'saveVoterChanges', 'saveVoteEdit'
-        ];
-        
-        functionsToClean.forEach(fn => {
-            if (window[fn]) {
+cleanupModalState() {
+    // Lista de funciones seguras para limpiar
+    const functionsToClean = [
+        'changePage', 'filterParticipants', 'saveConjuntoName',
+        'confirmAttendanceRegistration', 'saveEditedVoting',
+        'saveVoterChanges', 'saveVoteEdit'
+    ];
+    
+    functionsToClean.forEach(fn => {
+        try {
+            if (window[fn] && typeof window[fn] === 'function') {
                 delete window[fn];
             }
-        });
-    }
+        } catch (error) {
+            console.log(`No se pudo limpiar ${fn}:`, error);
+        }
+    });
+}
 
     confirm(message, title = 'Confirmar acción') {
         return new Promise((resolve) => {
