@@ -1650,7 +1650,7 @@ function renderActiveQuestions(questions) {
         container.innerHTML = `
             <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 1rem; opacity: 0.5;">
-                    <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"></path>
+                    <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2-2h-4"></path>
                     <path d="M9 7V3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path>
                 </svg>
                 <h3 style="margin-bottom: 0.5rem; color: var(--gray-700);">No hay votaciones creadas</h3>
@@ -1665,10 +1665,6 @@ function renderActiveQuestions(questions) {
         
         const typeText = q.type === 'yesno' ? 'Sí/No' : 
                         (q.allow_multiple ? 'Selección múltiple' : 'Selección única');
-        
-        // Asegurar que las opciones existan
-        const options = q.options || [];
-        console.log('Opciones para pregunta', q.id, ':', options); // Debug
         
         return `
             <div class="voting-card admin-card" data-question-id="${q.id}">
@@ -1692,20 +1688,14 @@ function renderActiveQuestions(questions) {
                         <span>⏱️</span>
                         <span>Estado: ${q.closed ? 'Finalizada' : 'En progreso'}</span>
                     </div>
-                    ${q.time_limit_minutes ? `
-                        <div class="meta-item">
-                            <span>⏰</span>
-                            <span>Tiempo límite: ${q.time_limit_minutes} min</span>
-                        </div>
-                    ` : ''}
                 </div>
 
                 <div class="voting-options-preview">
                     <h4>Opciones:</h4>
                     <div class="options-tags">
-                        ${options.length > 0 ? options.map(opt => 
+                        ${q.options && q.options.length > 0 ? q.options.map(opt => 
                             `<span class="option-tag">${opt.text}</span>`
-                        ).join('') : '<span class="option-tag" style="background: var(--gray-200); color: var(--gray-600);">Sin opciones</span>'}
+                        ).join('') : '<span class="option-tag no-options">Sin opciones</span>'}
                     </div>
                 </div>
 
@@ -1718,18 +1708,6 @@ function renderActiveQuestions(questions) {
                     <button class="btn btn-info" onclick="viewVotingResults(${q.id})">
                         📊 Ver Resultados
                     </button>
-
-                    ${!q.closed && q.expires_at ? `
-                        <button class="btn btn-warning" onclick="showExtendTimeModal(${q.id}, '${q.text}')">
-                            ⏰ Extender Tiempo
-                        </button>
-                    ` : ''}
-                    
-                    ${q.closed ? `
-                        <button class="btn btn-secondary" onclick="editVoting(${q.id})">
-                            ✏️ Editar
-                        </button>
-                    ` : ''}
                     
                     <button class="btn btn-danger" onclick="deleteVoting(${q.id})">
                         🗑️ Eliminar
