@@ -475,64 +475,27 @@ async function registerAttendance() {
 }
 
 function showAttendanceConfirmModal(participantInfo) {
-    modals.show({
-        title: '✅ Código Encontrado',
-        content: `
-            <div style="text-align: center; padding: 1rem;">
-                <div style="font-size: 3rem; margin-bottom: 1rem;">🏠</div>
-                <h3 style="color: var(--success-color); margin-bottom: 1rem;">Participante Verificado</h3>
-                
-                <div style="background: var(--gray-50); padding: 1.5rem; border-radius: 12px; margin: 1rem 0;">
-                    <p><strong>Código:</strong> ${participantInfo.code}</p>
-                    <p><strong>Nombre:</strong> ${participantInfo.name}</p>
-                    <p><strong>Coeficiente:</strong> ${participantInfo.coefficient}%</p>
-                </div>
-                
-                <p style="color: var(--gray-600); font-size: 0.9rem; margin-bottom: 1.5rem;">
-                    ¿Confirma que desea registrar su asistencia a la asamblea?
-                </p>
-            </div>
-        `,
-        actions: [
-            {
-                text: 'Cancelar',
-                class: 'btn-secondary',
-                handler: 'modals.hide()'
-            },
-            {
-                text: 'Confirmar Registro',
-                class: 'btn-success',
-                handler: `confirmAttendanceRegistration('${participantInfo.code}')`
-            }
-        ]
-    });
+    // Eliminar el paso de confirmación - ir directo al registro
+    processDirectRegistration(participantInfo);
 }
 
-// Función global para el modal
-window.confirmAttendanceRegistration = async function(code) {
+async function processDirectRegistration(participantInfo) {
     try {
-        // Cerrar modal inmediatamente para evitar trabas
-        if (modals.activeModal) {
-            modals.activeModal.style.display = 'none';
-        }
-        
         notifications.show('Registrando asistencia...', 'info', 3000);
         
-        // Preguntar tipo de participación
+        // Preguntar tipo de participación directamente
         const isPower = await showPowerQuestion();
         
-        // Hacer el registro real
+        // Hacer el registro
         const response = await apiCall('/auth/register-attendance', {
             method: 'POST',
             body: JSON.stringify({ 
-                code: code,
+                code: participantInfo.code,
                 is_power: isPower
             })
         });
 
-        console.log('Registro exitoso:', response);
-        
-        // Configurar usuario global CORRECTAMENTE
+        // Configurar usuario global
         window.currentUser = currentUser = {
             code: response.code,
             name: response.name,
@@ -540,46 +503,42 @@ window.confirmAttendanceRegistration = async function(code) {
             is_power: response.is_power
         };
 
-        notifications.show('✅ Asistencia registrada correctamente', 'success');
-        
-        // Mostrar modal de éxito SIN trabas
-        setTimeout(() => {
-            modals.show({
-                title: '🎉 Registro Completado',
-                content: `
-                    <div style="text-align: center; padding: 1rem;">
-                        <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
-                        <h3 style="color: var(--success-color); margin-bottom: 1rem;">¡Listo para votar!</h3>
-                        
-                        <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05)); padding: 1.5rem; border-radius: 12px; margin: 1rem 0; border: 1px solid var(--success-color);">
-                            <p><strong>Código:</strong> ${response.code}</p>
-                            <p><strong>Nombre:</strong> ${response.name}</p>
-                            <p><strong>Tipo:</strong> ${response.is_power ? '📋 Con Poder' : '🏠 Propietario'}</p>
-                            <p><strong>Coeficiente:</strong> ${response.coefficient}%</p>
-                        </div>
+        // Modal de bienvenida simple (solo cerrar)
+        modals.show({
+            title: '🎉 ¡Bienvenido a la Asamblea!',
+            content: `
+                <div style="text-align: center; padding: 1rem;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
+                    <h3 style="color: var(--success-color); margin-bottom: 1rem;">Asistencia Registrada</h3>
+                    
+                    <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05)); padding: 1.5rem; border-radius: 12px; margin: 1rem 0; border: 1px solid var(--success-color);">
+                        <p><strong>Código:</strong> ${response.code}</p>
+                        <p><strong>Nombre:</strong> ${response.name}</p>
+                        <p><strong>Tipo:</strong> ${response.is_power ? '📋 Con Poder' : '🏠 Propietario'}</p>
+                        <p><strong>Coeficiente:</strong> ${response.coefficient}%</p>
                     </div>
-                `,
-                actions: [
-                    {
-                        text: 'Ir a Votaciones',
-                        class: 'btn-success btn-large',
-                        handler: 'modals.hide(); setTimeout(() => directAccessVoting(), 100);'
-                    },
-                    {
-                        text: 'Cerrar',
-                        class: 'btn-secondary',
-                        handler: 'modals.hide()'
-                    }
-                ]
-            });
-        }, 500);
+                    
+                    <div style="background: var(--info-color); background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05)); padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px solid var(--info-color);">
+                        <p style="margin: 0; color: var(--info-dark); font-weight: 500;">
+                            🗳️ Ahora puede usar "Acceder a Votaciones" para participar
+                        </p>
+                    </div>
+                </div>
+            `,
+            actions: [{
+                text: 'Entendido',
+                class: 'btn-success',
+                handler: 'modals.hide()'
+            }]
+        });
+        
+        notifications.show('✅ Asistencia registrada. Use "Acceder a Votaciones" para participar.', 'success', 8000);
         
     } catch (error) {
         console.error('Error registrando asistencia:', error);
-        modals.hide();
-        notifications.show(`Error en registro: ${error.message}`, 'error');
+        notifications.show(`Error: ${error.message}`, 'error');
     }
-};
+}
 
 // Nueva función para acceso directo después del registro
 window.directAccessVoting = async function() {
@@ -624,6 +583,8 @@ async function accessVoting() {
     }
 
     try {
+        notifications.show('Verificando acceso...', 'info', 3000);
+        
         // Verificar que hay participantes en la base
         const dbCheck = await apiCall('/auth/check-database');
         if (!dbCheck.has_participants) {
@@ -637,13 +598,10 @@ async function accessVoting() {
             body: JSON.stringify({ code: code })
         });
 
-        console.log('Login exitoso:', response); // Debug
-
-        // Configurar tokens y usuario
+        // Login exitoso - configurar usuario
         voterToken = response.access_token;
         saveToken('voter', voterToken);
         
-        // Asegurar currentUser global
         currentUser = window.currentUser = {
             code: code,
             name: response.name || 'Usuario',
@@ -653,23 +611,51 @@ async function accessVoting() {
         
         isAdmin = false;
         
-        console.log('Usuario configurado:', currentUser); // Debug
-        
-        // Ir a pantalla de votante
+        notifications.show(`¡Bienvenido ${response.name}! Accediendo a votaciones...`, 'success');
         await showVoterScreen();
         
     } catch (error) {
         console.error('Error en acceso:', error);
 
         if (error.message.includes('403') || error.message.includes('asistencia primero')) {
-            notifications.show('Debe registrar su asistencia antes de acceder a las votaciones.', 'info');
+            // Usuario no tiene asistencia registrada
+            modals.show({
+                title: '📋 Registro Requerido',
+                content: `
+                    <div style="text-align: center; padding: 1rem;">
+                        <div style="font-size: 2.5rem; margin-bottom: 1rem;">🚪</div>
+                        <h3 style="margin-bottom: 1rem; color: var(--warning-color);">Debe registrar asistencia primero</h3>
+                        <p style="color: var(--gray-600); margin-bottom: 1.5rem;">
+                            Para acceder a las votaciones, debe registrar su asistencia a la asamblea usando el botón "Registro de Asistencia".
+                        </p>
+                        <div style="background: var(--gray-100); padding: 1rem; border-radius: 8px;">
+                            <p style="margin: 0; font-size: 0.9rem; color: var(--gray-700);">
+                                <strong>Código:</strong> ${code}
+                            </p>
+                        </div>
+                    </div>
+                `,
+                actions: [
+                    {
+                        text: 'Registrar Asistencia Ahora',
+                        class: 'btn-primary',
+                        handler: 'modals.hide(); registerAttendance();'
+                    },
+                    {
+                        text: 'Entendido',
+                        class: 'btn-secondary',
+                        handler: 'modals.hide()'
+                    }
+                ]
+            });
         } else if (error.message.includes('404') || error.message.includes('not found')) {
-            notifications.show('Su código no está en el sistema o no ha registrado asistencia. Use "Registro de Asistencia" primero.', 'error');
+            notifications.show('Su código no está en el sistema. Consulte con la administración del conjunto.', 'error');
         } else {
             notifications.show(`Error: ${error.message}`, 'error');
         }
     }
 }
+
 function showAdminLogin() {
     modals.show({
         title: '🔐 Acceso Administrador',
@@ -2765,22 +2751,6 @@ async function resetDatabase() {
 // ================================
 // EVENT LISTENERS Y INICIALIZACIÓN
 // ================================
-
-document.addEventListener('DOMContentLoaded', async () => {
-    // Event listeners principales
-    setupMainEventListeners();
-    
-    // Intentar restaurar sesión admin
-    await tryRestoreAdminSession();
-    
-    // Mostrar mensaje de bienvenida
-    if (!isAdmin) {
-        notifications.show('Sistema iniciado - Ingrese sus credenciales', 'success');
-    }
-    
-    // Configurar efectos visuales
-    setupVisualEffects();
-});
 
 function setupMainEventListeners() {
     // Limpiar listeners previos
