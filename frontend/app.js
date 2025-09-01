@@ -981,19 +981,11 @@ function updateVotingTimers() {
 }
 
 function renderVotingQuestions(questions, votedQuestions = new Set()) {
-    console.log('=== DEBUG RENDER ===');
     const container = document.getElementById('voting-questions');
-    console.log('Container encontrado:', !!container);
-    console.log('Questions length:', questions.length);
-    console.log('VotedQuestions:', votedQuestions);
     
     if (questions.length === 0) {
         container.innerHTML = `
             <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 1rem; opacity: 0.5;">
-                    <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"></path>
-                    <path d="M9 7V3a2 2 0 0 1 2-2h2a2 0 0 1 2 2v4"></path>
-                </svg>
                 <h3 style="margin-bottom: 0.5rem; color: var(--gray-700);">No hay votaciones activas</h3>
                 <p>Espere a que el administrador active nuevas votaciones</p>
             </div>
@@ -1001,47 +993,59 @@ function renderVotingQuestions(questions, votedQuestions = new Set()) {
         return;
     }
 
-    console.log('Renderizando', questions.length, 'preguntas');
-    
-    const questionsHTML = questions.map(question => {
+    let html = '';
+    questions.forEach(question => {
         const userVoted = votedQuestions.has(question.id);
-        console.log('Procesando pregunta:', question.id, 'votado:', userVoted);
         
         if (userVoted) {
-            return VotingComponents.createVotedStatus(question, 'Ya votaste');
+            html += `<div class="voting-card"><div class="voted-status">✅ Ya votaste en: ${question.text}</div></div>`;
         } else if (question.closed) {
-            return `
-                <div class="voting-card">
-                    <div class="question-header">
-                        <div class="question-title">${question.text}</div>
-                        <div class="question-status closed">🔒 CERRADA</div>
-                    </div>
-                    <div class="voted-status">
-                        🔒 Esta votación ha sido cerrada
-                    </div>
-                </div>
-            `;
+            html += `<div class="voting-card"><div class="voted-status">🔒 Cerrada: ${question.text}</div></div>`;
         } else {
+            // HTML directo sin componentes
             if (question.type === 'yesno') {
-                return VotingComponents.createYesNoVoting(question);
+                html += `
+                    <div class="voting-card" data-question-id="${question.id}">
+                        <div class="question-header">
+                            <div class="question-title">${question.text}</div>
+                            <div class="question-status open">🟢 ABIERTA</div>
+                        </div>
+                        
+                        <div class="yesno-options">
+                            <div class="option-btn yes" onclick="voteYesNo(${question.id}, 'Sí')">
+                                <div class="option-icon">✅</div>
+                                <div>SÍ</div>
+                            </div>
+                            <div class="option-btn no" onclick="voteYesNo(${question.id}, 'No')">
+                                <div class="option-icon">❌</div>
+                                <div>NO</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
             } else {
-                return VotingComponents.createMultipleVoting(question);
+                const options = question.options || [];
+                html += `
+                    <div class="voting-card" data-question-id="${question.id}">
+                        <div class="question-header">
+                            <div class="question-title">${question.text}</div>
+                            <div class="question-status open">🟢 ABIERTA</div>
+                        </div>
+                        
+                        <div class="multiple-options">
+                            ${options.map(opt => `
+                                <div class="option-btn" onclick="voteMultiple(${question.id}, '${opt.text}')">
+                                    ${opt.text}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
             }
         }
-    }).join('');
+    });
 
-    console.log('HTML generado - longitud:', questionsHTML.length);
-    console.log('Aplicando HTML al container...');
-
-    container.innerHTML = questionsHTML;
-
-    console.log('HTML aplicado. Container innerHTML length:', container.innerHTML.length);
-    
-    // Inicializar timers si hay preguntas con tiempo
-    const hasTimedQuestions = questions.some(q => q.time_remaining_seconds > 0);
-    if (hasTimedQuestions) {
-        setTimeout(initializeVotingTimer, 100);
-    }
+    container.innerHTML = html;
 }
 
 function initializeVotingTimer() {
