@@ -1569,6 +1569,7 @@ async function loadAforoData() {
 }
 
 async function loadActiveQuestions() {
+    console.log('🔄 loadActiveQuestions llamada desde:', new Error().stack.split('\n')[2]);
     // Evitar llamadas múltiples
     if (loadActiveQuestionsTimeout) {
         clearTimeout(loadActiveQuestionsTimeout);
@@ -1749,9 +1750,20 @@ function renderActiveQuestions(questions) {
         `;
     }).join('');
     
-    console.log('HTML generado:', questionsHTML.substring(0, 200) + '...'); // Debug
     container.innerHTML = questionsHTML;
-    console.log('HTML asignado. Container children:', container.children.length); // Debug
+    console.log('HTML asignado. Container children:', container.children.length);
+    console.log('Contenido actual:', container.innerHTML.substring(0, 300));
+
+    // Agregar observador para detectar cambios
+    setTimeout(() => {
+        console.log('Después de 1 segundo - Children:', container.children.length);
+        console.log('Contenido después de 1 segundo:', container.innerHTML.substring(0, 300));
+    }, 1000);
+
+    setTimeout(() => {
+        console.log('Después de 3 segundos - Children:', container.children.length);  
+        console.log('Contenido después de 3 segundos:', container.innerHTML.substring(0, 300));
+    }, 3000);
 }
 
 async function updateVoteCountsForActiveQuestions() {
