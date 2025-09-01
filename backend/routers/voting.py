@@ -270,7 +270,7 @@ def preguntas_activas():
             # SIEMPRE obtener opciones
             options = execute_query(
                 conn,
-                "SELECT option_text FROM options WHERE question_id = ? ORDER BY id",
+                "SELECT option_text as text FROM options WHERE question_id = ? ORDER BY id",
                 (q["id"],),
                 fetchall=True
             )
@@ -287,7 +287,7 @@ def preguntas_activas():
                 "expires_at": q["expires_at"],
                 "time_remaining_seconds": time_remaining,
                 "is_expired": is_expired,
-                "options": [{"text": o["option_text"]} for o in options] if options else []
+                "options": [{"text": o["text"]} for o in options] if options else []
             }
             
             out.append(question_data)
