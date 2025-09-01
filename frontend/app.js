@@ -1475,6 +1475,7 @@ function showAdminTab(tabName) {
         
         // Solo cargar datos cuando se activa la tab de votaciones
         if (tabName === 'votaciones') {
+            console.log('Cargando tab de votaciones...');
             setTimeout(() => loadActiveQuestions(), 100);
         } else if (tabName === 'estado') {
             setTimeout(() => loadAforoData(), 100);
@@ -1487,14 +1488,14 @@ function showAdminTab(tabName) {
 }
 
 async function loadAdminData() {
+    console.log('Iniciando carga de datos admin...');
     await Promise.all([
         loadAforoData(),
-        loadActiveQuestions(),
         refreshConnectedUsers(),
         loadParticipantsStatus()
     ]);
     
-    // Iniciar actualización automática de usuarios conectados
+    await loadActiveQuestions();
     startUsersRefreshInterval();
 }
 
@@ -1575,18 +1576,26 @@ async function loadActiveQuestions() {
     
     loadActiveQuestionsTimeout = setTimeout(async () => {
         try {
-            console.log('Cargando preguntas activas...'); // Debug
+            console.log('Llamando API /voting/questions/active...');
             const questions = await apiCall('/voting/questions/active');
-            console.log('Preguntas obtenidas:', questions.length); // Debug
+            console.log('Preguntas recibidas:', questions);
             renderActiveQuestions(questions);
             await updateVoteCountsForActiveQuestions();
         } catch (error) {
-            console.error('Error loading questions:', error);
-            document.getElementById('active-questions').innerHTML = 
-                '<p style="color: var(--danger-color); padding: 1rem;">Error cargando preguntas activas</p>';
+            console.error('Error loading active questions:', error);
+            const container = document.getElementById('active-questions');
+            if (container) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: var(--danger-color);">
+                        <p>Error al cargar las votaciones</p>
+                        <button onclick="loadActiveQuestions()" class="btn btn-primary" style="margin-top: 1rem;">
+                            Reintentar
+                        </button>
+                    </div>
+                `;
+            }
         }
-        loadActiveQuestionsTimeout = null;
-    }, 300); // Throttle de 300ms
+    }, 100);
 }
 
 async function refreshConnectedUsers() {
