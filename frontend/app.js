@@ -129,7 +129,6 @@ function connectAdminWebSocket() {
         adminWebSocket.onopen = () => {
             console.log('Admin WebSocket conectado');
             wsReconnectAttempts = 0;
-            notifications.show('Conexión en tiempo real activada', 'success', 3000);
         };
         
         adminWebSocket.onmessage = (event) => {
@@ -196,7 +195,6 @@ function handleAdminWebSocketMessage(message) {
     switch (message.type) {
         case 'attendance_registered':
             loadAforoData();
-            notifications.show(`Nueva asistencia: ${message.data.code} - ${message.data.name}`, 'info', 5000);
             addActivityLog(`Nueva asistencia: ${message.data.code} - ${message.data.name}`, 'success');
             break;
         case 'vote_registered':
@@ -343,7 +341,17 @@ function logout() {
 
     showScreen('welcome-screen');
     notifications.show('Sesión cerrada correctamente', 'info');
+    stopUsersRefreshInterval();
 }
+
+// Funciones globales para modales
+window.processDeleteCode = processDeleteCode;
+window.closeParticipantsModal = () => {
+    delete window.changePage;
+    delete window.filterParticipants;
+    delete window.closeParticipantsModal;
+    modals.hide();
+};
 
 // ================================
 // FUNCIONES DE ACCESO (LÓGICA ORIGINAL)
@@ -388,9 +396,7 @@ async function registerAttendance() {
         return;
     }
 
-    try {
-        notifications.show('Verificando código...', 'info');
-        
+    try {        
         // Verificar que hay participantes en la base
         const dbCheck = await apiCall('/auth/check-database');
         if (!dbCheck.has_participants) {
@@ -479,8 +485,6 @@ async function accessVoting() {
     }
 
     try {
-        notifications.show('Verificando acceso a votaciones...', 'info');
-        
         // Verificar que hay participantes en la base
         const dbCheck = await apiCall('/auth/check-database');
         if (!dbCheck.has_participants) {
@@ -571,8 +575,6 @@ async function validateAdminCredentials() {
     }
 
     try {
-        notifications.show('Verificando credenciales...', 'info');
-        
         const formData = new URLSearchParams();
         formData.append('username', username);
         formData.append('password', password);
@@ -591,7 +593,6 @@ async function validateAdminCredentials() {
         
         modals.hide();
         await showAdminScreen();
-        notifications.show('Acceso de administrador autorizado', 'success');
     } catch (error) {
         notifications.show(`Error: ${error.message}`, 'error');
     }
@@ -714,6 +715,24 @@ async function showVoterScreen() {
     }
     
     await loadVotingQuestions();
+
+    // Iniciar actualización de timers
+    if (!window.timerInterval) {
+        window.timerInterval = setInterval(updateTimers, 1000);
+    }
+
+    function updateTimers() {
+        document.querySelectorAll('.question-timer').forEach(timer => {
+            const remaining = parseInt(timer.getAttribute('data-remaining'));
+            if (remaining > 0) {
+                const newRemaining = remaining - 1;
+                timer.setAttribute('data-remaining', newRemaining);
+                const minutes = Math.floor(newRemaining / 60);
+                const seconds = newRemaining % 60;
+                timer.textContent = `⏰ ${minutes}:${String(seconds).padStart(2, '0')} restantes`;
+            }
+        });
+    }
 }
 
 async function loadVotingQuestions() {
@@ -851,8 +870,6 @@ async function voteYesNo(questionId, answer) {
     }
 
     try {
-        notifications.show('Registrando voto...', 'info');
-        
         await apiCall('/voting/vote', {
             method: 'POST',
             body: JSON.stringify({
@@ -961,8 +978,6 @@ async function submitMultipleVote(questionId) {
     }
 
     try {
-        notifications.show('Registrando votos...', 'info');
-        
         await apiCall('/voting/vote', {
             method: 'POST',
             body: JSON.stringify({
@@ -1063,6 +1078,7 @@ function showConjuntoModal() {
                 notifications.show(`Error: ${error.message}`, 'error');
             }
         };
+        window.processDeleteCode = processDeleteCode;
     });
 }
 
@@ -1183,6 +1199,9 @@ async function loadAdminData() {
         refreshConnectedUsers(),
         loadParticipantsStatus()
     ]);
+    
+    // Iniciar actualización automática de usuarios conectados
+    startUsersRefreshInterval();
 }
 
 async function loadParticipantsStatus() {
@@ -1337,7 +1356,78 @@ function renderActiveQuestions(questions) {
         return;
     }
 
-    container.innerHTML = questions.map(q => AdminComponents.createActiveVotingCard(q)).join('');
+    container.innerHTML = questions.map(q => {
+        const typeText = q.type === 'yesno' ? 'Sí/No' : 
+                        (q.allow_multiple ? 'Selección múltiple' : 'Selección única');
+        
+        return `
+            <div class="voting-card admin-card" data-question-id="${q.id}">
+                <div class="voting-header">
+                    <div class="voting-title">${q.text}</div>
+                    <div class="voting-status ${q.closed ? 'closed' : 'open'}">
+                        ${q.closed ? '🔒 Cerrada' : '🟢 Abierta'}
+                    </div>
+                </div>
+                
+                <div class="voting-meta">
+                    <div class="meta-item">
+                        <span>📊</span>
+                        <span>Tipo: ${typeText}</span>
+                    </div>
+                    <div class="meta-item">
+                        <span>🗳️</span>
+                        <span>Votos: <span class="vote-count" data-question-id="${q.id}">0</span></span>
+                    </div>
+                    <div class="meta-item">
+                        <span>⏱️</span>
+                        <span>Estado: ${q.closed ? 'Finalizada' : 'En progreso'}</span>
+                    </div>
+                    ${q.time_limit_minutes ? `
+                        <div class="meta-item">
+                            <span>⏰</span>
+                            <span>Tiempo límite: ${q.time_limit_minutes} min</span>
+                        </div>
+                    ` : ''}
+                </div>
+
+                <div class="voting-options-preview">
+                    <h4>Opciones:</h4>
+                    <div class="options-tags">
+                        ${q.options ? q.options.map(opt => 
+                            `<span class="option-tag">${opt.text || opt.option_text}</span>`
+                        ).join('') : ''}
+                    </div>
+                </div>
+
+                <div class="voting-actions">
+                    <button class="btn ${q.closed ? 'btn-success' : 'btn-warning'}" 
+                            onclick="toggleVotingStatus(${q.id})">
+                        ${q.closed ? '▶️ Abrir' : '⏸️ Cerrar'}
+                    </button>
+                    
+                    <button class="btn btn-info" onclick="viewVotingResults(${q.id})">
+                        📊 Ver Resultados
+                    </button>
+
+                    ${!q.closed && q.expires_at ? `
+                        <button class="btn btn-warning" onclick="showExtendTimeModal(${q.id}, '${q.text}')">
+                            ⏰ Extender Tiempo
+                        </button>
+                    ` : ''}
+                    
+                    ${q.closed ? `
+                        <button class="btn btn-secondary" onclick="editVoting(${q.id})">
+                            ✏️ Editar
+                        </button>
+                    ` : ''}
+                    
+                    <button class="btn btn-danger" onclick="deleteVoting(${q.id})">
+                        🗑️ Eliminar
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 async function updateVoteCountsForActiveQuestions() {
@@ -1367,9 +1457,7 @@ async function updateVoteCountsForActiveQuestions() {
 // ================================
 
 async function checkParticipants() {
-    try {
-        notifications.show('Verificando participantes...', 'info');
-        
+    try {        
         const response = await apiCall('/participants/', {
             headers: {
                 'Authorization': `Bearer ${adminToken}`
@@ -1390,7 +1478,6 @@ async function checkParticipants() {
             statusText.textContent = `${response.length} participantes registrados`;
             
             showParticipantsModal(`${response.length} participantes encontrados`, response);
-            notifications.show(`✅ ${response.length} participantes verificados`, 'success');
         }
     } catch (error) {
         const statusCircle = document.getElementById('status-circle');
@@ -1409,12 +1496,11 @@ function showParticipantsModal(title, participants) {
     let filteredParticipants = [...participants];
     
     function renderPage() {
-        // Ordenar por presente primero, luego por código
         const sortedParticipants = [...filteredParticipants].sort((a, b) => {
             if (a.present !== b.present) {
-                return b.present - a.present; // Presentes primero
+                return b.present - a.present;
             }
-            return a.code.localeCompare(b.code); // Luego por código
+            return a.code.localeCompare(b.code);
         });
         
         const startIndex = (currentPage - 1) * participantsPerPage;
@@ -1448,7 +1534,7 @@ function showParticipantsModal(title, participants) {
                         <span style="font-weight: 600;">${p.code}</span>
                         <span style="overflow: hidden; text-overflow: ellipsis;">${p.name || 'Sin nombre'}</span>
                         <span style="color: var(--primary-color); font-weight: 500; text-align: right;">${p.coefficient || 0}%</span>
-                        <button class="btn btn-info" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="showVoterManagementModal('${p.code}')">
+                        <button class="btn btn-info" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="showVoterManagementModal('${p.code}'); modals.hide();">
                             👤 Gestionar
                         </button>
                     </div>
@@ -1472,6 +1558,13 @@ function showParticipantsModal(title, participants) {
                 ${renderPage()}
             </div>
         `,
+        actions: [
+            {
+                text: 'Cerrar',
+                class: 'btn-secondary',
+                handler: 'closeParticipantsModal()'
+            }
+        ]
     });
     
     // Funciones locales del modal
@@ -1497,13 +1590,11 @@ function showParticipantsModal(title, participants) {
         document.getElementById('participants-content').innerHTML = renderPage();
     };
     
-    // Limpiar funciones globales al cerrar el modal
-    const originalHide = modals.hide.bind(modals);
-    modals.hide = () => {
+    window.closeParticipantsModal = () => {
         delete window.changePage;
         delete window.filterParticipants;
-        modals.hide = originalHide;
-        originalHide();
+        delete window.closeParticipantsModal;
+        modals.hide();
     };
 }
 
@@ -1707,8 +1798,6 @@ async function createNewVoting() {
     }
 
     try {
-        notifications.show('Creando votación...', 'info');
-        
         await apiCall('/voting/questions', {
             method: 'POST',
             body: JSON.stringify(questionData)
@@ -1880,8 +1969,6 @@ async function extendVotingTime(questionId) {
     }
     
     try {
-        notifications.show('Extendiendo tiempo...', 'info');
-        
         await apiCall(`/voting/questions/${questionId}/extend-time`, {
             method: 'PUT',
             body: JSON.stringify({ extra_minutes: minutes })
@@ -1937,8 +2024,6 @@ async function sendBroadcastMessage() {
     }
     
     try {
-        notifications.show('Enviando mensaje...', 'info');
-        
         const response = await apiCall('/admin/broadcast-message', {
             method: 'POST',
             body: JSON.stringify({
@@ -2051,8 +2136,6 @@ function showEditVotingModal(question) {
         }
         
         try {
-            notifications.show('Guardando cambios...', 'info');
-            
             await apiCall(`/voting/questions/${questionId}`, {
                 method: 'PUT',
                 body: JSON.stringify(updateData)
@@ -2083,45 +2166,51 @@ function showDeleteCodeModal() {
             <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Código a eliminar:</label>
             <input type="text" id="delete-code-input" class="modal-input" placeholder="1-201" 
                 style="text-transform: uppercase; margin-bottom: 1.5rem;">
-            
-            <div style="display: flex; gap: 1rem; justify-content: center;">
-                <button class="btn btn-secondary" onclick="modals.hide()">Cancelar</button>
-                <button class="btn btn-danger" onclick="confirmDeleteCode()">Eliminar</button>
-            </div>
-        `
+        `,
+        actions: [
+            {
+                text: 'Cancelar',
+                class: 'btn-secondary',
+                handler: 'modals.hide()'
+            },
+            {
+                text: 'Eliminar',
+                class: 'btn-danger',
+                handler: 'processDeleteCode()'
+            }
+        ]
     });
+}
+
+async function processDeleteCode() {
+    const code = document.getElementById('delete-code-input').value.trim().toUpperCase();
     
-    window.confirmDeleteCode = async () => {
-        const code = document.getElementById('delete-code-input').value.trim().toUpperCase();
+    if (!code || !Utils.validateCode(code)) {
+        notifications.show('Formato de código inválido. Use formato Torre-Apto (ej: 1-201)', 'error');
+        return;
+    }
+    
+    const confirmed = await modals.confirm(
+        `¿Eliminar registro del código ${code}?\n\nEsta acción no se puede deshacer.`,
+        'Confirmar eliminación'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+        notifications.show('Eliminando registro...', 'info');
         
-        if (!code || !Utils.validateCode(code)) {
-            notifications.show('Formato de código inválido. Use formato Torre-Apto (ej: 1-201)', 'error');
-            return;
-        }
+        await apiCall(`/admin/delete-code/${code}`, {
+            method: 'DELETE'
+        });
         
-        const confirmed = await modals.confirm(
-            `¿Eliminar registro del código ${code}?\n\nEsta acción no se puede deshacer.`,
-            'Confirmar eliminación'
-        );
+        modals.hide();
+        await loadAforoData();
+        notifications.show(`Código ${code} eliminado correctamente`, 'success');
         
-        if (!confirmed) return;
-        
-        try {
-            notifications.show('Eliminando registro...', 'info');
-            
-            await apiCall(`/admin/delete-code/${code}`, {
-                method: 'DELETE'
-            });
-            
-            modals.hide();
-            delete window.confirmDeleteCode;
-            await loadAforoData();
-            notifications.show(`Código ${code} eliminado correctamente`, 'success');
-            
-        } catch (error) {
-            notifications.show(`Error: ${error.message}`, 'error');
-        }
-    };
+    } catch (error) {
+        notifications.show(`Error: ${error.message}`, 'error');
+    }
 }
 
 async function showVoterManagementModal(code) {
@@ -2314,8 +2403,6 @@ async function saveVoteEdit(code, questionId) {
 
 async function downloadReports() {
     try {
-        notifications.show('Generando archivos...', 'info');
-        
         // Generar PDF
         const pdfResponse = await apiCall('/participants/asistencia/pdf', {
             method: 'POST'
@@ -2371,8 +2458,6 @@ async function resetDatabase() {
     if (!confirmed) return;
 
     try {
-        notifications.show('Realizando reset completo...', 'info');
-        
         await apiCall('/voting/admin/reset', {method: 'DELETE'});
 
         // Limpiar estado local
@@ -2529,7 +2614,6 @@ function startTimerUpdates() {
                 const seconds = newRemaining % 60;
                 timer.textContent = `⏰ ${minutes}:${String(seconds).padStart(2, '0')} restantes`;
                 
-                // Cambiar color cuando quedan menos de 2 minutos
                 if (newRemaining < 120) {
                     timer.style.background = 'linear-gradient(135deg, var(--danger-color), var(--danger-dark))';
                     timer.style.animation = 'pulse 2s infinite';
@@ -2537,6 +2621,7 @@ function startTimerUpdates() {
             } else {
                 timer.textContent = '⏰ Tiempo agotado';
                 timer.style.background = 'linear-gradient(135deg, var(--danger-color), var(--danger-dark))';
+                loadVotingQuestions();
             }
         });
     }, 1000);
@@ -2796,8 +2881,6 @@ async function validateTestUserAdmin() {
     }
 
     try {
-        notifications.show('Verificando credenciales...', 'info');
-        
         // Verificar credenciales de admin
         const formData = new URLSearchParams();
         formData.append('username', username);
@@ -2858,5 +2941,24 @@ async function validateTestUserAdmin() {
         
     } catch (error) {
         notifications.show('Credenciales de administrador incorrectas', 'error');
+    }
+}
+
+let usersRefreshInterval = null;
+
+function startUsersRefreshInterval() {
+    if (usersRefreshInterval) return;
+    
+    usersRefreshInterval = setInterval(async () => {
+        if (isAdmin && document.querySelector('.tab-button[data-tab="configuracion"].active')) {
+            await refreshConnectedUsers();
+        }
+    }, 2000); 
+}
+
+function stopUsersRefreshInterval() {
+    if (usersRefreshInterval) {
+        clearInterval(usersRefreshInterval);
+        usersRefreshInterval = null;
     }
 }
