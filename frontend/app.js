@@ -900,8 +900,12 @@ async function loadConjuntoName() {
         if (currentUser.code === CODIGO_PRUEBA) {
             conjuntoElement.textContent = '🧪 MODO DEMOSTRACIÓN';
         } else {
-            const conjuntoData = await apiCall('/participants/conjunto/nombre');
-            conjuntoElement.textContent = conjuntoData?.nombre || 'Conjunto Residencial';
+            try {
+                const conjuntoData = await apiCall('/participants/conjunto/nombre/public');
+                conjuntoElement.textContent = conjuntoData?.nombre || 'Conjunto Residencial';
+            } catch (error) {
+                conjuntoElement.textContent = 'Conjunto Residencial';
+            }
         }
     } catch (error) {
         console.log('No se pudo cargar nombre del conjunto');
@@ -975,63 +979,43 @@ function updateVotingTimers() {
         }
     });
 }
+
 function renderVotingQuestions(questions, votedQuestions = new Set()) {
     const container = document.getElementById('voting-questions');
     
     if (questions.length === 0) {
         container.innerHTML = `
-            <div class="panel">
-                <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
-                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 1rem; opacity: 0.5;">
-                        <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"></path>
-                        <path d="M9 7V3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path>
-                    </svg>
-                    <h3 style="margin-bottom: 0.5rem; color: var(--gray-700);">No hay votaciones activas</h3>
-                    <p>Espere a que el administrador active nuevas votaciones</p>
-                </div>
+            <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 1rem; opacity: 0.5;">
+                    <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"></path>
+                    <path d="M9 7V3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path>
+                </svg>
+                <h3 style="margin-bottom: 0.5rem; color: var(--gray-700);">No hay votaciones activas</h3>
+                <p>Espere a que el administrador cree nuevas votaciones</p>
             </div>
         `;
         return;
     }
 
-    // Ordenar preguntas: abiertas primero por ID descendente (nuevas arriba), luego cerradas
-    const sortedQuestions = [...questions].sort((a, b) => {
-        if (a.closed === b.closed) {
-            return b.id - a.id; // Nuevas primero
-        }
-        return a.closed ? 1 : -1;
-    });
+    console.log('Renderizando', questions.length, 'preguntas');
+    
+    // Iniciar timer si hay preguntas con tiempo
+    const hasTimedQuestions = questions.some(q => q.time_remaining_seconds > 0);
+    if (hasTimedQuestions && !window.timerInterval) {
+        window.timerInterval = setInterval(updateVotingTimers, 1000);
+    }
 
-    let html = '';
-    sortedQuestions.forEach(question => {
-        const hasVoted = votedQuestions.has(question.id);
+    const questionsHTML = questions.map(question => {
+        const userVoted = votedQuestions.has(question.id);
         
-        if (hasVoted) {
-            // Mostrar que ya votó
-            html += VotingComponents.createVotedStatus(question, 'Registrado');
-        } else if (question.closed) {
-            // Votación cerrada
-            html += `
-                <div class="voting-card">
-                    <div class="question-header">
-                        <div class="question-title">${question.text}</div>
-                    </div>
-                    <div class="voted-status" style="background: linear-gradient(145deg, #fef2f2, #fecaca); border-color: var(--danger-color); color: var(--danger-dark);">
-                        🔒 Esta votación ha sido cerrada
-                    </div>
-                </div>
-            `;
+        if (question.type === 'yesno') {
+            return VotingComponents.createYesNoVoting(question, userVoted);
         } else {
-            // Votación activa
-            if (question.type === 'yesno') {
-                html += VotingComponents.createYesNoVoting(question);
-            } else {
-                html += VotingComponents.createMultipleVoting(question);
-            }
+            return VotingComponents.createMultipleVoting(question, userVoted);
         }
-    });
+    }).join('');
 
-    container.innerHTML = html;
+    container.innerHTML = questionsHTML;
 }
 
 async function checkUserVotes() {
@@ -1053,22 +1037,6 @@ async function checkUserVotes() {
 // ================================
 
 async function voteYesNo(questionId, answer) {
-    if (currentUser && currentUser.code === CODIGO_PRUEBA) {
-        notifications.show(`Voto demo registrado: ${answer}`, 'success');
-        
-        // Simular que ya votó - cambiar solo esa votación específica
-        setTimeout(() => {
-            const votingCard = document.querySelector(`[data-question-id="${questionId}"]`);
-            if (votingCard) {
-                votingCard.innerHTML = VotingComponents.createVotedStatus({
-                    id: questionId,
-                    text: votingCard.querySelector('.question-title').textContent
-                }, answer);
-            }
-        }, 1000);
-        return;
-    }
-
     try {
         await apiCall('/voting/vote', {
             method: 'POST',
@@ -1077,15 +1045,29 @@ async function voteYesNo(questionId, answer) {
                 answer: answer
             })
         });
-
-        await loadVotingQuestions();
-        notifications.show(`Voto registrado: ${answer}`, 'success');
+        
+        notifications.show('Voto registrado correctamente', 'success');
+        await loadVotingQuestions(); // Recargar para mostrar estado actualizado
+        
     } catch (error) {
-        if (error.message.includes('Ya has votado')) {
-            notifications.show('Ya has votado en esta pregunta', 'error');
-        } else {
-            notifications.show(`Error: ${error.message}`, 'error');
-        }
+        notifications.show(`Error: ${error.message}`, 'error');
+    }
+}
+
+async function deleteVoting(questionId) {
+    const confirmed = await modals.confirm(
+        '¿Está seguro de que desea eliminar esta votación? Esta acción no se puede deshacer.',
+        'Confirmar eliminación'
+    );
+    
+    if (!confirmed) return;
+    
+    try {
+        await apiCall(`/voting/questions/${questionId}`, { method: 'DELETE' });
+        await loadActiveQuestions();
+        notifications.show('Votación eliminada correctamente', 'success');
+    } catch (error) {
+        notifications.show(`Error: ${error.message}`, 'error');
     }
 }
 

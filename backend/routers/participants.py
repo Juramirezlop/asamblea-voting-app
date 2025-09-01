@@ -70,6 +70,22 @@ def obtener_nombre_conjunto():
     finally:
         close_db(conn)
 
+# Obtener nombre conjunto (público)
+@router.get("/conjunto/nombre/public")
+def obtener_nombre_conjunto_publico():
+    """Endpoint público para obtener el nombre del conjunto"""
+    conn = get_db()
+    try:
+        result = execute_query(
+            conn,
+            "SELECT value FROM config WHERE key = ?",
+            ("conjunto_nombre",),
+            fetchone=True
+        )
+        return {"nombre": result["value"] if result and result["value"] else "Conjunto Residencial"}
+    finally:
+        close_db(conn)
+
 # Carga masiva desde JSON (formato que genera tu script: { "ASM-101": {...}, ... })
 @router.post("/bulk", dependencies=[Depends(admin_required)])
 async def agregar_participantes(data: Dict[str, dict]):
