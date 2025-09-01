@@ -480,21 +480,32 @@ class AdminComponents {
                 <div class="form-section">
                     <h3>⏰ Tiempo Límite</h3>
                     
-                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
-                        <input type="checkbox" id="enable-timer" style="transform: scale(1.2);">
-                        <label for="enable-timer" style="font-weight: 500;">Establecer tiempo límite para esta votación</label>
-                    </div>
-                    
-                    <div id="timer-config" style="display: none; padding: 1rem; background: rgba(245, 158, 11, 0.1); border-radius: 8px;">
-                        <label class="form-label">Minutos disponibles para votar:</label>
-                        <input type="number" id="time-limit-minutes" class="form-input" 
-                               value="15" min="1" max="180" style="width: 120px;">
-                        <p style="color: var(--gray-600); font-size: 0.9rem; margin-top: 0.5rem;">
-                            La votación se cerrará automáticamente después de este tiempo
-                        </p>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: start;">
+                        <div>
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">¿Establecer límite de tiempo?</label>
+                            <div style="display: flex; gap: 0.5rem;">
+                                <button type="button" id="timer-no-btn" class="timer-toggle-btn active" data-enabled="false"
+                                        style="flex: 1; padding: 0.75rem; border: 2px solid var(--gray-400); border-radius: 8px; background: var(--gray-100); font-weight: 600; cursor: pointer;">
+                                    No
+                                </button>
+                                <button type="button" id="timer-yes-btn" class="timer-toggle-btn" data-enabled="true"
+                                        style="flex: 1; padding: 0.75rem; border: 2px solid var(--gray-400); border-radius: 8px; background: white; font-weight: 600; cursor: pointer;">
+                                    Sí
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div id="timer-minutes-container" style="opacity: 0.5; pointer-events: none;">
+                            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Minutos disponibles:</label>
+                            <input type="number" id="time-limit-minutes" style="width: 100%; padding: 0.75rem; border: 2px solid var(--gray-300); border-radius: 8px; text-align: center; font-size: 1.1rem; font-weight: 600;" 
+                                   value="15" min="1" max="180">
+                            <p style="color: var(--gray-600); font-size: 0.85rem; margin-top: 0.5rem; text-align: center;">
+                                La votación se cerrará automáticamente
+                            </p>
+                        </div>
                     </div>
                 </div>
-
+                
                 <!-- Configuración para Múltiples Opciones -->
                 <div class="selection-config" id="multiple-config">
                     <h3>⚙️ Configuración de Selección</h3>

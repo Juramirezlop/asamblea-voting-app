@@ -1016,6 +1016,53 @@ function renderVotingQuestions(questions, votedQuestions = new Set()) {
     }).join('');
 
     container.innerHTML = questionsHTML;
+    setTimeout(initializeVotingTimer, 100);
+}
+
+function initializeVotingTimer() {
+    if (window.timerInterval) {
+        clearInterval(window.timerInterval);
+    }
+    
+    const timers = document.querySelectorAll('.question-timer[data-remaining]');
+    if (timers.length > 0) {
+        window.timerInterval = setInterval(() => {
+            let activeTimers = 0;
+            
+            timers.forEach(timer => {
+                const remaining = parseInt(timer.getAttribute('data-remaining'));
+                if (remaining > 0) {
+                    activeTimers++;
+                    const newRemaining = remaining - 1;
+                    timer.setAttribute('data-remaining', newRemaining);
+                    
+                    const minutes = Math.floor(newRemaining / 60);
+                    const seconds = newRemaining % 60;
+                    timer.textContent = `⏰ ${minutes}:${String(seconds).padStart(2, '0')} restantes`;
+                    
+                    if (newRemaining < 60) {
+                        timer.style.background = 'linear-gradient(135deg, var(--danger-color), var(--danger-dark))';
+                        timer.style.animation = 'pulse 2s infinite';
+                    }
+                } else if (remaining === 0) {
+                    timer.textContent = '⏰ Tiempo agotado';
+                    timer.style.background = 'linear-gradient(135deg, var(--danger-color), var(--danger-dark))';
+                    timer.style.animation = 'pulse 2s infinite';
+                    
+                    // Recargar preguntas cuando expire
+                    setTimeout(() => {
+                        if (typeof loadVotingQuestions === 'function') loadVotingQuestions();
+                        if (typeof loadActiveQuestions === 'function') loadActiveQuestions();
+                    }, 1000);
+                }
+            });
+            
+            if (activeTimers === 0) {
+                clearInterval(window.timerInterval);
+                window.timerInterval = null;
+            }
+        }, 1000);
+    }
 }
 
 async function checkUserVotes() {
@@ -1055,19 +1102,26 @@ async function voteYesNo(questionId, answer) {
 }
 
 async function deleteVoting(questionId) {
-    const confirmed = await modals.confirm(
-        '¿Está seguro de que desea eliminar esta votación? Esta acción no se puede deshacer.',
-        'Confirmar eliminación'
-    );
-    
-    if (!confirmed) return;
-    
     try {
-        await apiCall(`/voting/questions/${questionId}`, { method: 'DELETE' });
-        await loadActiveQuestions();
-        notifications.show('Votación eliminada correctamente', 'success');
+        const confirmed = await modals.confirm(
+            '¿Eliminar esta votación?\n\nSe borrarán también todos los votos registrados.',
+            'Confirmar eliminación'
+        );
+        
+        if (!confirmed) return;
+        
+        try {
+            await apiCall(`/voting/questions/${questionId}`, { method: 'DELETE' });
+            await loadActiveQuestions();
+            notifications.show('Votación eliminada correctamente', 'success');
+        } catch (error) {
+            console.error('Error eliminando votación:', error);
+            notifications.show(`Error al eliminar: ${error.message}`, 'error');
+        }
+        
     } catch (error) {
-        notifications.show(`Error: ${error.message}`, 'error');
+        console.error('Error con modal de confirmación:', error);
+        notifications.show('Error en la confirmación', 'error');
     }
 }
 
@@ -1343,6 +1397,36 @@ function setupVotingFormListeners() {
     document.getElementById('enable-timer').addEventListener('change', (e) => {
         const timerConfig = document.getElementById('timer-config');
         timerConfig.style.display = e.target.checked ? 'block' : 'none';
+    });
+
+    // Timer toggle buttons
+    document.querySelectorAll('.timer-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const enabled = e.target.getAttribute('data-enabled') === 'true';
+            
+            // Actualizar estados de botones
+            document.querySelectorAll('.timer-toggle-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = 'white';
+                b.style.borderColor = 'var(--gray-400)';
+                b.style.color = 'var(--gray-700)';
+            });
+            
+            e.target.classList.add('active');
+            e.target.style.background = enabled ? 'var(--warning-color)' : 'var(--gray-100)';
+            e.target.style.borderColor = enabled ? 'var(--warning-color)' : 'var(--gray-400)';
+            e.target.style.color = enabled ? 'white' : 'var(--gray-700)';
+            
+            // Mostrar/ocultar input de minutos
+            const minutesContainer = document.getElementById('timer-minutes-container');
+            if (enabled) {
+                minutesContainer.style.opacity = '1';
+                minutesContainer.style.pointerEvents = 'auto';
+            } else {
+                minutesContainer.style.opacity = '0.5';
+                minutesContainer.style.pointerEvents = 'none';
+            }
+        });
     });
 }
 
@@ -2012,8 +2096,8 @@ async function createNewVoting() {
     }
 
     // Verificar tiempo límite PARA AMBOS TIPOS (yesno y multiple)
-    const enableTimer = document.getElementById('enable-timer').checked;
-    if (enableTimer) {
+    const timerEnabled = document.querySelector('.timer-toggle-btn.active').getAttribute('data-enabled') === 'true';
+    if (timerEnabled) {
         const timeLimit = parseInt(document.getElementById('time-limit-minutes').value);
         if (timeLimit && timeLimit > 0) {
             questionData.time_limit_minutes = timeLimit;
@@ -2388,31 +2472,79 @@ function showEditVotingModal(question) {
 // FUNCIONES DE CONFIGURACIÓN
 // ================================
 
-function showDeleteCodeModal() {
-    modals.show({
-        title: '🚫 Eliminar Código',
-        content: `
-            <p style="color: var(--gray-700); margin-bottom: 1rem; text-align: center;">
-                Esta acción eliminará el registro de asistencia del código especificado.
-            </p>
-            
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Código a eliminar:</label>
-            <input type="text" id="delete-code-input" class="modal-input" placeholder="1-201" 
-                style="text-transform: uppercase; margin-bottom: 1.5rem;">
-        `,
-        actions: [
-            {
-                text: 'Cancelar',
-                class: 'btn-secondary',
-                handler: 'modals.hide()'
-            },
-            {
-                text: 'Eliminar',
-                class: 'btn-danger',
-                handler: 'window.processDeleteCode()'
-            }
-        ]
-    });
+async function showDeleteCodeModal() {
+    try {
+        // Obtener lista de participantes registrados
+        const participants = await apiCall('/participants/');
+        const registeredUsers = participants.filter(p => p.present);
+        
+        const usersList = registeredUsers.length > 0 ? 
+            registeredUsers.map(user => `
+                <div style="display: flex; justify-content: space-between; padding: 0.5rem; border: 1px solid var(--gray-300); border-radius: 6px; margin-bottom: 0.25rem; background: white;">
+                    <span><strong>${user.code}</strong> - ${user.name}</span>
+                    <button onclick="document.getElementById('delete-code-input').value='${user.code}'" 
+                            style="background: var(--primary-color); color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">
+                        Seleccionar
+                    </button>
+                </div>
+            `).join('') : 
+            '<p style="color: var(--gray-600); text-align: center;">No hay usuarios registrados</p>';
+
+        modals.show({
+            title: '🚫 Eliminar Código',
+            content: `
+                <p style="color: var(--gray-700); margin-bottom: 1rem; text-align: center;">
+                    Esta acción eliminará el registro de asistencia del código especificado.
+                </p>
+                
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Código a eliminar:</label>
+                <input type="text" id="delete-code-input" class="modal-input" placeholder="1-201" 
+                    style="text-transform: uppercase; margin-bottom: 1rem;">
+                
+                <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--gray-300); border-radius: 8px; padding: 0.5rem;">
+                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--gray-700);">Usuarios Registrados:</h4>
+                    ${usersList}
+                </div>
+            `,
+            actions: [
+                {
+                    text: 'Cancelar',
+                    class: 'btn-secondary',
+                    handler: 'modals.hide()'
+                },
+                {
+                    text: 'Eliminar',
+                    class: 'btn-danger',
+                    handler: 'window.processDeleteCode()'
+                }
+            ]
+        });
+    } catch (error) {
+        // Fallback si no puede cargar la lista
+        modals.show({
+            title: '🚫 Eliminar Código',
+            content: `
+                <p style="color: var(--gray-700); margin-bottom: 1rem; text-align: center;">
+                    Esta acción eliminará el registro de asistencia del código especificado.
+                </p>
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Código a eliminar:</label>
+                <input type="text" id="delete-code-input" class="modal-input" placeholder="1-201" 
+                    style="text-transform: uppercase; margin-bottom: 1.5rem;">
+            `,
+            actions: [
+                {
+                    text: 'Cancelar',
+                    class: 'btn-secondary',
+                    handler: 'modals.hide()'
+                },
+                {
+                    text: 'Eliminar',
+                    class: 'btn-danger',
+                    handler: 'window.processDeleteCode()'
+                }
+            ]
+        });
+    }
 }
 
 async function processDeleteCode() {
