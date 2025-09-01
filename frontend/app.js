@@ -52,6 +52,36 @@ window.addEventListener('beforeunload', (e) => {
 console.log('🗳️ Sistema de Votación inicializado correctamente');
 
 // ================================
+// FUNCIONES GLOBALES PARA MODALES
+// ================================
+window.processDeleteCode = async function() {
+    const code = document.getElementById('delete-code-input').value.trim().toUpperCase();
+    
+    if (!code || !Utils.validateCode(code)) {
+        notifications.show('Formato de código inválido', 'error');
+        return;
+    }
+    
+    try {
+        await apiCall(`/admin/delete-code/${code}`, { method: 'DELETE' });
+        modals.hide();
+        await loadAforoData();
+        await refreshConnectedUsers(); // Actualizar usuarios conectados
+        notifications.show(`Código ${code} eliminado`, 'success');
+    } catch (error) {
+        notifications.show(`Error: ${error.message}`, 'error');
+    }
+};
+
+window.modalResolvePower = function(isPower) {
+    modals.hide();
+    if (window.powerResolveCallback) {
+        window.powerResolveCallback(isPower);
+        delete window.powerResolveCallback;
+    }
+};
+
+// ================================
 // GESTIÓN DE TOKENS (LÓGICA ORIGINAL)
 // ================================
 
@@ -622,6 +652,8 @@ function showAttendanceModal(userData) {
 
 function showPowerQuestion() {
     return new Promise((resolve) => {
+        window.powerResolveCallback = resolve;
+        
         modals.show({
             title: 'Información del Apartamento',
             content: `
@@ -637,12 +669,6 @@ function showPowerQuestion() {
             `,
             closable: false
         });
-        
-        window.modalResolvePower = (isPower) => {
-            modals.hide();
-            delete window.modalResolvePower;
-            resolve(isPower);
-        };
     });
 }
 
@@ -1490,6 +1516,13 @@ async function checkParticipants() {
     }
 }
 
+window.closeParticipantsModal = function() {
+    delete window.changePage;
+    delete window.filterParticipants;
+    delete window.closeParticipantsModal;
+    modals.hide();
+};
+
 function showParticipantsModal(title, participants) {
     const participantsPerPage = 25;
     let currentPage = 1;
@@ -1588,13 +1621,6 @@ function showParticipantsModal(title, participants) {
         }
         currentPage = 1;
         document.getElementById('participants-content').innerHTML = renderPage();
-    };
-    
-    window.closeParticipantsModal = () => {
-        delete window.changePage;
-        delete window.filterParticipants;
-        delete window.closeParticipantsModal;
-        modals.hide();
     };
 }
 
@@ -2176,7 +2202,7 @@ function showDeleteCodeModal() {
             {
                 text: 'Eliminar',
                 class: 'btn-danger',
-                handler: 'processDeleteCode()'
+                handler: 'window.processDeleteCode()'
             }
         ]
     });
@@ -2206,6 +2232,7 @@ async function processDeleteCode() {
         
         modals.hide();
         await loadAforoData();
+        await refreshConnectedUsers();
         notifications.show(`Código ${code} eliminado correctamente`, 'success');
         
     } catch (error) {
@@ -2723,10 +2750,16 @@ function startMonitoring() {
     if (monitoringInterval) return;
     
     monitoringInterval = setInterval(async () => {
-        if (isAdmin && document.querySelector('.tab-button[data-tab="monitoreo"].active')) {
-            await refreshServerStatus();
+        if (isAdmin) {
+            const activeTab = document.querySelector('.tab-button.active');
+            if (activeTab && activeTab.getAttribute('data-tab') === 'monitoreo') {
+                await refreshServerStatus();
+            }
+            if (activeTab && activeTab.getAttribute('data-tab') === 'configuracion') {
+                await refreshConnectedUsers();
+            }
         }
-    }, 5000); // Actualizar cada 5 segundos
+    }, 3000);
 }
 
 function stopMonitoring() {
