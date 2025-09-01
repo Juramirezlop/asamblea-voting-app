@@ -16,6 +16,7 @@ let wsReconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 5;
 let updateInterval = null;
 let lastUpdateTimestamp = 0;
+let loadActiveQuestionsTimeout = null;
 
 // ================================
 // MANEJO DE ERRORES GLOBALES
@@ -222,6 +223,8 @@ function connectVoterWebSocket(voterCode) {
 }
 
 function handleAdminWebSocketMessage(message) {
+    console.log('Admin WebSocket mensaje:', message.type); // Debug
+    
     switch (message.type) {
         case 'attendance_registered':
             loadAforoData();
@@ -229,11 +232,16 @@ function handleAdminWebSocketMessage(message) {
             break;
         case 'vote_registered':
             loadAforoData();
-            loadActiveQuestions();
+            // NO recargar preguntas aquí, solo actualizar conteos
+            updateVoteCountsForActiveQuestions();
             addActivityLog(`Voto registrado: ${message.data.participant_code}`, 'info');
             break;
         case 'question_created':
-            loadActiveQuestions();
+            // Solo recargar si estamos en la tab de votaciones
+            const activeTab = document.querySelector('.tab-button.active');
+            if (activeTab && activeTab.getAttribute('data-tab') === 'votaciones') {
+                loadActiveQuestions();
+            }
             notifications.show('Nueva votación creada', 'success', 4000);
             addActivityLog('Nueva votación creada', 'success');
             break;
@@ -250,6 +258,8 @@ function handleAdminWebSocketMessage(message) {
         case 'notification':
             notifications.show(message.data.text || 'Notificación del sistema', message.data.type || 'info', message.data.duration || 5000);
             break;
+        default:
+            console.log('Mensaje WebSocket no manejado:', message.type);
     }
 }
 
@@ -396,7 +406,7 @@ async function registerAttendance() {
     }
 
     if (code === CODIGO_PRUEBA) {
-        // Modal para usuario de prueba
+        // Usuario de prueba - solo mostrar info
         modals.show({
             title: '🧪 Registro de Demostración',
             content: `
@@ -415,18 +425,18 @@ async function registerAttendance() {
                     </p>
                 </div>
             `,
-            actions: [
-                {
-                    text: 'Entendido',
-                    class: 'btn-info',
-                    handler: 'modals.hide()'
-                }
-            ]
+            actions: [{
+                text: 'Entendido',
+                class: 'btn-info',
+                handler: 'modals.hide()'
+            }]
         });
         return;
     }
 
     try {        
+        notifications.show('Verificando código...', 'info', 3000);
+        
         // Verificar que hay participantes en la base
         const dbCheck = await apiCall('/auth/check-database');
         if (!dbCheck.has_participants) {
@@ -441,10 +451,67 @@ async function registerAttendance() {
             return;
         }
         
+        // Obtener info del participante para mostrar en modal
+        const participantInfo = await apiCall(`/participants/info/${code}`);
+        
+        // Mostrar modal de confirmación ANTES de registrar
+        showAttendanceConfirmModal(participantInfo);
+        
+    } catch (error) {
+        console.error('Error en registro:', error);
+        
+        if (error.message.includes('404') || error.message.includes('not found')) {
+            notifications.show('Su código no está registrado en el sistema. Consulte con la administración del conjunto.', 'error');
+        } else {
+            notifications.show(`Error: ${error.message}`, 'error');
+        }
+    }
+}
+
+function showAttendanceConfirmModal(participantInfo) {
+    modals.show({
+        title: '✅ Código Encontrado',
+        content: `
+            <div style="text-align: center; padding: 1rem;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">🏠</div>
+                <h3 style="color: var(--success-color); margin-bottom: 1rem;">Participante Verificado</h3>
+                
+                <div style="background: var(--gray-50); padding: 1.5rem; border-radius: 12px; margin: 1rem 0;">
+                    <p><strong>Código:</strong> ${participantInfo.code}</p>
+                    <p><strong>Nombre:</strong> ${participantInfo.name}</p>
+                    <p><strong>Coeficiente:</strong> ${participantInfo.coefficient}%</p>
+                </div>
+                
+                <p style="color: var(--gray-600); font-size: 0.9rem; margin-bottom: 1.5rem;">
+                    ¿Confirma que desea registrar su asistencia a la asamblea?
+                </p>
+            </div>
+        `,
+        actions: [
+            {
+                text: 'Cancelar',
+                class: 'btn-secondary',
+                handler: 'modals.hide()'
+            },
+            {
+                text: 'Confirmar Registro',
+                class: 'btn-success',
+                handler: `confirmAttendanceRegistration('${participantInfo.code}')`
+            }
+        ]
+    });
+}
+
+// Función global para el modal
+window.confirmAttendanceRegistration = async function(code) {
+    try {
+        modals.hide();
+        notifications.show('Registrando asistencia...', 'info', 3000);
+        
         // Preguntar tipo de participación
         const isPower = await showPowerQuestion();
         
-        // Registrar asistencia
+        // Hacer el registro real
         const response = await apiCall('/auth/register-attendance', {
             method: 'POST',
             body: JSON.stringify({ 
@@ -453,62 +520,57 @@ async function registerAttendance() {
             })
         });
 
-        console.log('Registro exitoso:', response); // Debug
+        console.log('Registro exitoso:', response);
         
-        // Actualizar currentUser globalmente para que accessVoting() lo encuentre
-        window.currentUser = {
+        // Configurar usuario global
+        window.currentUser = currentUser = {
             code: response.code,
             name: response.name,
             coefficient: response.coefficient,
             is_power: response.is_power
         };
 
-        // Mostrar modal de confirmación
+        // Modal de éxito
         modals.show({
-            title: '✅ Registro Exitoso',
+            title: '🎉 Registro Completado',
             content: `
                 <div style="text-align: center; padding: 1rem;">
-                    <div style="font-size: 3rem; margin-bottom: 1rem;">🎉</div>
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
                     <h3 style="color: var(--success-color); margin-bottom: 1rem;">Asistencia Registrada</h3>
                     
-                    <div style="background: var(--gray-50); padding: 1.5rem; border-radius: 12px; margin: 1rem 0;">
+                    <div style="background: var(--success-color); background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05)); padding: 1.5rem; border-radius: 12px; margin: 1rem 0; border: 1px solid var(--success-color);">
                         <p><strong>Código:</strong> ${response.code}</p>
                         <p><strong>Nombre:</strong> ${response.name}</p>
-                        <p><strong>Tipo:</strong> ${response.is_power ? 'Votación con Poder' : 'Propietario Directo'}</p>
+                        <p><strong>Tipo:</strong> ${response.is_power ? '📋 Votación con Poder' : '🏠 Propietario Directo'}</p>
                         <p><strong>Coeficiente:</strong> ${response.coefficient}%</p>
                     </div>
                     
                     <p style="color: var(--gray-600); font-size: 0.9rem;">
-                        Su código permanecerá en el campo para que pueda acceder fácilmente a las votaciones
+                        ¡Ya puede participar en las votaciones de la asamblea!
                     </p>
                 </div>
             `,
             actions: [
                 {
-                    text: 'Acceder a Votaciones Ahora',
-                    class: 'btn-success',
+                    text: 'Acceder a Votaciones',
+                    class: 'btn-success btn-large',
                     handler: 'modals.hide(); accessVoting();'
                 },
                 {
-                    text: 'Entendido',
-                    class: 'btn-secondary', 
+                    text: 'Cerrar',
+                    class: 'btn-secondary',
                     handler: 'modals.hide()'
                 }
             ]
         });
-
-    } catch (error) {
-        console.error('Error en registro:', error);
         
-        if (error.message.includes('404') || error.message.includes('not found')) {
-            notifications.show('Su código no está registrado en el sistema. Consulte con la administración del conjunto.', 'error');
-        } else if (error.message.includes('400') || error.message.includes('already registered')) {
-            notifications.show('Su asistencia ya fue registrada previamente.', 'warning');
-        } else {
-            notifications.show(`Error: ${error.message}`, 'error');
-        }
+        notifications.show('✅ Asistencia registrada correctamente', 'success');
+        
+    } catch (error) {
+        console.error('Error registrando asistencia:', error);
+        notifications.show(`Error en registro: ${error.message}`, 'error');
     }
-}
+};
 
 async function accessVoting() {
     const code = document.getElementById('access-code').value.trim().toUpperCase();
@@ -1270,14 +1332,16 @@ function showAdminTab(tabName) {
     if (targetTab && targetButton) {
         targetTab.classList.add('active');
         targetButton.classList.add('active');
-    } else {
-        console.error(`Tab ${tabName} not found`);
-        // Fallback: mostrar primera tab
-        const firstTab = document.querySelector('.tab-content');
-        const firstButton = document.querySelector('.tab-button');
-        if (firstTab && firstButton) {
-            firstTab.classList.add('active');
-            firstButton.classList.add('active');
+        
+        // Solo cargar datos cuando se activa la tab de votaciones
+        if (tabName === 'votaciones') {
+            setTimeout(() => loadActiveQuestions(), 100);
+        } else if (tabName === 'estado') {
+            setTimeout(() => loadAforoData(), 100);
+        } else if (tabName === 'configuracion') {
+            setTimeout(() => refreshConnectedUsers(), 100);
+        } else if (tabName === 'monitoreo') {
+            setTimeout(() => refreshServerStatus(), 100);
         }
     }
 }
@@ -1364,15 +1428,25 @@ async function loadAforoData() {
 }
 
 async function loadActiveQuestions() {
-    try {
-        const questions = await apiCall('/voting/questions/active');
-        renderActiveQuestions(questions);
-    } catch (error) {
-        console.error('Error loading questions:', error);
-        document.getElementById('active-questions').innerHTML = 
-            '<p style="color: var(--danger-color); padding: 1rem;">Error cargando preguntas activas</p>';
+    // Evitar llamadas múltiples
+    if (loadActiveQuestionsTimeout) {
+        clearTimeout(loadActiveQuestionsTimeout);
     }
-    await updateVoteCountsForActiveQuestions();
+    
+    loadActiveQuestionsTimeout = setTimeout(async () => {
+        try {
+            console.log('Cargando preguntas activas...'); // Debug
+            const questions = await apiCall('/voting/questions/active');
+            console.log('Preguntas obtenidas:', questions.length); // Debug
+            renderActiveQuestions(questions);
+            await updateVoteCountsForActiveQuestions();
+        } catch (error) {
+            console.error('Error loading questions:', error);
+            document.getElementById('active-questions').innerHTML = 
+                '<p style="color: var(--danger-color); padding: 1rem;">Error cargando preguntas activas</p>';
+        }
+        loadActiveQuestionsTimeout = null;
+    }, 300); // Throttle de 300ms
 }
 
 async function refreshConnectedUsers() {
