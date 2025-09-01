@@ -2009,19 +2009,19 @@ async function createNewVoting() {
 
         questionData.allow_multiple = allowMultiple;
         questionData.max_selections = maxSelections;
-
-        // Verificar tiempo límite
-        const enableTimer = document.getElementById('enable-timer').checked;
-        if (enableTimer) {
-            const timeLimit = parseInt(document.getElementById('time-limit-minutes').value);
-            if (timeLimit && timeLimit > 0) {
-                questionData.time_limit_minutes = timeLimit;
-            }
-        }
         
         if (maxSelections > options.length) {
             notifications.show('El máximo de selecciones no puede ser mayor al número de opciones', 'error');
             return;
+        }
+    }
+
+    // Verificar tiempo límite PARA AMBOS TIPOS (yesno y multiple)
+    const enableTimer = document.getElementById('enable-timer').checked;
+    if (enableTimer) {
+        const timeLimit = parseInt(document.getElementById('time-limit-minutes').value);
+        if (timeLimit && timeLimit > 0) {
+            questionData.time_limit_minutes = timeLimit;
         }
     }
 
@@ -2035,6 +2035,9 @@ async function createNewVoting() {
         document.getElementById('question-text').value = '';
         document.getElementById('options-list').innerHTML = '';
         document.getElementById('max-selections').value = '1';
+        document.getElementById('enable-timer').checked = false;
+        document.getElementById('timer-config').style.display = 'none';
+        document.getElementById('time-limit-minutes').value = '15';
 
         notifications.show('Votación creada y activada', 'success');
         await loadActiveQuestions();
