@@ -90,7 +90,7 @@ def login_voter(data: VoterLoginRequest):
         # 1. Validar que el participante existe Y ya tiene asistencia
         participant = execute_query(
             conn,
-            "SELECT code, name, is_power, present FROM participants WHERE code = ?",
+            "SELECT code, name, is_power, present, coefficient FROM participants WHERE code = ?",
             (data.code,),
             fetchone=True
         )
@@ -139,7 +139,7 @@ async def register_attendance(data: VoterLoginRequest):
         # 1. Validar que el participante existe
         participant = execute_query(
             conn,
-            "SELECT code, name, present, is_power FROM participants WHERE code = ?",
+            "SELECT code, name, present, is_power, coefficient FROM participants WHERE code = ?",
             (data.code,),
             fetchone=True
         )
@@ -178,6 +178,7 @@ async def register_attendance(data: VoterLoginRequest):
             "code": data.code,
             "name": participant.get("name", "Sin nombre"),
             "is_power": data.is_power,
+            "coefficient": participant.get("coefficient", 1.00),
             "message": "Asistencia registrada correctamente"
         }
     

@@ -44,17 +44,18 @@ async def crear_pregunta(payload: QuestionCreate):
 
     # CALCULAR tiempo de expiración si hay límite
     expires_at = None
-    if payload.time_limit_minutes and payload.time_limit_minutes > 0:
-        expires_at = (datetime.utcnow() + timedelta(minutes=payload.time_limit_minutes)).isoformat()
-
+    time_limit = None
+    if hasattr(payload, 'time_limit_minutes') and payload.time_limit_minutes and payload.time_limit_minutes > 0:
+        time_limit = payload.time_limit_minutes
+        expires_at = (datetime.utcnow() + timedelta(minutes=time_limit)).isoformat()
     conn = get_db()
     try:
         # MODIFICAR query para incluir campos de cronómetro
         question = execute_query(
             conn,
             """INSERT INTO questions (text, type, active, allow_multiple, max_selections, time_limit_minutes, expires_at) 
-               VALUES (?, ?, 1, ?, ?, ?, ?) RETURNING id""",
-            (payload.text, typ, int(allow_multiple), max_selections, payload.time_limit_minutes, expires_at),
+            VALUES (?, ?, 1, ?, ?, ?, ?) RETURNING id""",
+            (payload.text, typ, int(allow_multiple), max_selections, time_limit, expires_at),
             fetchone=True
         )
         qid = question["id"]
@@ -648,11 +649,20 @@ def resultados(question_id: int):
         # Ordenar de mayor a menor por porcentaje (coeficiente)
         results_list.sort(key=lambda x: x["percentage"], reverse=True)
 
+        # Obtener total de participantes registrados en la base
+        total_registered_result = execute_query(
+            conn,
+            "SELECT COUNT(*) as total_registered FROM participants",
+            fetchone=True
+        )
+        total_registered = total_registered_result["total_registered"] if total_registered_result else 0
+
         return {
             "question_id": question_id,
             "question_text": q["text"],
             "type": q["type"],
             "total_participants": unique_voters,
+            "total_registered": total_registered,
             "total_votes": sum(r["participants"] for r in rows),
             "total_participant_coefficient": round(total_participant_weight, 2),
             "results": results_list

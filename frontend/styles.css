@@ -2233,6 +2233,20 @@ body {
     animation: pulse 2s infinite;
 }
 
+#timer-config {
+    text-align: center;
+}
+
+#timer-config label,
+#timer-config p {
+    text-align: center;
+}
+
+#timer-config input {
+    margin: 0 auto;
+    display: block;
+}
+
 /* Panel de gestión de votantes */
 .voter-management-panel {
     background: var(--gray-50);

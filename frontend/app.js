@@ -626,10 +626,10 @@ function showPowerQuestion() {
             content: `
                 <p style="margin-bottom: 1.5rem;">¿Este apartamento es suyo o tiene poder para votar por él?</p>
                 <div style="display: flex; gap: 1rem; justify-content: center;">
-                    <button class="btn btn-success" onclick="resolvePowerQuestion(false)" style="flex: 1;">
+                    <button class="btn btn-success" onclick="window.modalResolvePower(false)" style="flex: 1;">
                         Soy propietario
                     </button>
-                    <button class="btn btn-warning" onclick="resolvePowerQuestion(true)" style="flex: 1;">
+                    <button class="btn btn-warning" onclick="window.modalResolvePower(true)" style="flex: 1;">
                         Tengo poder
                     </button>
                 </div>
@@ -637,11 +637,9 @@ function showPowerQuestion() {
             closable: false
         });
         
-        window.resolvePowerQuestion = (isPower) => {
+        window.modalResolvePower = (isPower) => {
             modals.hide();
-            setTimeout(() => {
-                delete window.resolvePowerQuestion;
-            }, 100);
+            delete window.modalResolvePower;
             resolve(isPower);
         };
     });
@@ -777,9 +775,11 @@ function renderVotingQuestions(questions, votedQuestions = new Set()) {
         return;
     }
 
-    // Ordenar preguntas: abiertas primero, luego cerradas
+    // Ordenar preguntas: abiertas primero por ID descendente (nuevas arriba), luego cerradas
     const sortedQuestions = [...questions].sort((a, b) => {
-        if (a.closed === b.closed) return 0;
+        if (a.closed === b.closed) {
+            return b.id - a.id; // Nuevas primero
+        }
         return a.closed ? 1 : -1;
     });
 
@@ -1263,6 +1263,7 @@ async function loadActiveQuestions() {
         document.getElementById('active-questions').innerHTML = 
             '<p style="color: var(--danger-color); padding: 1rem;">Error cargando preguntas activas</p>';
     }
+    await updateVoteCountsForActiveQuestions();
 }
 
 async function refreshConnectedUsers() {
@@ -1339,6 +1340,28 @@ function renderActiveQuestions(questions) {
     container.innerHTML = questions.map(q => AdminComponents.createActiveVotingCard(q)).join('');
 }
 
+async function updateVoteCountsForActiveQuestions() {
+    try {
+        const questions = await apiCall('/voting/questions/active');
+        for (const question of questions) {
+            try {
+                const results = await apiCall(`/voting/results/${question.id}`);
+                const voteCountElement = document.querySelector(`[data-question-id="${question.id}"]`);
+                if (voteCountElement) {
+                    voteCountElement.textContent = results.total_participants || 0;
+                }
+            } catch (error) {
+                const voteCountElement = document.querySelector(`[data-question-id="${question.id}"]`);
+                if (voteCountElement) {
+                    voteCountElement.textContent = '0';
+                }
+            }
+        }
+    } catch (error) {
+        console.log('Error actualizando conteo de votos:', error);
+    }
+}
+
 // ================================
 // FUNCIONES DE ADMINISTRACIÓN
 // ================================
@@ -1386,9 +1409,17 @@ function showParticipantsModal(title, participants) {
     let filteredParticipants = [...participants];
     
     function renderPage() {
+        // Ordenar por presente primero, luego por código
+        const sortedParticipants = [...filteredParticipants].sort((a, b) => {
+            if (a.present !== b.present) {
+                return b.present - a.present; // Presentes primero
+            }
+            return a.code.localeCompare(b.code); // Luego por código
+        });
+        
         const startIndex = (currentPage - 1) * participantsPerPage;
         const endIndex = startIndex + participantsPerPage;
-        const pageParticipants = filteredParticipants.slice(startIndex, endIndex);
+        const pageParticipants = sortedParticipants.slice(startIndex, endIndex);
         const totalPages = Math.ceil(filteredParticipants.length / participantsPerPage);
         
         const paginationHTML = totalPages > 1 ? `
@@ -1592,6 +1623,17 @@ function addNewOption(text = '') {
     updateOptionNumbers();
 }
 
+function setupOptionInputListeners() {
+    // Agregar listener para Enter en inputs de opciones
+    document.addEventListener('keypress', function(e) {
+        if (e.target.classList.contains('option-text') && e.key === 'Enter') {
+            e.preventDefault();
+            addNewOption();
+        }
+    });
+    setupOptionInputListeners();
+}
+
 function removeOptionItem(button) {
     const optionsList = document.getElementById('options-list');
     if (optionsList.querySelectorAll('.option-item').length <= 2) {
@@ -1702,7 +1744,7 @@ async function viewVotingResults(questionId) {
         let contentHTML = `
             <div style="background: var(--gray-50); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
                 <p><strong>Pregunta:</strong> ${results.question_text}</p>
-                <p><strong>Participaron:</strong> ${results.total_participants} personas</p>
+                <p><strong>Participaron:</strong> ${results.total_participants} de ${results.total_registered} registrados</p>
                 <p><strong>Coeficiente total:</strong> ${results.total_participant_coefficient}%</p>
             </div>
             
@@ -1732,14 +1774,57 @@ async function viewVotingResults(questionId) {
                 {
                     text: 'Cerrar',
                     class: 'btn-secondary',
-                    handler: 'modals.hide()'
+                    handler: 'modals.hide(); if(window.resultsInterval) clearInterval(window.resultsInterval);'
                 }
             ]
         });
+
+        // Actualizar resultados cada 3 segundos
+        window.resultsInterval = setInterval(async () => {
+            try {
+                const updatedResults = await apiCall(`/voting/results/${questionId}`);
+                // Actualizar solo el contenido, no todo el modal
+                updateResultsContent(updatedResults);
+            } catch (error) {
+                console.log('Error actualizando resultados:', error);
+            }
+        }, 2000);
         
     } catch (error) {
         notifications.show(`Error: ${error.message}`, 'error');
     }
+}
+
+function updateResultsContent(results) {
+    const modalContent = document.querySelector('.modal-content');
+    if (!modalContent) return;
+    
+    const contentHTML = `
+        <div style="background: var(--gray-50); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+            <p><strong>Pregunta:</strong> ${results.question_text}</p>
+            <p><strong>Participaron:</strong> ${results.total_participants} personas</p>
+            <p><strong>Coeficiente total:</strong> ${results.total_participant_coefficient}%</p>
+        </div>
+        
+        <div style="max-height: 300px; overflow-y: auto;">
+            ${results.results && results.results.length > 0 ? 
+                results.results.map(result => `
+                    <div style="display: flex; align-items: center; padding: 0.8rem; margin: 0.5rem 0; background: white; border-radius: 8px; border: 1px solid var(--gray-300);">
+                        <span style="flex: 0 0 120px; font-weight: 600;">${result.answer}:</span>
+                        <div style="flex: 1; margin: 0 1rem;">
+                            <div style="background: var(--gray-200); height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div style="height: 100%; background: linear-gradient(90deg, var(--primary-color), var(--success-color)); width: ${result.percentage}%; transition: width 0.5s ease;"></div>
+                            </div>
+                        </div>
+                        <span style="flex: 0 0 80px; text-align: right; font-weight: 600;">${result.votes} votos (${result.percentage.toFixed(2)}%)</span>
+                    </div>
+                `).join('') : 
+                '<p style="text-align: center; color: var(--gray-600);">Sin votos registrados</p>'
+            }
+        </div>
+    `;
+    
+    modalContent.querySelector('.modal-body').innerHTML = contentHTML;
 }
 
 async function deleteVoting(questionId) {
@@ -1997,20 +2082,13 @@ function showDeleteCodeModal() {
             
             <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Código a eliminar:</label>
             <input type="text" id="delete-code-input" class="modal-input" placeholder="1-201" 
-                   style="text-transform: uppercase;">
-        `,
-        actions: [
-            {
-                text: 'Cancelar',
-                class: 'btn-secondary',
-                handler: 'modals.hide()'
-            },
-            {
-                text: 'Eliminar',
-                class: 'btn-danger',
-                handler: 'confirmDeleteCode()'
-            }
-        ]
+                style="text-transform: uppercase; margin-bottom: 1.5rem;">
+            
+            <div style="display: flex; gap: 1rem; justify-content: center;">
+                <button class="btn btn-secondary" onclick="modals.hide()">Cancelar</button>
+                <button class="btn btn-danger" onclick="confirmDeleteCode()">Eliminar</button>
+            </div>
+        `
     });
     
     window.confirmDeleteCode = async () => {

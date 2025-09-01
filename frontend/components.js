@@ -537,7 +537,7 @@ class AdminComponents {
                     </div>
                     <div class="meta-item">
                         <span>🗳️</span>
-                        <span>Votos: <span class="vote-count">-</span></span>
+                        <span>Votos: <span class="vote-count" data-question-id="${question.id}">Cargando...</span></span>
                     </div>
                     <div class="meta-item">
                         <span>⏱️</span>
