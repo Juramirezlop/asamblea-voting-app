@@ -75,11 +75,8 @@ window.processDeleteCode = async function() {
 };
 
 window.modalResolvePower = function(isPower) {
-    if (window.powerResolveCallback) {
-        const callback = window.powerResolveCallback;
-        delete window.powerResolveCallback;
-        modals.hide();
-        callback(isPower);
+    if (window.powerResolveCallback && typeof window.powerResolveCallback === 'function') {
+        window.powerResolveCallback(isPower);
     }
 };
 
@@ -755,11 +752,26 @@ function showPowerQuestion() {
     return new Promise((resolve) => {
         // Limpiar callback previo si existe
         if (window.powerResolveCallback) {
-            window.powerResolveCallback(false); // Resolver como false
+            try {
+                window.powerResolveCallback(false); // Resolver como false
+            } catch (e) {
+                console.log('Error limpiando callback previo:', e);
+            }
             delete window.powerResolveCallback;
         }
         
-        window.powerResolveCallback = resolve;
+        // Crear nuevo callback
+        window.powerResolveCallback = (isPower) => {
+            try {
+                const callback = window.powerResolveCallback;
+                delete window.powerResolveCallback;
+                modals.hide();
+                resolve(isPower);
+            } catch (e) {
+                console.error('Error en powerResolveCallback:', e);
+                resolve(false);
+            }
+        };
         
         modals.show({
             title: '🏠 Información del Apartamento',
@@ -795,13 +807,13 @@ function showPowerQuestion() {
             closable: false
         });
         
-        // Auto-cleanup si no responde en 60 segundos
+        // Auto-cleanup si no responde en 30 segundos
         setTimeout(() => {
             if (window.powerResolveCallback === resolve) {
-                resolve(false); // Default: propietario
                 delete window.powerResolveCallback;
                 modals.hide();
-                notifications.show('Tiempo agotado. Se seleccionó "Propietario" por defecto.', 'warning');
+                resolve(false); // Default: propietario
+                notifications.show('Tiempo agotado. Se seleccionó "Propietario" por defecto.', 'warning', 5000);
             }
         }, 30000);
     });

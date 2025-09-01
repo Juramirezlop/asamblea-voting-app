@@ -200,7 +200,7 @@ class ModalSystem {
         const functionsToClean = [
             'changePage', 'filterParticipants', 'saveConjuntoName',
             'confirmAttendanceRegistration', 'saveEditedVoting',
-            'saveVoterChanges', 'saveVoteEdit'
+            'saveVoterChanges', 'saveVoteEdit', 'powerResolveCallback', 'modalResolve'
         ];
         
         functionsToClean.forEach(fn => {
