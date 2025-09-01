@@ -1393,41 +1393,51 @@ function setupVotingFormListeners() {
         });
     });
 
-    // Timer checkbox
-    document.getElementById('enable-timer').addEventListener('change', (e) => {
-        const timerConfig = document.getElementById('timer-config');
-        timerConfig.style.display = e.target.checked ? 'block' : 'none';
-    });
-
-    // Timer toggle buttons
-    document.querySelectorAll('.timer-toggle-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const enabled = e.target.getAttribute('data-enabled') === 'true';
-            
-            // Actualizar estados de botones
-            document.querySelectorAll('.timer-toggle-btn').forEach(b => {
-                b.classList.remove('active');
-                b.style.background = 'white';
-                b.style.borderColor = 'var(--gray-400)';
-                b.style.color = 'var(--gray-700)';
+    // Timer toggle buttons (con verificación de existencia)
+    const timerButtons = document.querySelectorAll('.timer-toggle-btn');
+    if (timerButtons.length > 0) {
+        timerButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const enabled = e.target.getAttribute('data-enabled') === 'true';
+                
+                // Actualizar estados de botones
+                document.querySelectorAll('.timer-toggle-btn').forEach(b => {
+                    b.classList.remove('active');
+                    b.style.background = 'white';
+                    b.style.borderColor = 'var(--gray-400)';
+                    b.style.color = 'var(--gray-700)';
+                });
+                
+                e.target.classList.add('active');
+                e.target.style.background = enabled ? 'var(--warning-color)' : 'var(--gray-100)';
+                e.target.style.borderColor = enabled ? 'var(--warning-color)' : 'var(--gray-400)';
+                e.target.style.color = enabled ? 'white' : 'var(--gray-700)';
+                
+                // Mostrar/ocultar input de minutos
+                const minutesContainer = document.getElementById('timer-minutes-container');
+                if (minutesContainer) {
+                    if (enabled) {
+                        minutesContainer.style.opacity = '1';
+                        minutesContainer.style.pointerEvents = 'auto';
+                    } else {
+                        minutesContainer.style.opacity = '0.5';
+                        minutesContainer.style.pointerEvents = 'none';
+                    }
+                }
             });
-            
-            e.target.classList.add('active');
-            e.target.style.background = enabled ? 'var(--warning-color)' : 'var(--gray-100)';
-            e.target.style.borderColor = enabled ? 'var(--warning-color)' : 'var(--gray-400)';
-            e.target.style.color = enabled ? 'white' : 'var(--gray-700)';
-            
-            // Mostrar/ocultar input de minutos
-            const minutesContainer = document.getElementById('timer-minutes-container');
-            if (enabled) {
-                minutesContainer.style.opacity = '1';
-                minutesContainer.style.pointerEvents = 'auto';
-            } else {
-                minutesContainer.style.opacity = '0.5';
-                minutesContainer.style.pointerEvents = 'none';
+        });
+    }
+
+    // Timer checkbox (mantener compatibilidad con versión anterior)
+    const enableTimerCheckbox = document.getElementById('enable-timer');
+    if (enableTimerCheckbox) {
+        enableTimerCheckbox.addEventListener('change', (e) => {
+            const timerConfig = document.getElementById('timer-config');
+            if (timerConfig) {
+                timerConfig.style.display = e.target.checked ? 'block' : 'none';
             }
         });
-    });
+    }
 }
 
 function showAdminTab(tabName) {
@@ -2095,12 +2105,26 @@ async function createNewVoting() {
         }
     }
 
-    // Verificar tiempo límite PARA AMBOS TIPOS (yesno y multiple)
-    const timerEnabled = document.querySelector('.timer-toggle-btn.active').getAttribute('data-enabled') === 'true';
+    // Verificar tiempo límite PARA AMBOS TIPOS (yesno y multiple) - VERSIÓN SEGURA
+    let timerEnabled = false;
+    
+    // Intentar con la nueva UI de botones
+    const activeTimerBtn = document.querySelector('.timer-toggle-btn.active');
+    if (activeTimerBtn) {
+        timerEnabled = activeTimerBtn.getAttribute('data-enabled') === 'true';
+    } else {
+        // Fallback a checkbox si existe
+        const enableTimerCheckbox = document.getElementById('enable-timer');
+        timerEnabled = enableTimerCheckbox ? enableTimerCheckbox.checked : false;
+    }
+    
     if (timerEnabled) {
-        const timeLimit = parseInt(document.getElementById('time-limit-minutes').value);
-        if (timeLimit && timeLimit > 0) {
-            questionData.time_limit_minutes = timeLimit;
+        const timeLimitInput = document.getElementById('time-limit-minutes');
+        if (timeLimitInput) {
+            const timeLimit = parseInt(timeLimitInput.value);
+            if (timeLimit && timeLimit > 0) {
+                questionData.time_limit_minutes = timeLimit;
+            }
         }
     }
 
@@ -2110,13 +2134,42 @@ async function createNewVoting() {
             body: JSON.stringify(questionData)
         });
 
-        // Limpiar formulario
-        document.getElementById('question-text').value = '';
-        document.getElementById('options-list').innerHTML = '';
-        document.getElementById('max-selections').value = '1';
-        document.getElementById('enable-timer').checked = false;
-        document.getElementById('timer-config').style.display = 'none';
-        document.getElementById('time-limit-minutes').value = '15';
+        // Limpiar formulario - CON VALIDACIONES
+        const questionTextInput = document.getElementById('question-text');
+        if (questionTextInput) questionTextInput.value = '';
+        
+        const optionsList = document.getElementById('options-list');
+        if (optionsList) optionsList.innerHTML = '';
+        
+        const maxSelectionsInput = document.getElementById('max-selections');
+        if (maxSelectionsInput) maxSelectionsInput.value = '1';
+        
+        // Limpiar timer (ambas versiones)
+        const enableTimerCheckbox = document.getElementById('enable-timer');
+        if (enableTimerCheckbox) enableTimerCheckbox.checked = false;
+        
+        const timerConfig = document.getElementById('timer-config');
+        if (timerConfig) timerConfig.style.display = 'none';
+        
+        const timeLimitInput = document.getElementById('time-limit-minutes');
+        if (timeLimitInput) timeLimitInput.value = '15';
+        
+        // Resetear botones de timer si existen
+        document.querySelectorAll('.timer-toggle-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if (btn.getAttribute('data-enabled') === 'false') {
+                btn.classList.add('active');
+                btn.style.background = 'var(--gray-100)';
+            } else {
+                btn.style.background = 'white';
+            }
+        });
+        
+        const minutesContainer = document.getElementById('timer-minutes-container');
+        if (minutesContainer) {
+            minutesContainer.style.opacity = '0.5';
+            minutesContainer.style.pointerEvents = 'none';
+        }
 
         notifications.show('Votación creada y activada', 'success');
         await loadActiveQuestions();
