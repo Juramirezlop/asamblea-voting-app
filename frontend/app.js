@@ -679,9 +679,6 @@ function showPowerQuestion() {
 async function showVoterScreen() {
     // Usar window.currentUser como fallback si currentUser es null
     const user = currentUser || window.currentUser;
-    console.log('showVoterScreen - currentUser:', currentUser);
-    console.log('showVoterScreen - window.currentUser:', window.currentUser);
-    console.log('showVoterScreen - user final:', user);
     
     if (!user || !user.code) {
         console.error('No hay usuario válido');
@@ -765,42 +762,55 @@ async function loadVotingQuestions() {
     const container = document.getElementById('voting-questions');
     
     try {
-        // Para usuario de prueba
         if (currentUser && currentUser.code === CODIGO_PRUEBA) {
             const testQuestions = getSimulatedTestQuestions();
             renderVotingQuestions(testQuestions);
+            if (!window.timerInterval) {
+                window.timerInterval = setInterval(updateVotingTimers, 1000);
+            }
             return;
         }
 
-        // CORRECCIÓN: Verificar que el usuario tenga token válido
         if (!voterToken) {
-            container.innerHTML = `
-                <div class="panel">
-                    <p style="color: var(--danger-color); text-align: center;">Sesión expirada. Por favor, vuelva a ingresar.</p>
-                </div>
-            `;
+            container.innerHTML = `<div class="panel"><p style="color: var(--danger-color); text-align: center;">Sesión expirada. Por favor, ingrese nuevamente.</p></div>`;
             return;
-        }
-
-        if (isAdmin) {
-            await apiCall('/voting/questions/check-expired', { method: 'POST' });
         }
 
         const questions = await apiCall('/voting/questions/active');
-        const votedQuestions = await checkUserVotes();
+        const userVotes = await apiCall('/voting/user-votes');
+        const votedQuestions = new Set(userVotes.map(vote => vote.question_id));
         
         renderVotingQuestions(questions, votedQuestions);
+        if (!window.timerInterval) {
+            window.timerInterval = setInterval(updateVotingTimers, 1000);
+        }
+
     } catch (error) {
-        console.error('Error loading voting questions:', error);
-        container.innerHTML = `
-            <div class="panel">
-                <p style="color: var(--danger-color); text-align: center;">Error cargando votaciones: ${error.message}</p>
-                <button class="btn btn-secondary" onclick="loadVotingQuestions()">Reintentar</button>
-            </div>
-        `;
+        console.error('Error cargando votaciones:', error);
+        container.innerHTML = `<div class="panel"><p style="color: var(--danger-color); text-align: center;">Error: ${error.message}</p></div>`;
     }
 }
 
+function updateVotingTimers() {
+    document.querySelectorAll('.question-timer').forEach(timer => {
+        const remaining = parseInt(timer.getAttribute('data-remaining'));
+        if (remaining > 0) {
+            const newRemaining = remaining - 1;
+            timer.setAttribute('data-remaining', newRemaining);
+            const minutes = Math.floor(newRemaining / 60);
+            const seconds = newRemaining % 60;
+            timer.textContent = `⏰ ${minutes}:${String(seconds).padStart(2, '0')} restantes`;
+            
+            if (newRemaining < 120) {
+                timer.style.background = 'linear-gradient(135deg, var(--danger-color), var(--danger-dark))';
+                timer.style.animation = 'pulse 2s infinite';
+            }
+        } else {
+            timer.textContent = '⏰ Tiempo agotado';
+            timer.style.background = 'linear-gradient(135deg, var(--danger-color), var(--danger-dark))';
+        }
+    });
+}
 function renderVotingQuestions(questions, votedQuestions = new Set()) {
     const container = document.getElementById('voting-questions');
     
@@ -2628,36 +2638,6 @@ function setupVisualEffects() {
         });
     });
 }
-
-// Sistema de cronómetros en tiempo real
-function startTimerUpdates() {
-    setInterval(() => {
-        document.querySelectorAll('.question-timer').forEach(timer => {
-            const remaining = parseInt(timer.getAttribute('data-remaining'));
-            if (remaining > 0) {
-                const newRemaining = remaining - 1;
-                timer.setAttribute('data-remaining', newRemaining);
-                const minutes = Math.floor(newRemaining / 60);
-                const seconds = newRemaining % 60;
-                timer.textContent = `⏰ ${minutes}:${String(seconds).padStart(2, '0')} restantes`;
-                
-                if (newRemaining < 120) {
-                    timer.style.background = 'linear-gradient(135deg, var(--danger-color), var(--danger-dark))';
-                    timer.style.animation = 'pulse 2s infinite';
-                }
-            } else {
-                timer.textContent = '⏰ Tiempo agotado';
-                timer.style.background = 'linear-gradient(135deg, var(--danger-color), var(--danger-dark))';
-                loadVotingQuestions();
-            }
-        });
-    }, 1000);
-}
-
-// Iniciar cronómetros cuando se carga la página de votante
-document.addEventListener('DOMContentLoaded', () => {
-    startTimerUpdates();
-});
 
 // ================================
 // SISTEMA DE MONITOREO
