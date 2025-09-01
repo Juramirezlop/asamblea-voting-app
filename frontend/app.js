@@ -981,7 +981,11 @@ function updateVotingTimers() {
 }
 
 function renderVotingQuestions(questions, votedQuestions = new Set()) {
+    console.log('=== DEBUG RENDER ===');
     const container = document.getElementById('voting-questions');
+    console.log('Container encontrado:', !!container);
+    console.log('Questions length:', questions.length);
+    console.log('VotedQuestions:', votedQuestions);
     
     if (questions.length === 0) {
         container.innerHTML = `
@@ -1026,7 +1030,12 @@ function renderVotingQuestions(questions, votedQuestions = new Set()) {
         }
     }).join('');
 
+    console.log('HTML generado - longitud:', questionsHTML.length);
+    console.log('Aplicando HTML al container...');
+
     container.innerHTML = questionsHTML;
+
+    console.log('HTML aplicado. Container innerHTML length:', container.innerHTML.length);
     
     // Inicializar timers si hay preguntas con tiempo
     const hasTimedQuestions = questions.some(q => q.time_remaining_seconds > 0);
