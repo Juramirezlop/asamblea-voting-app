@@ -183,10 +183,8 @@ class ModalSystem {
 
     hide() {
         if (this.activeModal && this.activeModal.parentNode) {
-            this.activeModal.classList.remove('show');
-            
-            // Limpiar funciones globales del modal
-            cleanupModalFunctions();
+            this.activeModal.classList.remove('show');            
+            this.cleanupModalState();
             
             setTimeout(() => {
                 if (this.activeModal && this.activeModal.parentNode) {
@@ -197,26 +195,53 @@ class ModalSystem {
         }
     }
 
+    cleanupModalState() {
+        // Limpiar solo si no hay resolvers pendientes importantes
+        const functionsToClean = [
+            'changePage', 'filterParticipants', 'saveConjuntoName',
+            'confirmAttendanceRegistration', 'saveEditedVoting',
+            'saveVoterChanges', 'saveVoteEdit'
+        ];
+        
+        functionsToClean.forEach(fn => {
+            if (window[fn]) {
+                delete window[fn];
+            }
+        });
+    }
+
     confirm(message, title = 'Confirmar acción') {
         return new Promise((resolve) => {
+            // Limpiar resolver previo
+            if (window.modalResolve) {
+                window.modalResolve(false); // Resolver pendiente como false
+            }
+            
             this.show({
                 title,
-                content: `<p>${message}</p>`,
+                content: `<p style="margin: 1rem 0; text-align: center;">${message}</p>`,
                 actions: [
                     {
                         text: 'Cancelar',
                         class: 'btn-secondary',
-                        handler: `modals.hide(); window.modalResolve(false);`
+                        handler: `modals.hide(); if(window.modalResolve) { window.modalResolve(false); delete window.modalResolve; }`
                     },
                     {
                         text: 'Confirmar',
                         class: 'btn-danger',
-                        handler: `modals.hide(); window.modalResolve(true);`
+                        handler: `modals.hide(); if(window.modalResolve) { window.modalResolve(true); delete window.modalResolve; }`
                     }
                 ]
             });
 
             window.modalResolve = resolve;
+            
+            setTimeout(() => {
+                if (window.modalResolve === resolve) {
+                    resolve(false);
+                    delete window.modalResolve;
+                }
+            }, 10000);
         });
     }
 

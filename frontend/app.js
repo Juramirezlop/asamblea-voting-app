@@ -75,10 +75,11 @@ window.processDeleteCode = async function() {
 };
 
 window.modalResolvePower = function(isPower) {
-    modals.hide();
     if (window.powerResolveCallback) {
-        window.powerResolveCallback(isPower);
+        const callback = window.powerResolveCallback;
         delete window.powerResolveCallback;
+        modals.hide();
+        callback(isPower);
     }
 };
 
@@ -452,7 +453,18 @@ async function registerAttendance() {
         }
         
         // Obtener info del participante para mostrar en modal
-        const participantInfo = await apiCall(`/participants/info/${code}`);
+        let participantInfo;
+        try {
+            participantInfo = await apiCall(`/participants/info/${code}`);
+        } catch (infoError) {
+            // Si no puede obtener info, usar datos básicos
+            participantInfo = {
+                code: code,
+                name: 'Participante',
+                coefficient: 1.0
+            };
+            console.log('No se pudo obtener info detallada, usando datos básicos');
+        }
         
         // Mostrar modal de confirmación ANTES de registrar
         showAttendanceConfirmModal(participantInfo);
@@ -729,8 +741,9 @@ function showAttendanceModal(userData) {
 
 function showPowerQuestion() {
     return new Promise((resolve) => {
-        // Limpiar callback previo
+        // Limpiar callback previo si existe
         if (window.powerResolveCallback) {
+            window.powerResolveCallback(false); // Resolver como false
             delete window.powerResolveCallback;
         }
         
@@ -769,6 +782,16 @@ function showPowerQuestion() {
             `,
             closable: false
         });
+        
+        // Auto-cleanup si no responde en 60 segundos
+        setTimeout(() => {
+            if (window.powerResolveCallback === resolve) {
+                resolve(false); // Default: propietario
+                delete window.powerResolveCallback;
+                modals.hide();
+                notifications.show('Tiempo agotado. Se seleccionó "Propietario" por defecto.', 'warning');
+            }
+        }, 30000);
     });
 }
 
@@ -2110,18 +2133,25 @@ function updateResultsContent(results) {
 }
 
 async function deleteVoting(questionId) {
-    const confirmed = await modals.confirm(
-        '¿Eliminar esta encuesta? Se borrarán también todos los votos.',
-        'Confirmar eliminación'
-    );
-    
-    if (!confirmed) return;
-    
     try {
+        const confirmed = await modals.confirm(
+            '¿Eliminar esta votación?\n\nSe borrarán también todos los votos registrados.',
+            'Confirmar eliminación'
+        );
+        
+        if (!confirmed) return;
+        
+        notifications.show('Eliminando votación...', 'info', 3000);
+        
         await apiCall(`/voting/questions/${questionId}`, { method: 'DELETE' });
-        await loadActiveQuestions();
-        notifications.show('Encuesta eliminada', 'success');
+        
+        // Recargar preguntas después de eliminar
+        setTimeout(() => loadActiveQuestions(), 500);
+        
+        notifications.show('Votación eliminada correctamente', 'success');
+        
     } catch (error) {
+        console.error('Error eliminando votación:', error);
         notifications.show(`Error: ${error.message}`, 'error');
     }
 }
@@ -3153,3 +3183,27 @@ function stopUsersRefreshInterval() {
         usersRefreshInterval = null;
     }
 }
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // Limpiar estado previo
+    if (window.modalResolve) {
+        delete window.modalResolve;
+    }
+    if (window.powerResolveCallback) {
+        delete window.powerResolveCallback;
+    }
+    
+    // Event listeners principales
+    setupMainEventListeners();
+    
+    // Intentar restaurar sesión admin
+    await tryRestoreAdminSession();
+    
+    // Mostrar mensaje de bienvenida
+    if (!isAdmin) {
+        notifications.show('Sistema iniciado - Ingrese sus credenciales', 'success');
+    }
+    
+    // Configurar efectos visuales
+    setupVisualEffects();
+});

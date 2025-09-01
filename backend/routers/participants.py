@@ -644,7 +644,7 @@ def check_participant_exists(code: str):
     finally:
         close_db(conn)
 
-@router.get("/info/{code}", dependencies=[Depends(admin_required)])
+@router.get("/info/{code}")
 def get_participant_info(code: str):
     conn = get_db()
     try:
