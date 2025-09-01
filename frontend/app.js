@@ -478,8 +478,6 @@ function showAttendanceConfirmModal(participantInfo) {
 
 async function processDirectRegistration(participantInfo) {
     try {
-        notifications.show('Registrando asistencia...', 'info', 3000);
-        
         // Preguntar tipo de participación directamente
         const isPower = await showPowerQuestion();
         
@@ -500,39 +498,42 @@ async function processDirectRegistration(participantInfo) {
             is_power: response.is_power
         };
 
-        // Modal de bienvenida simple (solo cerrar)
-        modals.show({
-            title: '🎉 ¡Bienvenido a la Asamblea!',
-            content: `
-                <div style="text-align: center; padding: 1rem;">
-                    <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
-                    <h3 style="color: var(--success-color); margin-bottom: 1rem;">Asistencia Registrada</h3>
-                    
-                    <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05)); padding: 1.5rem; border-radius: 12px; margin: 1rem 0; border: 1px solid var(--success-color);">
-                        <p><strong>Código:</strong> ${response.code}</p>
-                        <p><strong>Nombre:</strong> ${response.name}</p>
-                        <p><strong>Tipo:</strong> ${response.is_power ? '📋 Con Poder' : '🏠 Propietario'}</p>
-                        <p><strong>Coeficiente:</strong> ${response.coefficient}%</p>
+        // Modal de bienvenida simple (sin auto-close problemático)
+        setTimeout(() => {
+            modals.show({
+                title: '🎉 ¡Bienvenido a la Asamblea!',
+                content: `
+                    <div style="text-align: center; padding: 1rem;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
+                        <h3 style="color: var(--success-color); margin-bottom: 1rem;">Asistencia Registrada</h3>
+                        
+                        <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05)); padding: 1.5rem; border-radius: 12px; margin: 1rem 0; border: 1px solid var(--success-color);">
+                            <p><strong>Código:</strong> ${response.code}</p>
+                            <p><strong>Nombre:</strong> ${response.name}</p>
+                            <p><strong>Tipo:</strong> ${response.is_power ? '📋 Con Poder' : '🏠 Propietario'}</p>
+                            <p><strong>Coeficiente:</strong> ${response.coefficient}%</p>
+                        </div>
+                        
+                        <div style="background: var(--info-color); background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05)); padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px solid var(--info-color);">
+                            <p style="margin: 0; color: var(--info-dark); font-weight: 500;">
+                                🗳️ Ahora puede usar "Acceder a Votaciones" para participar
+                            </p>
+                        </div>
                     </div>
-                    
-                    <div style="background: var(--info-color); background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(37, 99, 235, 0.05)); padding: 1rem; border-radius: 8px; margin-top: 1rem; border: 1px solid var(--info-color);">
-                        <p style="margin: 0; color: var(--info-dark); font-weight: 500;">
-                            🗳️ Ahora puede usar "Acceder a Votaciones" para participar
-                        </p>
-                    </div>
-                </div>
-            `,
-            actions: [{
-                text: 'Entendido',
-                class: 'btn-success',
-                handler: 'modals.hide()'
-            }]
-        });
+                `,
+                actions: [{
+                    text: 'Entendido',
+                    class: 'btn-success',
+                    handler: 'modals.hide()'
+                }],
+                closable: true
+            });
+        }, 500); // Delay para evitar conflictos con el modal anterior
         
-        notifications.show('✅ Asistencia registrada. Use "Acceder a Votaciones" para participar.', 'success', 8000);
+        notifications.show('✅ Asistencia registrada. Use "Acceder a Votaciones" para participar.', 'success');
         
     } catch (error) {
-        console.error('Error registrando asistencia:', error);
+        console.error('Error en registro directo:', error);
         notifications.show(`Error: ${error.message}`, 'error');
     }
 }
@@ -807,7 +808,7 @@ function showPowerQuestion() {
             closable: false
         });
         
-        // Auto-cleanup si no responde en 30 segundos
+        // Auto-cleanup si no responde
         setTimeout(() => {
             if (window.powerResolveCallback === resolve) {
                 delete window.powerResolveCallback;
@@ -815,7 +816,7 @@ function showPowerQuestion() {
                 resolve(false); // Default: propietario
                 notifications.show('Tiempo agotado. Se seleccionó "Propietario" por defecto.', 'warning', 5000);
             }
-        }, 30000);
+        }, 60000);
     });
 }
 

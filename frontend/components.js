@@ -291,9 +291,13 @@ class VotingComponents {
                 <div class="question-header">
                     <div class="question-title">${question.text}</div>
                     <div class="question-meta">
-                    ${question.time_remaining_seconds !== null && question.time_remaining_seconds !== undefined ? `
+                    ${question.time_remaining_seconds > 0 ? `
                         <div class="question-timer" data-question-id="${question.id}" data-remaining="${question.time_remaining_seconds}">
                             ⏰ ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')} restantes
+                        </div>
+                    ` : question.time_remaining_seconds === 0 ? `
+                        <div class="question-timer" style="background: linear-gradient(135deg, var(--danger-color), var(--danger-dark));">
+                            ⏰ Tiempo agotado
                         </div>
                     ` : ''}
                         <div class="meta-item">
