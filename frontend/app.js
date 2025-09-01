@@ -1654,6 +1654,7 @@ function renderConnectedUsers(data) {
 
 function renderActiveQuestions(questions) {
     const container = document.getElementById('active-questions');
+    console.log('Container encontrado:', container); // Debug
     
     if (questions.length === 0) {
         container.innerHTML = `
@@ -1748,7 +1749,9 @@ function renderActiveQuestions(questions) {
         `;
     }).join('');
     
+    console.log('HTML generado:', questionsHTML.substring(0, 200) + '...'); // Debug
     container.innerHTML = questionsHTML;
+    console.log('HTML asignado. Container children:', container.children.length); // Debug
 }
 
 async function updateVoteCountsForActiveQuestions() {
