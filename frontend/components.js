@@ -216,10 +216,15 @@ class ModalSystem {
 
     confirm(message, title = 'Confirmar acción') {
         return new Promise((resolve) => {
-            // Limpiar resolver previo
+            // Limpiar resolver previo si existe
             if (window.modalResolve) {
-                window.modalResolve(false); // Resolver pendiente como false
+                try {
+                    window.modalResolve(false);
+                } catch (e) {}
+                delete window.modalResolve;
             }
+            
+            window.modalResolve = resolve;
             
             this.show({
                 title,
@@ -227,25 +232,40 @@ class ModalSystem {
                 actions: [
                     {
                         text: 'Cancelar',
-                        class: 'btn-secondary',
-                        handler: `modals.hide(); if(window.modalResolve) { window.modalResolve(false); delete window.modalResolve; }`
+                        class: 'btn-secondary', 
+                        handler: `
+                            try {
+                                if(window.modalResolve) { 
+                                    window.modalResolve(false); 
+                                    delete window.modalResolve; 
+                                }
+                                modals.hide();
+                            } catch(e) { console.error('Error cancelar:', e); }
+                        `
                     },
                     {
                         text: 'Confirmar',
                         class: 'btn-danger',
-                        handler: `modals.hide(); if(window.modalResolve) { window.modalResolve(true); delete window.modalResolve; }`
+                        handler: `
+                            try {
+                                if(window.modalResolve) { 
+                                    window.modalResolve(true); 
+                                    delete window.modalResolve; 
+                                }
+                                modals.hide();
+                            } catch(e) { console.error('Error confirmar:', e); }
+                        `
                     }
                 ]
             });
-
-            window.modalResolve = resolve;
             
             setTimeout(() => {
                 if (window.modalResolve === resolve) {
-                    resolve(false);
                     delete window.modalResolve;
+                    resolve(false);
+                    this.hide();
                 }
-            }, 10000);
+            }, 5000);
         });
     }
 
