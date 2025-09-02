@@ -1407,6 +1407,27 @@ function setupVotingFormListeners() {
         });
     });
 
+    // Configurar estado inicial de timer
+    const timerConfig = document.getElementById('timer-config');
+    if (timerConfig) {
+        timerConfig.style.display = 'none';
+    }
+
+    // Resetear botones de timer correctamente
+    document.querySelectorAll('.timer-toggle-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.getAttribute('data-enabled') === 'false') {
+            btn.classList.add('active');
+            btn.style.background = 'var(--gray-200)';
+            btn.style.borderColor = 'var(--gray-400)';
+            btn.style.color = 'var(--gray-700)';
+        } else {
+            btn.style.background = 'white';
+            btn.style.borderColor = 'var(--gray-300)';
+            btn.style.color = 'var(--gray-600)';
+        }
+    });
+
     // Timer toggle buttons (con verificación de existencia)
     const timerButtons = document.querySelectorAll('.timer-toggle-btn');
     if (timerButtons.length > 0) {
@@ -2254,74 +2275,128 @@ async function viewVotingResults(questionId) {
     try {
         const results = await apiCall(`/voting/results/${questionId}`);
         
-        // CONTENIDO ESTÁTICO (no dinámico)
+        // Crear modal con ID único
+        const modalId = `results-modal-${questionId}`;
+        
         const contentHTML = `
-            <div style="background: var(--gray-50); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+            <div id="${modalId}" style="background: var(--gray-50); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
                 <p><strong>Pregunta:</strong> ${results.question_text}</p>
-                <p><strong>Participaron:</strong> ${results.total_participants} de ${results.total_registered} registrados</p>
-                <p><strong>Coeficiente total:</strong> ${results.total_participant_coefficient}%</p>
+                <p><strong>Participaron:</strong> <span id="live-participants-${questionId}">${results.total_participants}</span> de ${results.total_registered} registrados</p>
+                <p><strong>Coeficiente total:</strong> <span id="live-coefficient-${questionId}">${results.total_participant_coefficient}%</span></p>
+                ${results.time_limit_minutes ? `
+                    <div id="live-timer-${questionId}" style="padding: 0.5rem; background: var(--warning-light); border-radius: 6px; font-weight: 600; color: var(--warning-dark);">
+                        ⏰ Cargando tiempo restante...
+                    </div>
+                ` : ''}
             </div>
             
-            <div style="max-height: 300px; overflow-y: auto;">
-                ${results.results && results.results.length > 0 ?
-                    results.results.map(result => `
-                        <div style="display: flex; align-items: center; padding: 0.8rem; margin: 0.5rem 0; background: white; border-radius: 8px; border: 1px solid var(--gray-300);">
-                            <span style="flex: 0 0 120px; font-weight: 600;">${result.answer}:</span>
-                            <div style="flex: 1; margin: 0 1rem;">
-                                <div style="background: var(--gray-200); height: 8px; border-radius: 4px; overflow: hidden;">
-                                    <div style="height: 100%; background: linear-gradient(90deg, var(--primary-color), var(--success-color)); width: ${result.percentage}%; transition: width 0.5s ease;"></div>
-                                </div>
-                            </div>
-                            <span style="flex: 0 0 80px; text-align: right; font-weight: 600;">${result.votes} votos (${result.percentage.toFixed(2)}%)</span>
-                        </div>
-                    `).join('') : 
-                    '<p style="text-align: center; color: var(--gray-600);">Sin votos registrados</p>'
-                }
+            <div id="live-results-${questionId}" style="max-height: 300px; overflow-y: auto;">
+                ${generateResultsHTML(results)}
             </div>
         `;
+
+        modals.show(`Resultados - ${results.question_text}`, contentHTML);
         
-        modals.show({
-            title: 'Resultados Detallados',
-            content: contentHTML,
-            size: 'large'
-        });
+        // Iniciar actualización en vivo
+        startLiveResultsUpdate(questionId, results.time_limit_minutes);
         
     } catch (error) {
         notifications.show(`Error: ${error.message}`, 'error');
     }
 }
 
-function updateResultsContent(results) {
-    const modalContent = document.querySelector('.modal-content');
-    if (!modalContent) return;
+function generateResultsHTML(results) {
+    if (!results.results || results.results.length === 0) {
+        return '<p style="text-align: center; color: var(--gray-600); padding: 2rem;">Sin votos aún</p>';
+    }
     
-    const contentHTML = `
-        <div style="background: var(--gray-50); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
-            <p><strong>Pregunta:</strong> ${results.question_text}</p>
-            <p><strong>Participaron:</strong> ${results.total_participants} personas</p>
-            <p><strong>Coeficiente total:</strong> ${results.total_participant_coefficient}%</p>
+    return results.results.map(result => `
+        <div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <span style="font-weight: 600; color: var(--gray-800);">${result.option}</span>
+                <span style="font-weight: 600; color: var(--success-color);">${result.votes} votos</span>
+            </div>
+            <div style="background: var(--gray-200); height: 8px; border-radius: 4px; overflow: hidden;">
+                <div style="background: var(--success-color); height: 100%; width: ${result.percentage}%; transition: width 0.3s ease;"></div>
+            </div>
+            <div style="font-size: 0.875rem; color: var(--gray-600); margin-top: 0.25rem;">
+                ${result.percentage}% - ${result.coefficient}% coeficiente
+            </div>
         </div>
-        
-        <div style="max-height: 300px; overflow-y: auto;">
-            ${results.results && results.results.length > 0 ? 
-                results.results.map(result => `
-                    <div style="display: flex; align-items: center; padding: 0.8rem; margin: 0.5rem 0; background: white; border-radius: 8px; border: 1px solid var(--gray-300);">
-                        <span style="flex: 0 0 120px; font-weight: 600;">${result.answer}:</span>
-                        <div style="flex: 1; margin: 0 1rem;">
-                            <div style="background: var(--gray-200); height: 8px; border-radius: 4px; overflow: hidden;">
-                                <div style="height: 100%; background: linear-gradient(90deg, var(--primary-color), var(--success-color)); width: ${result.percentage}%; transition: width 0.5s ease;"></div>
-                            </div>
-                        </div>
-                        <span style="flex: 0 0 80px; text-align: right; font-weight: 600;">${result.votes} votos (${result.percentage.toFixed(2)}%)</span>
-                    </div>
-                `).join('') : 
-                '<p style="text-align: center; color: var(--gray-600);">Sin votos registrados</p>'
-            }
-        </div>
-    `;
-    
-    modalContent.querySelector('.modal-body').innerHTML = contentHTML;
+    `).join('');
 }
+
+let liveUpdateInterval = null;
+
+function startLiveResultsUpdate(questionId, hasTimer) {
+    // Limpiar intervalo anterior
+    if (liveUpdateInterval) {
+        clearInterval(liveUpdateInterval);
+    }
+    
+    liveUpdateInterval = setInterval(async () => {
+        try {
+            // Verificar si el modal sigue abierto
+            if (!document.getElementById(`live-results-${questionId}`)) {
+                clearInterval(liveUpdateInterval);
+                return;
+            }
+            
+            const results = await apiCall(`/voting/results/${questionId}`);
+            
+            // Actualizar participantes
+            const participantsSpan = document.getElementById(`live-participants-${questionId}`);
+            if (participantsSpan) {
+                participantsSpan.textContent = results.total_participants;
+            }
+            
+            // Actualizar coeficiente
+            const coefficientSpan = document.getElementById(`live-coefficient-${questionId}`);
+            if (coefficientSpan) {
+                coefficientSpan.textContent = `${results.total_participant_coefficient}%`;
+            }
+            
+            // Actualizar resultados
+            const resultsDiv = document.getElementById(`live-results-${questionId}`);
+            if (resultsDiv) {
+                resultsDiv.innerHTML = generateResultsHTML(results);
+            }
+            
+            // Actualizar timer si existe
+            if (hasTimer) {
+                const timerDiv = document.getElementById(`live-timer-${questionId}`);
+                if (timerDiv) {
+                    const questionData = await apiCall(`/voting/questions`);
+                    const question = questionData.find(q => q.id === questionId);
+                    
+                    if (question && question.time_remaining_seconds !== null) {
+                        if (question.time_remaining_seconds <= 0) {
+                            timerDiv.innerHTML = '⏰ <span style="color: var(--danger-color);">Tiempo agotado</span>';
+                            timerDiv.style.background = 'var(--danger-light)';
+                        } else {
+                            const minutes = Math.floor(question.time_remaining_seconds / 60);
+                            const seconds = question.time_remaining_seconds % 60;
+                            timerDiv.innerHTML = `⏰ Tiempo restante: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                        }
+                    }
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error actualizando resultados en vivo:', error);
+        }
+    }, 2000); // Actualizar cada 2 segundos
+}
+
+// Limpiar al cerrar modal
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-overlay')) {
+        if (liveUpdateInterval) {
+            clearInterval(liveUpdateInterval);
+            liveUpdateInterval = null;
+        }
+    }
+});
 
 async function deleteVoting(questionId) {
     try {

@@ -234,8 +234,6 @@ async def extend_question_time(question_id: int, request: ExtendTimeRequest):
 def preguntas_activas():
     conn = get_db()
     try:
-        current_time = datetime.utcnow().isoformat()
-        
         # Consulta mejorada que incluye las opciones
         qs = execute_query(
             conn,
@@ -252,25 +250,37 @@ def preguntas_activas():
         
         out = []
         for q in qs:
-            # Verificar si expiró
-            is_expired = False
+            # Calcular tiempo restante correctamente
             time_remaining = None
+            is_expired = False
             
-            if q["expires_at"] and q["closed"] == 0:
-                expires_at = datetime.fromisoformat(q["expires_at"])
-                current_dt = datetime.fromisoformat(current_time)
-                
-                if current_dt >= expires_at:
+            if q["time_limit_minutes"] and q["expires_at"]:
+                try:
+                    expires_at = datetime.fromisoformat(q["expires_at"].replace('Z', '+00:00'))
+                    current_dt = datetime.utcnow()
+                    
+                    if current_dt >= expires_at:
+                        # Ya expiró
+                        time_remaining = 0
+                        is_expired = True
+                        # Auto-cerrar si expiró
+                        execute_query(
+                            conn,
+                            "UPDATE questions SET closed = 1 WHERE id = ?",
+                            (q["id"],),
+                            commit=True
+                        )
+                    else:
+                        # Tiempo restante en segundos
+                        time_remaining = int((expires_at - current_dt).total_seconds())
+                        is_expired = False
+                except Exception as e:
+                    logger.error(f"Error calculando tiempo para pregunta {q['id']}: {e}")
+                    time_remaining = 0
                     is_expired = True
-                    # Auto-cerrar si expiró
-                    execute_query(
-                        conn,
-                        "UPDATE questions SET closed = 1 WHERE id = ?",
-                        (q["id"],),
-                        commit=True
-                    )
-                else:
-                    time_remaining = int((expires_at - current_dt).total_seconds())
+            else:
+                time_remaining = None
+                is_expired = False
             
             # SIEMPRE obtener opciones
             options = execute_query(
