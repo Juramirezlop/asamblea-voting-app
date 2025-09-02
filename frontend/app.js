@@ -1619,30 +1619,30 @@ function startAdminTimers() {
 
     window.adminTimerInterval = setInterval(() => {
         document.querySelectorAll('.countdown-timer').forEach(timer => {
-            const expiresAt = timer.getAttribute('data-expires');
-            const questionId = timer.getAttribute('data-question-id');
+            const questionId = parseInt(timer.getAttribute('data-question-id'));
             
-            if (expiresAt) {
-                const now = new Date();
-                const expires = new Date(expiresAt);
-                const diff = expires - now;
-                
-                if (diff > 0) {
-                    const minutes = Math.floor(diff / 60000);
-                    const seconds = Math.floor((diff % 60000) / 1000);
-                    timer.textContent = `(${minutes}:${String(seconds).padStart(2, '0')} restantes)`;
-                    timer.style.color = diff < 120000 ? 'var(--danger-color)' : 'var(--warning-color)';
-                } else {
-                    timer.textContent = '(¡Tiempo agotado!)';
-                    timer.style.color = 'var(--danger-color)';
-                    // Auto-reload para refrescar estado
-                    setTimeout(() => loadActiveQuestions(), 2000);
-                }
-            }
+            // Obtener tiempo restante desde el API en lugar de calcular fechas
+            apiCall('/voting/questions/active')
+                .then(questions => {
+                    const question = questions.find(q => q.id === questionId);
+                    if (question && question.time_remaining_seconds !== null) {
+                        if (question.time_remaining_seconds > 0) {
+                            const minutes = Math.floor(question.time_remaining_seconds / 60);
+                            const seconds = question.time_remaining_seconds % 60;
+                            timer.textContent = `(${minutes}:${String(seconds).padStart(2, '0')} restantes)`;
+                            timer.style.color = question.time_remaining_seconds < 120 ? 'var(--danger-color)' : 'var(--warning-color)';
+                        } else {
+                            timer.textContent = '(¡Tiempo agotado!)';
+                            timer.style.color = 'var(--danger-color)';
+                        }
+                    }
+                })
+                .catch(() => {
+                    timer.textContent = '(Error calculando)';
+                });
         });
     }, 1000);
 }
-
 async function refreshConnectedUsers() {
     try {
         const users = await apiCall('/admin/connected-users');
@@ -2271,23 +2271,26 @@ async function toggleVotingStatus(questionId) {
 async function viewVotingResults(questionId) {
     try {
         const results = await apiCall(`/voting/results/${questionId}`);
-        
-        // Crear modal con ID único
-        const modalId = `results-modal-${questionId}`;
-        
+        const questionData = await apiCall(`/voting/questions/active`);
+        const question = questionData.find(q => q.id === questionId);
+        const hasTimer = question && question.time_limit_minutes;
+        const timeRemaining = question ? question.time_remaining_seconds : null;
+
         const contentHTML = `
-            <div id="${modalId}" style="background: var(--gray-50); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
-                <p><strong>Pregunta:</strong> ${results.question_text}</p>
-                <p><strong>Participaron:</strong> <span id="live-participants-${questionId}">${results.total_participants}</span> de ${results.total_registered} registrados</p>
-                <p><strong>Coeficiente total:</strong> <span id="live-coefficient-${questionId}">${results.total_participant_coefficient}%</span></p>
-                ${results.time_limit_minutes ? `
-                    <div id="live-timer-${questionId}" style="padding: 0.5rem; background: var(--warning-light); border-radius: 6px; font-weight: 600; color: var(--warning-dark);">
-                        ⏰ Cargando tiempo restante...
-                    </div>
-                ` : ''}
+            <div style="background: linear-gradient(135deg, var(--primary-color), #764ba2); color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <h3 style="margin: 0 0 8px 0; font-size: 1.1rem;">${results.question_text}</h3>
+                <div style="display: flex; gap: 20px; font-size: 0.9rem; opacity: 0.9;">
+                    <span>👥 ${results.total_participants} de ${results.total_registered}</span>
+                    <span>📊 ${results.total_participant_coefficient}%</span>
+                    ${hasTimer && timeRemaining > 0 ? `
+                        <span style="background: rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">
+                            ⏰ ${Math.floor(timeRemaining/60)}:${String(timeRemaining%60).padStart(2,'0')}
+                        </span>
+                    ` : ''}
+                </div>
             </div>
             
-            <div id="live-results-${questionId}" style="max-height: 300px; overflow-y: auto;">
+            <div style="max-height: 200px; overflow-y: auto;">
                 ${generateResultsHTML(results)}
             </div>
         `;
@@ -2308,19 +2311,16 @@ async function viewVotingResults(questionId) {
 
 function generateResultsHTML(results) {
     if (!results.results || results.results.length === 0) {
-        return '<p style="text-align: center; color: var(--gray-600); padding: 2rem;">Sin votos registrados</p>';
+        return '<p style="text-align: center; color: var(--gray-600); padding: 1rem;">Sin votos registrados</p>';
     }
     
     return results.results.map(result => `
-        <div style="padding: 0.5rem 0; border-bottom: 1px solid var(--gray-200);">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
-                <strong>${result.answer || 'Sin respuesta'}</strong>
-                <span>${result.votes} votos</span>
+        <div style="display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--gray-200);">
+            <div style="flex: 0 0 50px; font-weight: 600; color: var(--gray-800);">${result.answer || 'Sin respuesta'}</div>
+            <div style="flex: 1; margin: 0 12px; height: 8px; background: var(--gray-200); border-radius: 4px; overflow: hidden;">
+                <div style="height: 100%; background: linear-gradient(90deg, var(--danger-color), #f87171); border-radius: 4px; width: ${result.percentage}%; transition: width 0.4s ease;"></div>
             </div>
-            <div style="background: var(--gray-200); height: 6px; border-radius: 3px; overflow: hidden; margin-bottom: 0.2rem;">
-                <div style="height: 100%; background: var(--success-color); width: ${result.percentage}%; transition: width 0.3s ease;"></div>
-            </div>
-            <div style="font-size: 0.8rem; color: var(--gray-600);">${result.percentage}%</div>
+            <div style="flex: 0 0 100px; text-align: right; font-weight: 600; color: var(--gray-700); font-size: 0.9rem;">${result.votes} votos | ${result.percentage}%</div>
         </div>
     `).join('');
 }
