@@ -1639,37 +1639,37 @@ async function loadActiveQuestions() {
 }
 
 function startAdminTimers() {
-    // Limpiar interval anterior
+
     if (window.adminTimerInterval) {
         clearInterval(window.adminTimerInterval);
     }
 
-    window.adminTimerInterval = setInterval(() => {
-        document.querySelectorAll('.countdown-timer').forEach(timer => {
-            const questionId = parseInt(timer.getAttribute('data-question-id'));
+    window.adminTimerInterval = setInterval(async () => {
+        try {
+            const questions = await apiCall('/voting/questions/active');
             
-            // Obtener tiempo restante desde el API en lugar de calcular fechas
-            apiCall('/voting/questions/active')
-                .then(questions => {
-                    const question = questions.find(q => q.id === questionId);
-                    if (question && question.time_remaining_seconds !== null) {
-                        if (question.time_remaining_seconds > 0) {
-                            const minutes = Math.floor(question.time_remaining_seconds / 60);
-                            const seconds = question.time_remaining_seconds % 60;
-                            timer.textContent = `(${minutes}:${String(seconds).padStart(2, '0')} restantes)`;
-                            timer.style.color = question.time_remaining_seconds < 120 ? 'var(--danger-color)' : 'var(--warning-color)';
-                        } else {
-                            timer.textContent = '(¡Tiempo agotado!)';
-                            timer.style.color = 'var(--danger-color)';
-                        }
+            document.querySelectorAll('.countdown-timer').forEach(timer => {
+                const questionId = parseInt(timer.getAttribute('data-question-id'));
+                const question = questions.find(q => q.id === questionId);
+                
+                if (question && question.time_remaining_seconds !== null) {
+                    if (question.time_remaining_seconds <= 0) {
+                        timer.textContent = '(Tiempo agotado)';
+                        timer.style.color = 'var(--danger-color)';
+                    } else {
+                        const minutes = Math.floor(question.time_remaining_seconds / 60);
+                        const seconds = question.time_remaining_seconds % 60;
+                        timer.textContent = `(${minutes}:${String(seconds).padStart(2, '0')} restantes)`;
+                        timer.style.color = question.time_remaining_seconds < 120 ? 'var(--danger-color)' : 'var(--warning-color)';
                     }
-                })
-                .catch(() => {
-                    timer.textContent = '(Error calculando)';
-                });
-        });
+                }
+            });
+        } catch (error) {
+            console.error('Error actualizando timers admin:', error);
+        }
     }, 1000);
 }
+
 async function refreshConnectedUsers() {
     try {
         const users = await apiCall('/admin/connected-users');
@@ -2374,25 +2374,38 @@ function startLiveResultsUpdate(questionId, hasTimer) {
     // Limpiar intervalo anterior
     if (liveUpdateInterval) {
         clearInterval(liveUpdateInterval);
-        liveUpdateInterval = null;
     }
     
-    // Almacenar referencia del modal abierto para WebSocket
-    window.currentResultsModal = questionId;
-    
-    // Solo mantener timer para el reloj si existe
-    if (hasTimer) {
-        liveUpdateInterval = setInterval(async () => {
-            try {
-                // Verificar si el modal sigue abierto
-                if (!document.getElementById(`live-results-${questionId}`)) {
-                    clearInterval(liveUpdateInterval);
-                    liveUpdateInterval = null;
-                    window.currentResultsModal = null;
-                    return;
-                }
-                
-                // Solo actualizar timer, no resultados (esos van por WebSocket)
+    liveUpdateInterval = setInterval(async () => {
+        try {
+            // Verificar si el modal sigue abierto
+            if (!document.getElementById(`live-results-${questionId}`)) {
+                clearInterval(liveUpdateInterval);
+                return;
+            }
+            
+            const results = await apiCall(`/voting/results/${questionId}`);
+            
+            // Actualizar participantes
+            const participantsSpan = document.getElementById(`live-participants-${questionId}`);
+            if (participantsSpan) {
+                participantsSpan.textContent = results.total_participants;
+            }
+            
+            // Actualizar coeficiente
+            const coefficientSpan = document.getElementById(`live-coefficient-${questionId}`);
+            if (coefficientSpan) {
+                coefficientSpan.textContent = `${results.total_participant_coefficient}%`;
+            }
+            
+            // Actualizar resultados
+            const resultsDiv = document.getElementById(`live-results-${questionId}`);
+            if (resultsDiv) {
+                resultsDiv.innerHTML = generateResultsHTML(results);
+            }
+            
+            // Actualizar timer si existe
+            if (hasTimer) {
                 const timerDiv = document.getElementById(`live-timer-${questionId}`);
                 if (timerDiv) {
                     const questionData = await apiCall(`/voting/questions/active`);
@@ -2402,8 +2415,6 @@ function startLiveResultsUpdate(questionId, hasTimer) {
                         if (question.time_remaining_seconds <= 0) {
                             timerDiv.innerHTML = '⏰ Tiempo agotado';
                             timerDiv.style.background = 'rgba(239, 68, 68, 0.2)';
-                            clearInterval(liveUpdateInterval);
-                            liveUpdateInterval = null;
                         } else {
                             const minutes = Math.floor(question.time_remaining_seconds / 60);
                             const seconds = question.time_remaining_seconds % 60;
@@ -2411,26 +2422,12 @@ function startLiveResultsUpdate(questionId, hasTimer) {
                         }
                     }
                 }
-                
-            } catch (error) {
-                console.error('Error actualizando timer:', error);
             }
-        }, 1000); // Timer cada segundo
-    }
-    
-    // Cleanup al cerrar modal
-    const modal = document.querySelector('.modal-overlay');
-    if (modal) {
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                window.currentResultsModal = null;
-                if (liveUpdateInterval) {
-                    clearInterval(liveUpdateInterval);
-                    liveUpdateInterval = null;
-                }
-            }
-        });
-    }
+            
+        } catch (error) {
+            console.error('Error actualizando resultados en vivo:', error);
+        }
+    }, 1000); // Cada segundo
 }
 
 async function updateLiveResults(questionId) {
