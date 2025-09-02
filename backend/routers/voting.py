@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List
 from ..database import get_db, execute_query, close_db
 from ..auth.auth import admin_required, voter_required, admin_or_voter_required
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 router = APIRouter(prefix="/voting", tags=["Voting"])
 logger = logging.getLogger(__name__)
@@ -256,11 +256,19 @@ async def preguntas_activas():
             
             if q["time_limit_minutes"] and q["expires_at"]:
                 try:
-                    expires_at = datetime.fromisoformat(q["expires_at"].replace('Z', '+00:00'))
-                    current_dt = datetime.utcnow()
+                    # Parsear correctamente la fecha
+                    expires_str = q["expires_at"]
+                    if expires_str.endswith('Z'):
+                        expires_str = expires_str[:-1] + '+00:00'
+                    expires_at = datetime.fromisoformat(expires_str)
+                    if expires_at.tzinfo is None:
+                        expires_at = expires_at.replace(tzinfo=timezone.utc)
+                    
+                    # Usar UTC para ambas fechas
+                    current_dt = datetime.now(timezone.utc)
                     
                     if current_dt >= expires_at:
-                        if q["closed"] == 0:  # Solo notificar si no estaba cerrada
+                        if q["closed"] == 0:
                             time_remaining = 0
                             is_expired = True
                             # Auto-cerrar
@@ -270,21 +278,14 @@ async def preguntas_activas():
                                 (q["id"],),
                                 commit=True
                             )
-
-                            # WebSocket UNA SOLA VEZ
-                            try:
-                                from ..main import manager
-                                await manager.broadcast_to_admins({
-                                    "type": "question_expired", 
-                                    "data": {"question_id": q["id"], "text": q["text"]}
-                                })
-                            except Exception as ws_error:
-                                logger.error(f"Error enviando WebSocket: {ws_error}")
                         else:
-                            # Ya estaba cerrada, no notificar
                             time_remaining = 0
                             is_expired = True
-
+                    else:
+                        # Calcular segundos restantes
+                        diff = expires_at - current_dt
+                        time_remaining = max(0, int(diff.total_seconds()))
+                        is_expired = False
                 except Exception as e:
                     logger.error(f"Error calculando tiempo para pregunta {q['id']}: {e}")
                     time_remaining = 0

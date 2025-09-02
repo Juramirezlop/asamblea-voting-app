@@ -1257,11 +1257,11 @@ body {
 .modal-overlay.large .modal-content {
     max-width: 90vw;
     max-height: 90vh;
-    width: 1000px;
+    width: 700px;
     overflow-y: auto;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 800px) {
     .modal-overlay.large .modal-content {
         width: 95vw;
     }
