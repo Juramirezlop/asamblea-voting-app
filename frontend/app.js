@@ -1777,7 +1777,9 @@ function renderActiveQuestions(questions) {
                             <span>Límite: ${q.time_limit_minutes} min
                                 ${q.expires_at && !q.closed ?
                                     `<span class="countdown-timer" data-expires="${q.expires_at}" data-question-id="${q.id}">
-                                        ${q.time_remaining_seconds ? Math.floor(q.time_remaining_seconds/60) + ':' + String(q.time_remaining_seconds%60).padStart(2,'0') + ' restantes' : 'Calculando...'}
+                                        ${q.time_remaining_seconds > 0 ? 
+                                            Math.floor(q.time_remaining_seconds/60) + ':' + String(q.time_remaining_seconds%60).padStart(2,'0') + ' restantes' 
+                                            : 'Tiempo agotado'}
                                     </span>`
                                     : ''
                                 }
@@ -2732,17 +2734,6 @@ async function showDeleteCodeModal() {
                 <input type="text" id="delete-code-input" class="modal-input" placeholder="Escriba para buscar..." 
                     style="text-transform: uppercase; margin-bottom: 0.5rem;" autocomplete="off">
                 <div id="code-suggestions" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--gray-300); border-radius: 6px; display: none;"></div>
-                
-                <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--gray-300); border-radius: 8px; padding: 0.5rem; margin-top: 1rem;">
-                    <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: var(--gray-700);">Usuarios Registrados (${registeredUsers.length}):</h4>
-                    ${registeredUsers.map(user => `
-                        <div onclick="document.getElementById('delete-code-input').value='${user.code}'; document.getElementById('code-suggestions').style.display='none';" 
-                             style="display: flex; justify-content: space-between; padding: 0.5rem; border: 1px solid var(--gray-300); border-radius: 6px; margin-bottom: 0.25rem; background: white; cursor: pointer;" 
-                             onmouseover="this.style.background='var(--gray-100)'" onmouseout="this.style.background='white'">
-                            <span><strong>${user.code}</strong> - ${user.name}</span>
-                        </div>
-                    `).join('')}
-                </div>
             `,
             actions: [
                 {
