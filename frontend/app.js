@@ -2254,7 +2254,8 @@ async function viewVotingResults(questionId) {
     try {
         const results = await apiCall(`/voting/results/${questionId}`);
         
-        let contentHTML = `
+        // CONTENIDO ESTÁTICO (no dinámico)
+        const contentHTML = `
             <div style="background: var(--gray-50); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
                 <p><strong>Pregunta:</strong> ${results.question_text}</p>
                 <p><strong>Participaron:</strong> ${results.total_participants} de ${results.total_registered} registrados</p>
@@ -2262,7 +2263,7 @@ async function viewVotingResults(questionId) {
             </div>
             
             <div style="max-height: 300px; overflow-y: auto;">
-                ${results.results && results.results.length > 0 ? 
+                ${results.results && results.results.length > 0 ?
                     results.results.map(result => `
                         <div style="display: flex; align-items: center; padding: 0.8rem; margin: 0.5rem 0; background: white; border-radius: 8px; border: 1px solid var(--gray-300);">
                             <span style="flex: 0 0 120px; font-weight: 600;">${result.answer}:</span>
@@ -2282,26 +2283,8 @@ async function viewVotingResults(questionId) {
         modals.show({
             title: 'Resultados Detallados',
             content: contentHTML,
-            size: 'large',
-            actions: [
-                {
-                    text: 'Cerrar',
-                    class: 'btn-secondary',
-                    handler: 'modals.hide(); if(window.resultsInterval) clearInterval(window.resultsInterval);'
-                }
-            ]
+            size: 'large'
         });
-
-        // Actualizar resultados cada 3 segundos
-        window.resultsInterval = setInterval(async () => {
-            try {
-                const updatedResults = await apiCall(`/voting/results/${questionId}`);
-                // Actualizar solo el contenido, no todo el modal
-                updateResultsContent(updatedResults);
-            } catch (error) {
-                console.log('Error actualizando resultados:', error);
-            }
-        }, 2000);
         
     } catch (error) {
         notifications.show(`Error: ${error.message}`, 'error');

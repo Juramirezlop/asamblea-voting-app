@@ -46,7 +46,7 @@ async def crear_pregunta(payload: QuestionCreate):
     expires_at = None
     time_limit = None
     if hasattr(payload, 'time_limit_minutes') and payload.time_limit_minutes and payload.time_limit_minutes > 0:
-        time_limit = payload.time_limit_minutes
+        time_limit = payload.time_limit_minutes if payload.time_limit_minutes else None
         expires_at = (datetime.utcnow() + timedelta(minutes=time_limit)).isoformat()
     conn = get_db()
     try:
@@ -432,54 +432,73 @@ def mis_votos(user=Depends(voter_required)):
 async def toggle_question_status(question_id: int):
     conn = get_db()
     try:
-        # Obtener estado actual
-        current_status = execute_query(
+        # Obtener estado actual con información completa
+        question = execute_query(
             conn,
-            "SELECT closed, text FROM questions WHERE id = ?",
+            "SELECT closed, text, time_limit_minutes, expires_at FROM questions WHERE id = ?",
             (question_id,),
             fetchone=True
         )
         
-        if not current_status:
+        if not question:
             raise HTTPException(status_code=404, detail="Pregunta no encontrada")
         
-        # Cambiar estado
-        execute_query(
-            conn,
-            "UPDATE questions SET closed = 1 - closed WHERE id = ?",
-            (question_id,),
-            commit=True
-        )
+        if question["closed"]:
+            # Si está cerrada y tiene timer, recalcular nueva expiración
+            if question["time_limit_minutes"]:
+                new_expires = datetime.utcnow() + timedelta(minutes=question["time_limit_minutes"])
+                execute_query(
+                    conn,
+                    "UPDATE questions SET closed = 0, expires_at = ? WHERE id = ?",
+                    (new_expires.isoformat(), question_id),
+                    commit=True
+                )
+            else:
+                # Sin timer, solo abrir
+                execute_query(
+                    conn,
+                    "UPDATE questions SET closed = 0 WHERE id = ?",
+                    (question_id,),
+                    commit=True
+                )
+        else:
+            # Cerrar votación
+            execute_query(
+                conn,
+                "UPDATE questions SET closed = 1 WHERE id = ?",
+                (question_id,),
+                commit=True
+            )
         
         # Obtener nuevo estado
-        status = execute_query(
+        new_status = execute_query(
             conn,
             "SELECT closed FROM questions WHERE id = ?",
             (question_id,),
             fetchone=True
         )
         
-        new_closed = bool(status["closed"]) if status else False
-        
-        # WEBSOCKET: Notificar cambio de estado
+        # WEBSOCKET: Solo UNA notificación
         from ..main import manager
-        await manager.broadcast_to_voters({
-            "type": "question_status_changed",
-            "data": {
-                "question_id": question_id,
-                "closed": new_closed,
-                "text": current_status["text"]
-            }
-        })
         await manager.broadcast_to_admins({
             "type": "question_toggled",
-            "data": {"question_id": question_id, "closed": new_closed}
+            "data": {
+                "question_id": question_id,
+                "closed": bool(new_status["closed"])
+            }
         })
         
-        return {"closed": new_closed}
+        return {
+            "status": "actualizado",
+            "question_id": question_id,
+            "closed": bool(new_status["closed"])
+        }
+        
+    except Exception as e:
+        logger.error(f"Error toggle pregunta {question_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno: {str(e)}")
     finally:
         close_db(conn)
-
 # --- Borrar encuestas ---
 @router.delete("/questions/{question_id}", dependencies=[Depends(admin_required)])
 async def delete_question(question_id: int):
