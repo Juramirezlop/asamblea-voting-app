@@ -1680,6 +1680,11 @@ function startAdminTimers() {
                     }
                 }
             });
+
+            await manager.broadcast_to_voters({
+                "type": "questions_updated"
+            });
+            
         } catch (error) {
             console.error('Error actualizando timers admin:', error);
         }
@@ -1791,11 +1796,11 @@ function renderActiveQuestions(questions) {
                         <div class="meta-item">
                             <span>⏰</span>
                             <span>Límite: ${q.time_limit_minutes} min
-                                ${q.expires_at && !q.closed ?
-                                    `<span class="question-timer" data-question-id="${q.id}" data-remaining="${q.time_remaining_seconds}">
+                                ${q.expires_at && q.time_remaining_seconds !== null ?
+                                    `<span class="countdown-timer" data-question-id="${q.id}" style="color: ${q.time_remaining_seconds > 0 ? 'var(--warning-color)' : 'var(--danger-color)'}; font-weight: 600; margin-left: 8px;">
                                         ${q.time_remaining_seconds > 0 ? 
-                                            Math.floor(q.time_remaining_seconds/60) + ':' + String(q.time_remaining_seconds%60).padStart(2,'0') + ' restantes' 
-                                            : 'Tiempo agotado'}
+                                            '(' + Math.floor(q.time_remaining_seconds/60) + ':' + String(q.time_remaining_seconds%60).padStart(2,'0') + ' restantes)' 
+                                            : '(Tiempo agotado)'}
                                     </span>`
                                     : ''
                                 }

@@ -311,15 +311,26 @@ class VotingComponents {
                 <div class="question-header">
                     <div class="question-title">${question.text}</div>
                     <div class="question-meta">
-                    ${question.time_remaining_seconds > 0 ? `
-                        <div class="question-timer" data-question-id="${question.id}" data-remaining="${question.time_remaining_seconds}">
-                            ⏰ ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')} restantes
-                        </div>
-                    ` : question.time_remaining_seconds === 0 ? `
-                        <div class="question-timer" style="background: linear-gradient(135deg, var(--danger-color), var(--danger-dark));">
-                            ⏰ Tiempo agotado
-                        </div>
-                    ` : ''}
+                    ${question.time_remaining_seconds !== null && question.time_remaining_seconds !== undefined ?
+                        question.time_remaining_seconds > 0 ? `
+                            <div class="meta-item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <polyline points="12,6 12,12 16,14"></polyline>
+                                </svg>
+                                <span class="question-timer" data-remaining="${question.time_remaining_seconds}">
+                                    ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')} restantes
+                                </span>
+                            </div>
+                        ` : `
+                            <div class="meta-item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <path d="M12 6v6l4 2"></path>
+                                </svg>
+                                <span style="color: var(--danger-color); font-weight: 600;">Tiempo agotado</span>
+                            </div>
+                        ` : ''}
                         <div class="meta-item">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M3 3v18h18"></path>
