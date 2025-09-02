@@ -1407,71 +1407,67 @@ function setupVotingFormListeners() {
         });
     });
 
-    // Configurar estado inicial de timer
-    const timerConfig = document.getElementById('timer-config');
-    if (timerConfig) {
-        timerConfig.style.display = 'none';
-    }
-
-    // Resetear botones de timer correctamente
+    // Timer toggle buttons - configuración inicial
     document.querySelectorAll('.timer-toggle-btn').forEach(btn => {
+        const enabled = btn.getAttribute('data-enabled') === 'true';
+        
+        // Estado inicial
         btn.classList.remove('active');
-        if (btn.getAttribute('data-enabled') === 'false') {
+        if (!enabled) {
+            // Botón "No" activo por defecto
             btn.classList.add('active');
             btn.style.background = 'var(--gray-200)';
             btn.style.borderColor = 'var(--gray-400)';
             btn.style.color = 'var(--gray-700)';
         } else {
+            // Botón "Sí"
             btn.style.background = 'white';
             btn.style.borderColor = 'var(--gray-300)';
             btn.style.color = 'var(--gray-600)';
         }
-    });
-
-    // Timer toggle buttons (con verificación de existencia)
-    const timerButtons = document.querySelectorAll('.timer-toggle-btn');
-    if (timerButtons.length > 0) {
-        timerButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const enabled = e.target.getAttribute('data-enabled') === 'true';
-                
-                // Actualizar estados de botones
-                document.querySelectorAll('.timer-toggle-btn').forEach(b => {
-                    b.classList.remove('active');
-                    b.style.background = 'white';
-                    b.style.borderColor = 'var(--gray-400)';
-                    b.style.color = 'var(--gray-700)';
-                });
-                
-                e.target.classList.add('active');
-                e.target.style.background = enabled ? 'var(--success-color)' : 'var(--danger-color)';
-                e.target.style.borderColor = enabled ? 'var(--success-color)' : 'var(--danger-color)';
-                e.target.style.color = 'white';
-                
-                // Mostrar/ocultar input de minutos
-                const minutesContainer = document.getElementById('timer-minutes-container');
-                if (minutesContainer) {
-                    if (enabled) {
-                        minutesContainer.style.opacity = '1';
-                        minutesContainer.style.pointerEvents = 'auto';
-                    } else {
-                        minutesContainer.style.opacity = '0.5';
-                        minutesContainer.style.pointerEvents = 'none';
-                    }
-                }
+        
+        // Event listener
+        btn.addEventListener('click', (e) => {
+            const clickedEnabled = e.target.getAttribute('data-enabled') === 'true';
+            
+            // Resetear todos los botones
+            document.querySelectorAll('.timer-toggle-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = 'white';
+                b.style.borderColor = 'var(--gray-300)';
+                b.style.color = 'var(--gray-600)';
             });
-        });
-    }
-
-    // Timer checkbox (mantener compatibilidad con versión anterior)
-    const enableTimerCheckbox = document.getElementById('enable-timer');
-    if (enableTimerCheckbox) {
-        enableTimerCheckbox.addEventListener('change', (e) => {
-            const timerConfig = document.getElementById('timer-config');
-            if (timerConfig) {
-                timerConfig.style.display = e.target.checked ? 'block' : 'none';
+            
+            // Activar el clickeado
+            e.target.classList.add('active');
+            if (clickedEnabled) {
+                e.target.style.background = 'var(--success-color)';
+                e.target.style.borderColor = 'var(--success-color)';
+            } else {
+                e.target.style.background = 'var(--gray-200)';
+                e.target.style.borderColor = 'var(--gray-400)';
+            }
+            e.target.style.color = clickedEnabled ? 'white' : 'var(--gray-700)';
+            
+            // Mostrar/ocultar input de minutos
+            const minutesContainer = document.getElementById('timer-minutes-container');
+            if (minutesContainer) {
+                if (clickedEnabled) {
+                    minutesContainer.style.opacity = '1';
+                    minutesContainer.style.pointerEvents = 'auto';
+                } else {
+                    minutesContainer.style.opacity = '0.5';
+                    minutesContainer.style.pointerEvents = 'none';
+                }
             }
         });
+    });
+
+    // Estado inicial del contenedor de minutos
+    const minutesContainer = document.getElementById('timer-minutes-container');
+    if (minutesContainer) {
+        minutesContainer.style.opacity = '0.5';
+        minutesContainer.style.pointerEvents = 'none';
     }
 }
 
@@ -2295,7 +2291,11 @@ async function viewVotingResults(questionId) {
             </div>
         `;
 
-        modals.show(`Resultados - ${results.question_text}`, contentHTML);
+        modals.show({
+            title: `Resultados - ${results.question_text}`,
+            content: contentHTML,
+            size: 'large'
+        });
         
         // Iniciar actualización en vivo
         startLiveResultsUpdate(questionId, results.time_limit_minutes);
@@ -2366,7 +2366,7 @@ function startLiveResultsUpdate(questionId, hasTimer) {
             if (hasTimer) {
                 const timerDiv = document.getElementById(`live-timer-${questionId}`);
                 if (timerDiv) {
-                    const questionData = await apiCall(`/voting/questions`);
+                    const questionData = await apiCall(`/voting/questions/active`);
                     const question = questionData.find(q => q.id === questionId);
                     
                     if (question && question.time_remaining_seconds !== null) {
