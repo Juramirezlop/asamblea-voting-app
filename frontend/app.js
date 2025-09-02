@@ -228,12 +228,19 @@ function handleAdminWebSocketMessage(message) {
             setTimeout(() => loadAforoData(), 500);
             addActivityLog(`Nueva asistencia: ${message.data.code} - ${message.data.name}`, 'success');
             break;
-            
+
         case 'vote_registered':
+            // Actualizar conteos generales
             setTimeout(() => {
                 loadAforoData();
                 updateVoteCountsForActiveQuestions();
             }, 300);
+            
+            // Si hay modal de resultados abierto, actualizarlo
+            if (window.currentResultsModal) {
+                updateLiveResults(window.currentResultsModal);
+            }
+            
             addActivityLog(`Voto registrado: ${message.data.participant_code}`, 'info');
             break;
 
@@ -253,9 +260,19 @@ function handleAdminWebSocketMessage(message) {
             break;
 
         case 'question_expired':
-            setTimeout(() => loadActiveQuestions(), 500);
-            addActivityLog(`Votación expirada: ${message.data.text}`, 'warning');
-            notifications.show('Una votación ha expirado automáticamente', 'warning');
+            // Evitar notificaciones duplicadas
+            const lastExpiredKey = `expired_${message.data.question_id}`;
+            const now = Date.now();
+            if (!window.lastNotifications) window.lastNotifications = {};
+            
+            if (!window.lastNotifications[lastExpiredKey] || 
+                now - window.lastNotifications[lastExpiredKey] > 5000) {
+                
+                window.lastNotifications[lastExpiredKey] = now;
+                setTimeout(() => loadActiveQuestions(), 500);
+                addActivityLog(`Votación expirada: ${message.data.text}`, 'warning');
+                notifications.show('Una votación ha expirado automáticamente', 'warning');
+            }
             break;
 
         default:
@@ -2313,7 +2330,7 @@ async function viewVotingResults(questionId) {
                 </div>
             </div>
             
-            <div id="live-results-${questionId}" style="max-height: 180px; overflow-y: auto;">
+            <div id="live-results-${questionId}" style="max-height: 250px; overflow-y: auto;">
                 ${generateResultsHTML(results)}
             </div>
         `;
@@ -2321,7 +2338,7 @@ async function viewVotingResults(questionId) {
         modals.show({
             title: `Resultados`,
             content: contentHTML,
-            size: 'medium'
+            size: 'large'
         });
         
         startLiveResultsUpdate(questionId, question ? question.time_limit_minutes : false);
@@ -2355,38 +2372,25 @@ function startLiveResultsUpdate(questionId, hasTimer) {
     // Limpiar intervalo anterior
     if (liveUpdateInterval) {
         clearInterval(liveUpdateInterval);
+        liveUpdateInterval = null;
     }
     
-    liveUpdateInterval = setInterval(async () => {
-        try {
-            // Verificar si el modal sigue abierto
-            if (!document.getElementById(`live-results-${questionId}`)) {
-                clearInterval(liveUpdateInterval);
-                return;
-            }
-            
-            const results = await apiCall(`/voting/results/${questionId}`);
-            
-            // Actualizar participantes
-            const participantsSpan = document.getElementById(`live-participants-${questionId}`);
-            if (participantsSpan) {
-                participantsSpan.textContent = results.total_participants;
-            }
-            
-            // Actualizar coeficiente
-            const coefficientSpan = document.getElementById(`live-coefficient-${questionId}`);
-            if (coefficientSpan) {
-                coefficientSpan.textContent = `${results.total_participant_coefficient}%`;
-            }
-            
-            // Actualizar resultados
-            const resultsDiv = document.getElementById(`live-results-${questionId}`);
-            if (resultsDiv) {
-                resultsDiv.innerHTML = generateResultsHTML(results);
-            }
-            
-            // Actualizar timer si existe
-            if (hasTimer) {
+    // Almacenar referencia del modal abierto para WebSocket
+    window.currentResultsModal = questionId;
+    
+    // Solo mantener timer para el reloj si existe
+    if (hasTimer) {
+        liveUpdateInterval = setInterval(async () => {
+            try {
+                // Verificar si el modal sigue abierto
+                if (!document.getElementById(`live-results-${questionId}`)) {
+                    clearInterval(liveUpdateInterval);
+                    liveUpdateInterval = null;
+                    window.currentResultsModal = null;
+                    return;
+                }
+                
+                // Solo actualizar timer, no resultados (esos van por WebSocket)
                 const timerDiv = document.getElementById(`live-timer-${questionId}`);
                 if (timerDiv) {
                     const questionData = await apiCall(`/voting/questions/active`);
@@ -2394,8 +2398,10 @@ function startLiveResultsUpdate(questionId, hasTimer) {
                     
                     if (question && question.time_remaining_seconds !== null) {
                         if (question.time_remaining_seconds <= 0) {
-                            timerDiv.innerHTML = '⏰ <span style="color: var(--danger-color);">Tiempo agotado</span>';
-                            timerDiv.style.background = 'var(--danger-light)';
+                            timerDiv.innerHTML = '⏰ Tiempo agotado';
+                            timerDiv.style.background = 'rgba(239, 68, 68, 0.2)';
+                            clearInterval(liveUpdateInterval);
+                            liveUpdateInterval = null;
                         } else {
                             const minutes = Math.floor(question.time_remaining_seconds / 60);
                             const seconds = question.time_remaining_seconds % 60;
@@ -2403,12 +2409,45 @@ function startLiveResultsUpdate(questionId, hasTimer) {
                         }
                     }
                 }
+                
+            } catch (error) {
+                console.error('Error actualizando timer:', error);
             }
-            
-        } catch (error) {
-            console.error('Error actualizando resultados en vivo:', error);
-        }
-    }, 2000); // Actualizar cada 2 segundos
+        }, 1000); // Timer cada segundo
+    }
+    
+    // Cleanup al cerrar modal
+    const modal = document.querySelector('.modal-overlay');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                window.currentResultsModal = null;
+                if (liveUpdateInterval) {
+                    clearInterval(liveUpdateInterval);
+                    liveUpdateInterval = null;
+                }
+            }
+        });
+    }
+}
+
+async function updateLiveResults(questionId) {
+    try {
+        const results = await apiCall(`/voting/results/${questionId}`);
+        
+        // Actualizar solo los elementos que cambian
+        const participantsSpan = document.getElementById(`live-participants-${questionId}`);
+        if (participantsSpan) participantsSpan.textContent = results.total_participants;
+        
+        const coefficientSpan = document.getElementById(`live-coefficient-${questionId}`);
+        if (coefficientSpan) coefficientSpan.textContent = `${results.total_participant_coefficient}%`;
+        
+        const resultsDiv = document.getElementById(`live-results-${questionId}`);
+        if (resultsDiv) resultsDiv.innerHTML = generateResultsHTML(results);
+        
+    } catch (error) {
+        console.error('Error actualizando resultados:', error);
+    }
 }
 
 // Limpiar al cerrar modal

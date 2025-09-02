@@ -260,30 +260,31 @@ async def preguntas_activas():
                     current_dt = datetime.utcnow()
                     
                     if current_dt >= expires_at:
-                        # Ya expiró
-                        time_remaining = 0
-                        is_expired = True
-                        # Auto-cerrar si expiró
-                        execute_query(
-                            conn,
-                            "UPDATE questions SET closed = 1 WHERE id = ?",
-                            (q["id"],),
-                            commit=True
-                        )
+                        if q["closed"] == 0:  # Solo notificar si no estaba cerrada
+                            time_remaining = 0
+                            is_expired = True
+                            # Auto-cerrar
+                            execute_query(
+                                conn,
+                                "UPDATE questions SET closed = 1 WHERE id = ?",
+                                (q["id"],),
+                                commit=True
+                            )
 
-                        try:
-                            from ..main import manager
-                            await manager.broadcast_to_admins({
-                                "type": "question_expired", 
-                                "data": {"question_id": q["id"], "text": q["text"]}
-                            })
-                        except Exception as ws_error:
-                            logger.error(f"Error enviando WebSocket: {ws_error}")
+                            # WebSocket UNA SOLA VEZ
+                            try:
+                                from ..main import manager
+                                await manager.broadcast_to_admins({
+                                    "type": "question_expired", 
+                                    "data": {"question_id": q["id"], "text": q["text"]}
+                                })
+                            except Exception as ws_error:
+                                logger.error(f"Error enviando WebSocket: {ws_error}")
+                        else:
+                            # Ya estaba cerrada, no notificar
+                            time_remaining = 0
+                            is_expired = True
 
-                    else:
-                        # Tiempo restante en segundos
-                        time_remaining = int((expires_at - current_dt).total_seconds())
-                        is_expired = False
                 except Exception as e:
                     logger.error(f"Error calculando tiempo para pregunta {q['id']}: {e}")
                     time_remaining = 0
