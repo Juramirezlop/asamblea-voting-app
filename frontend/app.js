@@ -1581,7 +1581,7 @@ async function loadActiveQuestions() {
             const questions = await apiCall('/voting/questions/active');
             console.log('Preguntas recibidas:', questions);
             renderActiveQuestions(questions);
-            await updateVoteCountsForActiveQuestions();
+            // await updateVoteCountsForActiveQuestions();
         } catch (error) {
             console.error('Error loading active questions:', error);
             const container = document.getElementById('active-questions');
