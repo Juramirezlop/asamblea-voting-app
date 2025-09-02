@@ -1581,7 +1581,7 @@ async function loadActiveQuestions() {
             const questions = await apiCall('/voting/questions/active');
             console.log('Preguntas recibidas:', questions);
             renderActiveQuestions(questions);
-            // await updateVoteCountsForActiveQuestions();
+            await updateVoteCountsForActiveQuestions();
         } catch (error) {
             console.error('Error loading active questions:', error);
             const container = document.getElementById('active-questions');
@@ -1771,20 +1771,22 @@ async function updateVoteCountsForActiveQuestions() {
         const questions = await apiCall('/voting/questions/active');
         for (const question of questions) {
             try {
-                const results = await apiCall(`/voting/results/${question.id}`);
-                const voteCountElement = document.querySelector(`[data-question-id="${question.id}"]`);
+                const results = await apiCall(`/voting/results/${question.id}`);                
+                const voteCountElement = document.querySelector(`.vote-count[data-question-id="${question.id}"]`);
+                
                 if (voteCountElement) {
                     voteCountElement.textContent = results.total_participants || 0;
                 }
             } catch (error) {
-                const voteCountElement = document.querySelector(`[data-question-id="${question.id}"]`);
+                const voteCountElement = document.querySelector(`.vote-count[data-question-id="${question.id}"]`);
+                
                 if (voteCountElement) {
                     voteCountElement.textContent = '0';
                 }
             }
         }
     } catch (error) {
-        console.log('Error actualizando conteo de votos:', error);
+        console.log('Error actualizando contadores de votos:', error);
     }
 }
 
