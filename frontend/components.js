@@ -349,7 +349,7 @@ class VotingComponents {
                     </div>
                 </div>
 
-                ${question.closed ? `
+                ${question.closed || (question.time_remaining_seconds !== null && question.time_remaining_seconds <= 0) ? `
                     <div class="voted-status">
                         🔒 Esta votación ha sido cerrada
                     </div>
@@ -409,7 +409,7 @@ class VotingComponents {
                     </div>
                 </div>
 
-                ${question.closed ? `
+                ${question.closed || (question.time_remaining_seconds !== null && question.time_remaining_seconds <= 0) ? `
                     <div class="voted-status">
                         🔒 Esta votación ha sido cerrada
                     </div>

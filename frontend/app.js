@@ -311,6 +311,10 @@ function handleVoterWebSocketMessage(message) {
             notifications.show(message.data.message, 'error', 10000);
             setTimeout(() => logout(), 2000);
             break;
+        case 'question_expired':
+            loadVotingQuestions();
+            notifications.show(`⏰ Votación cerrada por tiempo agotado: ${message.data.text}`, 'warning', 8000);
+            break;
     }
 }
 
@@ -1800,7 +1804,7 @@ function renderActiveQuestions(questions) {
                                 ${q.expires_at && q.time_remaining_seconds !== null ?
                                     `<span class="countdown-timer" data-question-id="${q.id}" style="color: black; font-weight: 600; margin-left: 8px;">
                                         ${q.time_remaining_seconds > 0 ? 
-                                            '⏰' + Math.floor(q.time_remaining_seconds/60) + ':' + String(q.time_remaining_seconds%60).padStart(2,'0') + ' restantes' 
+                                            Math.floor(q.time_remaining_seconds/60) + ':' + String(q.time_remaining_seconds%60).padStart(2,'0') + ' restantes' 
                                             : '(Tiempo agotado)'}
                                     </span>`
                                     : ''
