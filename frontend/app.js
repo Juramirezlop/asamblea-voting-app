@@ -241,7 +241,6 @@ function handleAdminWebSocketMessage(message) {
             if (activeTab && activeTab.getAttribute('data-tab') === 'votaciones') {
                 setTimeout(() => loadActiveQuestions(), 800);
             }
-            notifications.show('Nueva votación creada', 'success', 4000);
             addActivityLog('Nueva votación creada', 'success');
             break;
         case 'participant_removed':
@@ -427,8 +426,6 @@ async function registerAttendance() {
     }
 
     try {        
-        notifications.show('Verificando código...', 'info', 3000);
-        
         // Verificar que hay participantes en la base
         const dbCheck = await apiCall('/auth/check-database');
         if (!dbCheck.has_participants) {
@@ -581,8 +578,6 @@ async function accessVoting() {
     }
 
     try {
-        notifications.show('Verificando acceso...', 'info', 3000);
-        
         // Verificar que hay participantes en la base
         const dbCheck = await apiCall('/auth/check-database');
         if (!dbCheck.has_participants) {
@@ -1582,6 +1577,7 @@ async function loadActiveQuestions() {
             const questions = await apiCall('/voting/questions/active');
             renderActiveQuestions(questions);
             await updateVoteCountsForActiveQuestions();
+            startAdminTimers();
         } catch (error) {
             console.error('Error loading active questions:', error);
             const container = document.getElementById('active-questions');
@@ -1597,6 +1593,38 @@ async function loadActiveQuestions() {
             }
         }
     }, 100);
+}
+
+function startAdminTimers() {
+    // Limpiar interval anterior
+    if (window.adminTimerInterval) {
+        clearInterval(window.adminTimerInterval);
+    }
+
+    window.adminTimerInterval = setInterval(() => {
+        document.querySelectorAll('.countdown-timer').forEach(timer => {
+            const expiresAt = timer.getAttribute('data-expires');
+            const questionId = timer.getAttribute('data-question-id');
+            
+            if (expiresAt) {
+                const now = new Date();
+                const expires = new Date(expiresAt);
+                const diff = expires - now;
+                
+                if (diff > 0) {
+                    const minutes = Math.floor(diff / 60000);
+                    const seconds = Math.floor((diff % 60000) / 1000);
+                    timer.textContent = `(${minutes}:${String(seconds).padStart(2, '0')} restantes)`;
+                    timer.style.color = diff < 120000 ? 'var(--danger-color)' : 'var(--warning-color)';
+                } else {
+                    timer.textContent = '(¡Tiempo agotado!)';
+                    timer.style.color = 'var(--danger-color)';
+                    // Auto-reload para refrescar estado
+                    setTimeout(() => loadActiveQuestions(), 2000);
+                }
+            }
+        });
+    }, 1000);
 }
 
 async function refreshConnectedUsers() {
@@ -1703,7 +1731,12 @@ function renderActiveQuestions(questions) {
                     ${q.time_limit_minutes ? `
                         <div class="meta-item">
                             <span>⏰</span>
-                            <span>Límite: ${q.time_limit_minutes} min</span>
+                            <span>Límite: ${q.time_limit_minutes} min 
+                                ${q.expires_at && !q.closed ? 
+                                    `<span class="countdown-timer" data-expires="${q.expires_at}" data-question-id="${q.id}">Calculando...</span>` 
+                                    : ''
+                                }
+                            </span>
                         </div>
                     ` : ''}
                 </div>
@@ -1727,7 +1760,7 @@ function renderActiveQuestions(questions) {
                         📊 Ver Resultados
                     </button>
 
-                    ${!q.closed && q.expires_at ? `
+                    ${q.time_limit_minutes ? `
                         <button class="btn btn-warning" onclick="showExtendTimeModal(${q.id}, '${q.text}')">
                             ⏰ Extender Tiempo
                         </button>

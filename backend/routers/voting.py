@@ -167,12 +167,17 @@ async def extend_question_time(question_id: int, request: ExtendTimeRequest):
         if not question:
             raise HTTPException(status_code=404, detail="Pregunta no encontrada o no activa")
         
-        if question["closed"]:
-            raise HTTPException(status_code=400, detail="No se puede extender tiempo de votación cerrada")
-        
         if not question["expires_at"]:
             raise HTTPException(status_code=400, detail="Esta votación no tiene límite de tiempo")
         
+        if question["closed"]:
+            execute_query(
+                conn,
+                "UPDATE questions SET closed = 0 WHERE id = ?",
+                (question_id,),
+                commit=True
+            )
+
         # Calcular nueva hora de expiración
         current_expires = datetime.fromisoformat(question["expires_at"])
         new_expires = current_expires + timedelta(minutes=extra_minutes)
