@@ -228,6 +228,7 @@ function handleAdminWebSocketMessage(message) {
             setTimeout(() => loadAforoData(), 500);
             addActivityLog(`Nueva asistencia: ${message.data.code} - ${message.data.name}`, 'success');
             break;
+            
         case 'vote_registered':
             setTimeout(() => {
                 loadAforoData();
@@ -235,6 +236,7 @@ function handleAdminWebSocketMessage(message) {
             }, 300);
             addActivityLog(`Voto registrado: ${message.data.participant_code}`, 'info');
             break;
+
         case 'question_created':
             // Solo recargar si estamos viendo la tab de votaciones
             const activeTab = document.querySelector('.tab-button.active');
@@ -243,11 +245,19 @@ function handleAdminWebSocketMessage(message) {
             }
             addActivityLog('Nueva votación creada', 'success');
             break;
+
         case 'participant_removed':
             setTimeout(() => loadAforoData(), 500);
             notifications.show(`Código eliminado: ${message.data.code}`, 'warning', 4000);
             addActivityLog(`Código eliminado: ${message.data.code}`, 'warning');
             break;
+
+        case 'question_expired':
+            setTimeout(() => loadActiveQuestions(), 500);
+            addActivityLog(`Votación expirada: ${message.data.text}`, 'warning');
+            notifications.show('Una votación ha expirado automáticamente', 'warning');
+            break;
+
         default:
             // Solo log para mensajes no críticos
             console.log('Mensaje WebSocket:', message.type);
@@ -2252,6 +2262,21 @@ async function createNewVoting() {
 
         notifications.show('Votación creada y activada', 'success');
         await loadActiveQuestions();
+
+        // Resetear estado visual del timer
+        document.querySelectorAll('.timer-toggle-btn').forEach(btn => {
+            btn.classList.remove('active');
+            btn.style.background = 'white';
+            btn.style.borderColor = 'var(--gray-300)';
+            btn.style.color = 'var(--gray-600)';
+            
+            if (btn.getAttribute('data-enabled') === 'false') {
+                btn.classList.add('active');
+                btn.style.background = 'var(--danger-color)';
+                btn.style.borderColor = 'var(--danger-color)';
+                btn.style.color = 'white';
+            }
+        });
         
     } catch (error) {
         notifications.show(`Error: ${error.message}`, 'error');
@@ -2273,36 +2298,33 @@ async function viewVotingResults(questionId) {
         const results = await apiCall(`/voting/results/${questionId}`);
         const questionData = await apiCall(`/voting/questions/active`);
         const question = questionData.find(q => q.id === questionId);
-        const hasTimer = question && question.time_limit_minutes;
-        const timeRemaining = question ? question.time_remaining_seconds : null;
-
+        
         const contentHTML = `
-            <div style="background: linear-gradient(135deg, var(--primary-color), #764ba2); color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <div style="background: linear-gradient(135deg, var(--danger-color), #764ba2); color: white; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                 <h3 style="margin: 0 0 8px 0; font-size: 1.1rem;">${results.question_text}</h3>
-                <div style="display: flex; gap: 20px; font-size: 0.9rem; opacity: 0.9;">
-                    <span>👥 ${results.total_participants} de ${results.total_registered}</span>
-                    <span>📊 ${results.total_participant_coefficient}%</span>
-                    ${hasTimer && timeRemaining > 0 ? `
-                        <span style="background: rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 600;">
-                            ⏰ ${Math.floor(timeRemaining/60)}:${String(timeRemaining%60).padStart(2,'0')}
+                <div style="display: flex; gap: 15px; font-size: 0.85rem;">
+                    <span>Participantes: <span id="live-participants-${questionId}">${results.total_participants}</span> de ${results.total_registered}</span>
+                    <span>Coeficiente: <span id="live-coefficient-${questionId}">${results.total_participant_coefficient}%</span></span>
+                    ${question && question.time_limit_minutes && question.time_remaining_seconds > 0 ? `
+                        <span id="live-timer-${questionId}" style="background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 8px; font-size: 0.8rem;">
+                            Tiempo restante: ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')}
                         </span>
                     ` : ''}
                 </div>
             </div>
             
-            <div style="max-height: 200px; overflow-y: auto;">
+            <div id="live-results-${questionId}" style="max-height: 180px; overflow-y: auto;">
                 ${generateResultsHTML(results)}
             </div>
         `;
 
         modals.show({
-            title: `Resultados - ${results.question_text}`,
+            title: `Resultados`,
             content: contentHTML,
-            size: 'large'
+            size: 'medium'
         });
         
-        // Iniciar actualización en vivo
-        startLiveResultsUpdate(questionId, results.time_limit_minutes);
+        startLiveResultsUpdate(questionId, question ? question.time_limit_minutes : false);
         
     } catch (error) {
         notifications.show(`Error: ${error.message}`, 'error');
@@ -2315,16 +2337,18 @@ function generateResultsHTML(results) {
     }
     
     return results.results.map(result => `
-        <div style="display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--gray-200);">
-            <div style="flex: 0 0 50px; font-weight: 600; color: var(--gray-800);">${result.answer || 'Sin respuesta'}</div>
-            <div style="flex: 1; margin: 0 12px; height: 8px; background: var(--gray-200); border-radius: 4px; overflow: hidden;">
-                <div style="height: 100%; background: linear-gradient(90deg, var(--danger-color), #f87171); border-radius: 4px; width: ${result.percentage}%; transition: width 0.4s ease;"></div>
+        <div style="display: flex; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--gray-200);">
+            <div style="flex: 0 0 40px; font-weight: 600; color: var(--gray-800);">${result.answer || 'Sin respuesta'}</div>
+            <div style="flex: 1; margin: 0 8px; height: 6px; background: var(--gray-200); border-radius: 3px; overflow: hidden;">
+                <div style="height: 100%; background: linear-gradient(90deg, var(--danger-color), #f87171); border-radius: 3px; width: ${result.percentage}%; transition: width 0.4s ease;"></div>
             </div>
-            <div style="flex: 0 0 100px; text-align: right; font-weight: 600; color: var(--gray-700); font-size: 0.9rem;">${result.votes} votos | ${result.percentage}%</div>
+            <div style="flex: 0 0 120px; text-align: right; font-size: 0.85rem;">
+                <span style="font-weight: 600; color: var(--gray-700);">${result.votes} votos</span>
+                <span style="color: var(--gray-500);"> | ${result.percentage}%</span>
+            </div>
         </div>
     `).join('');
 }
-
 let liveUpdateInterval = null;
 
 function startLiveResultsUpdate(questionId, hasTimer) {

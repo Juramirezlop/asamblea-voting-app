@@ -231,7 +231,7 @@ async def extend_question_time(question_id: int, request: ExtendTimeRequest):
 
 # --- Obtener preguntas activas (votante) ---
 @router.get("/questions/active", dependencies=[Depends(admin_or_voter_required)])
-def preguntas_activas():
+async def preguntas_activas():
     conn = get_db()
     try:
         # Consulta mejorada que incluye las opciones
@@ -270,6 +270,16 @@ def preguntas_activas():
                             (q["id"],),
                             commit=True
                         )
+
+                        try:
+                            from ..main import manager
+                            await manager.broadcast_to_admins({
+                                "type": "question_expired", 
+                                "data": {"question_id": q["id"], "text": q["text"]}
+                            })
+                        except Exception as ws_error:
+                            logger.error(f"Error enviando WebSocket: {ws_error}")
+
                     else:
                         # Tiempo restante en segundos
                         time_remaining = int((expires_at - current_dt).total_seconds())
