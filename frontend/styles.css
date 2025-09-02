@@ -2254,3 +2254,35 @@ body {
     padding: 1.5rem;
     margin-top: 1rem;
 }
+
+/* Mejorar estado vacío */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--gray-600);
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 12px;
+    border: 2px dashed var(--gray-300);
+    margin: 2rem 0;
+}
+
+.empty-state svg {
+    margin-bottom: 1.5rem;
+    opacity: 0.6;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.empty-state h3 {
+    margin-bottom: 0.8rem;
+    color: var(--gray-700);
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+.empty-state p {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.5;
+    max-width: 400px;
+    margin: 0 auto;
+}

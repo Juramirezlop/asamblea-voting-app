@@ -985,13 +985,13 @@ function renderVotingQuestions(questions, votedQuestions = new Set()) {
     
     if (questions.length === 0) {
         container.innerHTML = `
-            <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 1rem; opacity: 0.5;">
+            <div class="empty-state">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"></path>
-                    <path d="M9 7V3a2 2 0 0 1 2-2h2a2 0 0 1 2 2v4"></path>
+                    <path d="M9 7V3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path>
                 </svg>
-                <h3 style="margin-bottom: 0.5rem; color: var(--gray-700);">No hay votaciones activas</h3>
-                <p>Espere a que el administrador active nuevas votaciones</p>
+                <h3>No hay votaciones activas</h3>
+                <p>Espere a que el administrador active nuevas votaciones para poder participar</p>
             </div>
         `;
         return;
@@ -1118,22 +1118,16 @@ async function voteYesNo(questionId, answer) {
 }
 
 async function deleteVoting(questionId) {
-    try {
-        console.log('🗑️ Iniciando eliminación de votación:', questionId);
-        
+    try {        
         const confirmed = await modals.confirm(
             '¿Eliminar esta votación?\n\nSe borrarán también todos los votos registrados.',
             'Confirmar eliminación'
         );
-        
-        console.log('Respuesta de confirmación:', confirmed);
-        
+                
         if (!confirmed) {
             console.log('Eliminación cancelada');
             return;
         }
-        
-        console.log('Procediendo con eliminación...');
         
         try {
             await apiCall(`/voting/questions/${questionId}`, { method: 'DELETE' });
@@ -1664,13 +1658,13 @@ function renderActiveQuestions(questions) {
     
     if (questions.length === 0) {
         container.innerHTML = `
-            <div style="text-align: center; padding: 3rem; color: var(--gray-600);">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 1rem; opacity: 0.5;">
-                    <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"></path>
+            <div class="empty-state">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"></path>
                     <path d="M9 7V3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path>
                 </svg>
-                <h3 style="margin-bottom: 0.5rem; color: var(--gray-700);">No hay votaciones creadas</h3>
-                <p>Cree una nueva votación usando el formulario de arriba</p>
+                <h3>No hay votaciones creadas</h3>
+                <p>Cree una nueva votación usando el formulario de arriba para comenzar el proceso de votación</p>
             </div>
         `;
         return;
@@ -2379,15 +2373,19 @@ async function extendVotingTime(questionId) {
     }
     
     try {
+        console.log('Enviando extensión de tiempo:', questionId, minutes);
+        
         await apiCall(`/voting/questions/${questionId}/extend-time`, {
             method: 'PUT',
             body: JSON.stringify({ extra_minutes: minutes })
         });
         
         modals.hide();
+        await loadActiveQuestions(); // Recargar para ver cambios
         notifications.show(`⏰ Tiempo extendido por ${minutes} minutos`, 'success');
         
     } catch (error) {
+        console.error('Error extendiendo tiempo:', error);
         notifications.show(`Error: ${error.message}`, 'error');
     }
 }
