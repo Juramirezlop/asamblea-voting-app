@@ -981,27 +981,6 @@ async function loadVotingQuestions() {
     }
 }
 
-function updateVotingTimers() {
-    document.querySelectorAll('.question-timer').forEach(timer => {
-        const remaining = parseInt(timer.getAttribute('data-remaining'));
-        if (remaining > 0) {
-            const newRemaining = remaining - 1;
-            timer.setAttribute('data-remaining', newRemaining);
-            const minutes = Math.floor(newRemaining / 60);
-            const seconds = newRemaining % 60;
-            timer.textContent = `⏰ ${minutes}:${String(seconds).padStart(2, '0')} restantes`;
-            
-            if (newRemaining < 120) {
-                timer.style.background = 'linear-gradient(135deg, var(--danger-color), var(--danger-dark))';
-                timer.style.animation = 'pulse 2s infinite';
-            }
-        } else {
-            timer.textContent = '⏰ Tiempo agotado';
-            timer.style.background = 'linear-gradient(135deg, var(--danger-color), var(--danger-dark))';
-        }
-    });
-}
-
 function renderVotingQuestions(questions, votedQuestions = new Set()) {
     const container = document.getElementById('voting-questions');
     
@@ -1094,28 +1073,39 @@ function initializeVotingTimer() {
                     const seconds = newRemaining % 60;
                     timer.textContent = `⏰ ${minutes}:${String(seconds).padStart(2, '0')} restantes`;
                     
-                    if (newRemaining < 60) {
+                    if (newRemaining <= 15) {
                         timer.style.color = 'var(--danger-color)';
                         timer.style.fontWeight = '700';
                     }
+
                 } else if (remaining === 0) {
                     timer.textContent = '⏰ Tiempo agotado';
                     timer.style.color = 'var(--danger-color)';
                     timer.style.background = 'none';
                     timer.style.animation = 'none';
                     
-                    // Marcar el timer como expirado pero NO recargar
-                    timer.setAttribute('data-expired', 'true');
+                    // Marcar como expirado y forzar cierre
+                    if (!timer.getAttribute('data-expired')) {
+                        timer.setAttribute('data-expired', 'true');
+                        const questionId = parseInt(timer.getAttribute('data-question-id') || timer.closest('[data-question-id]').getAttribute('data-question-id'));
+                        
+                        // Forzar cierre de la pregunta
+                        setTimeout(async () => {
+                            try {
+                                await apiCall(`/voting/questions/${questionId}/toggle`, { method: 'PUT' });
+                                if (typeof loadVotingQuestions === 'function') loadVotingQuestions();
+                                if (typeof loadActiveQuestions === 'function') loadActiveQuestions();
+                            } catch (error) {
+                                console.error('Error cerrando pregunta expirada:', error);
+                            }
+                        }, 500);
+                    }
                 }
             });
             
             if (activeTimers === 0) {
                 clearInterval(window.timerInterval);
                 window.timerInterval = null;
-                
-                setTimeout(() => {
-                    if (typeof loadVotingQuestions === 'function') loadVotingQuestions();
-                }, 1000);
             }
         }, 1000);
     }

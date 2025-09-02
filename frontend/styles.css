@@ -2223,7 +2223,7 @@ body {
 
 /* Cronómetro de votaciones */
 .question-timer {
-    color: var(--warning-color);
+    color: var(--dark-color);
     font-weight: 600;
     font-size: 0.9rem;
 }
