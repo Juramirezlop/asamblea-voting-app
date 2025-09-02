@@ -1100,20 +1100,22 @@ function initializeVotingTimer() {
                     }
                 } else if (remaining === 0) {
                     timer.textContent = '⏰ Tiempo agotado';
-                    timer.style.background = 'linear-gradient(135deg, var(--danger-color), var(--danger-dark))';
-                    timer.style.animation = 'pulse 2s infinite';
+                    timer.style.color = 'var(--danger-color)';
+                    timer.style.background = 'none';
+                    timer.style.animation = 'none';
                     
-                    // Recargar preguntas cuando expire
-                    setTimeout(() => {
-                        if (typeof loadVotingQuestions === 'function') loadVotingQuestions();
-                        if (typeof loadActiveQuestions === 'function') loadActiveQuestions();
-                    }, 2000);
+                    // Marcar el timer como expirado pero NO recargar
+                    timer.setAttribute('data-expired', 'true');
                 }
             });
             
             if (activeTimers === 0) {
                 clearInterval(window.timerInterval);
                 window.timerInterval = null;
+                
+                setTimeout(() => {
+                    if (typeof loadVotingQuestions === 'function') loadVotingQuestions();
+                }, 1000);
             }
         }, 1000);
     }
@@ -1675,7 +1677,7 @@ function startAdminTimers() {
                     } else {
                         const minutes = Math.floor(question.time_remaining_seconds / 60);
                         const seconds = question.time_remaining_seconds % 60;
-                        timer.textContent = `(${minutes}:${String(seconds).padStart(2, '0')} restantes)`;
+                        timer.textContent = `⏰ (${minutes}:${String(seconds).padStart(2, '0')} restantes)`;
                         timer.style.color = question.time_remaining_seconds < 120 ? 'var(--danger-color)' : 'var(--warning-color)';
                     }
                 }
@@ -1799,7 +1801,7 @@ function renderActiveQuestions(questions) {
                                 ${q.expires_at && q.time_remaining_seconds !== null ?
                                     `<span class="countdown-timer" data-question-id="${q.id}" style="color: ${q.time_remaining_seconds > 0 ? 'var(--warning-color)' : 'var(--danger-color)'}; font-weight: 600; margin-left: 8px;">
                                         ${q.time_remaining_seconds > 0 ? 
-                                            '(' + Math.floor(q.time_remaining_seconds/60) + ':' + String(q.time_remaining_seconds%60).padStart(2,'0') + ' restantes)' 
+                                            '⏰' + '(' + Math.floor(q.time_remaining_seconds/60) + ':' + String(q.time_remaining_seconds%60).padStart(2,'0') + ' restantes)' 
                                             : '(Tiempo agotado)'}
                                     </span>`
                                     : ''
