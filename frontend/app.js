@@ -1776,7 +1776,7 @@ function renderActiveQuestions(questions) {
                             <span>⏰</span>
                             <span>Límite: ${q.time_limit_minutes} min
                                 ${q.expires_at && !q.closed ?
-                                    `<span class="countdown-timer" data-expires="${q.expires_at}" data-question-id="${q.id}">
+                                    `<span class="question-timer" data-question-id="${q.id}" data-remaining="${q.time_remaining_seconds}">
                                         ${q.time_remaining_seconds > 0 ? 
                                             Math.floor(q.time_remaining_seconds/60) + ':' + String(q.time_remaining_seconds%60).padStart(2,'0') + ' restantes' 
                                             : 'Tiempo agotado'}
