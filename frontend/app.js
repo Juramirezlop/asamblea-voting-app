@@ -1119,12 +1119,21 @@ async function voteYesNo(questionId, answer) {
 
 async function deleteVoting(questionId) {
     try {
+        console.log('🗑️ Iniciando eliminación de votación:', questionId);
+        
         const confirmed = await modals.confirm(
             '¿Eliminar esta votación?\n\nSe borrarán también todos los votos registrados.',
             'Confirmar eliminación'
         );
         
-        if (!confirmed) return;
+        console.log('Respuesta de confirmación:', confirmed);
+        
+        if (!confirmed) {
+            console.log('Eliminación cancelada');
+            return;
+        }
+        
+        console.log('Procediendo con eliminación...');
         
         try {
             await apiCall(`/voting/questions/${questionId}`, { method: 'DELETE' });
@@ -1569,7 +1578,6 @@ async function loadAforoData() {
 }
 
 async function loadActiveQuestions() {
-    console.log('🔄 loadActiveQuestions llamada desde:', new Error().stack.split('\n')[2]);
     // Evitar llamadas múltiples
     if (loadActiveQuestionsTimeout) {
         clearTimeout(loadActiveQuestionsTimeout);
@@ -1577,9 +1585,7 @@ async function loadActiveQuestions() {
     
     loadActiveQuestionsTimeout = setTimeout(async () => {
         try {
-            console.log('Llamando API /voting/questions/active...');
             const questions = await apiCall('/voting/questions/active');
-            console.log('Preguntas recibidas:', questions);
             renderActiveQuestions(questions);
             await updateVoteCountsForActiveQuestions();
         } catch (error) {
@@ -1655,7 +1661,6 @@ function renderConnectedUsers(data) {
 
 function renderActiveQuestions(questions) {
     const container = document.getElementById('active-questions');
-    console.log('Container encontrado:', container); // Debug
     
     if (questions.length === 0) {
         container.innerHTML = `
@@ -1672,14 +1677,12 @@ function renderActiveQuestions(questions) {
     }
 
     const questionsHTML = questions.map(q => {
-        console.log('Renderizando pregunta:', q); // Debug
         
         const typeText = q.type === 'yesno' ? 'Sí/No' : 
                         (q.allow_multiple ? 'Selección múltiple' : 'Selección única');
         
         // Asegurar que las opciones existan
         const options = q.options || [];
-        console.log('Opciones para pregunta', q.id, ':', options); // Debug
         
         return `
             <div class="voting-card admin-card" data-question-id="${q.id}">
@@ -1751,19 +1754,6 @@ function renderActiveQuestions(questions) {
     }).join('');
     
     container.innerHTML = questionsHTML;
-    console.log('HTML asignado. Container children:', container.children.length);
-    console.log('Contenido actual:', container.innerHTML.substring(0, 300));
-
-    // Agregar observador para detectar cambios
-    setTimeout(() => {
-        console.log('Después de 1 segundo - Children:', container.children.length);
-        console.log('Contenido después de 1 segundo:', container.innerHTML.substring(0, 300));
-    }, 1000);
-
-    setTimeout(() => {
-        console.log('Después de 3 segundos - Children:', container.children.length);  
-        console.log('Contenido después de 3 segundos:', container.innerHTML.substring(0, 300));
-    }, 3000);
 }
 
 async function updateVoteCountsForActiveQuestions() {
@@ -2325,28 +2315,34 @@ function updateResultsContent(results) {
 
 async function deleteVoting(questionId) {
     try {
+        console.log('🗑️ Iniciando eliminación de votación:', questionId);
+        
         const confirmed = await modals.confirm(
             '¿Eliminar esta votación?\n\nSe borrarán también todos los votos registrados.',
             'Confirmar eliminación'
         );
         
-        if (!confirmed) return;
+        console.log('Respuesta de confirmación:', confirmed);
         
-        notifications.show('Eliminando votación...', 'info', 3000);
-        
-        await apiCall(`/voting/questions/${questionId}`, { method: 'DELETE' });
-        
-        // Recargar preguntas después de eliminar
-        setTimeout(() => loadActiveQuestions(), 500);
-        
-        notifications.show('Votación eliminada correctamente', 'success');
+        if (!confirmed) {
+            console.log('Eliminación cancelada');
+            return;
+        }
+                
+        try {
+            await apiCall(`/voting/questions/${questionId}`, { method: 'DELETE' });
+            await loadActiveQuestions();
+            notifications.show('Votación eliminada correctamente', 'success');
+        } catch (error) {
+            console.error('Error eliminando votación:', error);
+            notifications.show(`Error al eliminar: ${error.message}`, 'error');
+        }
         
     } catch (error) {
-        console.error('Error eliminando votación:', error);
-        notifications.show(`Error: ${error.message}`, 'error');
+        console.error('Error con modal de confirmación:', error);
+        notifications.show('Error en la confirmación', 'error');
     }
 }
-
 function showExtendTimeModal(questionId, questionText) {
     modals.show({
         title: '⏰ Extender Tiempo de Votación',
