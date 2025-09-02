@@ -1652,13 +1652,14 @@ async function loadActiveQuestions() {
 }
 
 function startAdminTimers() {
-
     if (window.adminTimerInterval) {
         clearInterval(window.adminTimerInterval);
     }
 
     window.adminTimerInterval = setInterval(async () => {
         try {
+            await apiCall('/voting/questions/check-expired', { method: 'POST' });
+            
             const questions = await apiCall('/voting/questions/active');
             
             document.querySelectorAll('.countdown-timer').forEach(timer => {
@@ -1668,32 +1669,14 @@ function startAdminTimers() {
                 if (question && question.time_remaining_seconds !== null) {
                     if (question.time_remaining_seconds <= 0) {
                         timer.textContent = '(Tiempo agotado)';
-                        timer.style.color = 'var(--danger-color)';
-                        
-                        // Auto-cerrar la encuesta
-                        if (!timer.getAttribute('data-auto-closed')) {
-                            timer.setAttribute('data-auto-closed', 'true');
-                            setTimeout(async () => {
-                                try {
-                                    await apiCall(`/voting/questions/${questionId}/toggle`, { method: 'PUT' });
-                                    await loadActiveQuestions();
-                                    notifications.show('Votación cerrada automáticamente por tiempo agotado', 'info');
-                                } catch (error) {
-                                    console.error('Error cerrando automáticamente:', error);
-                                }
-                            }, 1000);
-                        }
+                        timer.style.color = 'black';
                     } else {
                         const minutes = Math.floor(question.time_remaining_seconds / 60);
                         const seconds = question.time_remaining_seconds % 60;
                         timer.textContent = `⏰ (${minutes}:${String(seconds).padStart(2, '0')} restantes)`;
-                        timer.style.color = question.time_remaining_seconds < 120 ? 'var(--danger-color)' : 'var(--warning-color)';
+                        timer.style.color = 'black';
                     }
                 }
-            });
-
-            await manager.broadcast_to_voters({
-                "type": "questions_updated"
             });
             
         } catch (error) {
