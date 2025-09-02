@@ -1095,8 +1095,8 @@ function initializeVotingTimer() {
                     timer.textContent = `⏰ ${minutes}:${String(seconds).padStart(2, '0')} restantes`;
                     
                     if (newRemaining < 60) {
-                        timer.style.background = 'linear-gradient(135deg, var(--danger-color), var(--danger-dark))';
-                        timer.style.animation = 'pulse 2s infinite';
+                        timer.style.color = 'var(--danger-color)';
+                        timer.style.fontWeight = '700';
                     }
                 } else if (remaining === 0) {
                     timer.textContent = '⏰ Tiempo agotado';
@@ -1107,7 +1107,7 @@ function initializeVotingTimer() {
                     setTimeout(() => {
                         if (typeof loadVotingQuestions === 'function') loadVotingQuestions();
                         if (typeof loadActiveQuestions === 'function') loadActiveQuestions();
-                    }, 1000);
+                    }, 2000);
                 }
             });
             
@@ -2345,9 +2345,12 @@ async function viewVotingResults(questionId) {
                 <div style="display: flex; gap: 15px; font-size: 0.85rem;">
                     <span>Participantes: <span id="live-participants-${questionId}">${results.total_participants}</span> de ${results.total_registered}</span>
                     <span>Coeficiente: <span id="live-coefficient-${questionId}">${results.total_participant_coefficient}%</span></span>
-                    ${question && question.time_limit_minutes && question.time_remaining_seconds > 0 ? `
+                    ${question && question.time_limit_minutes ?
+                    `
                         <span id="live-timer-${questionId}" style="background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 8px; font-size: 0.8rem;">
-                            Tiempo restante: ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')}
+                            ⏰ ${question.time_remaining_seconds > 0 ? 
+                                `Tiempo restante: ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')}` 
+                                : 'Tiempo agotado'}
                         </span>
                     ` : ''}
                 </div>
