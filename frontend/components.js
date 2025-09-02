@@ -319,7 +319,7 @@ class VotingComponents {
                                     <polyline points="12,6 12,12 16,14"></polyline>
                                 </svg>
                                 <span class="question-timer" data-remaining="${question.time_remaining_seconds}">
-                                    ⏰ ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')} restantes
+                                    ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')} restantes
                                 </span>
                             </div>
                         ` : `
@@ -379,7 +379,7 @@ class VotingComponents {
                     <div class="question-meta">
                     ${question.time_remaining_seconds !== null && question.time_remaining_seconds !== undefined ? `
                         <div class="question-timer" data-question-id="${question.id}" data-remaining="${question.time_remaining_seconds}">
-                            ⏰ ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')} restantes
+                            ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')} restantes
                         </div>
                     ` : ''}
                         <div class="meta-item">

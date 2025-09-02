@@ -1668,16 +1668,23 @@ function startAdminTimers() {
                 
                 if (question && question.time_remaining_seconds !== null) {
                     if (question.time_remaining_seconds <= 0) {
-                        timer.textContent = '(Tiempo agotado)';
-                        timer.style.color = 'black';
+                        timer.textContent = 'Tiempo agotado';
+                        timer.style.color = 'var(--danger-color)';
                     } else {
                         const minutes = Math.floor(question.time_remaining_seconds / 60);
                         const seconds = question.time_remaining_seconds % 60;
-                        timer.textContent = `⏰ (${minutes}:${String(seconds).padStart(2, '0')} restantes)`;
-                        timer.style.color = 'black';
+                        timer.textContent = `${minutes}:${String(seconds).padStart(2, '0')} restantes`;
+                        timer.style.color = question.time_remaining_seconds < 30 ? 'var(--danger-color)' : 'black';
                     }
                 }
             });
+
+            const hasExpiredQuestions = questions.some(q => q.time_remaining_seconds <= 0 && !q.closed);
+            if (hasExpiredQuestions) {
+                setTimeout(() => {
+                    loadActiveQuestions();
+                }, 2000);
+            }
             
         } catch (error) {
             console.error('Error actualizando timers admin:', error);
@@ -1793,7 +1800,7 @@ function renderActiveQuestions(questions) {
                                 ${q.expires_at && q.time_remaining_seconds !== null ?
                                     `<span class="countdown-timer" data-question-id="${q.id}" style="color: black; font-weight: 600; margin-left: 8px;">
                                         ${q.time_remaining_seconds > 0 ? 
-                                            '⏰' + '(' + Math.floor(q.time_remaining_seconds/60) + ':' + String(q.time_remaining_seconds%60).padStart(2,'0') + ' restantes)' 
+                                            '⏰' + Math.floor(q.time_remaining_seconds/60) + ':' + String(q.time_remaining_seconds%60).padStart(2,'0') + ' restantes' 
                                             : '(Tiempo agotado)'}
                                     </span>`
                                     : ''
@@ -2342,7 +2349,7 @@ async function viewVotingResults(questionId) {
                     ${question && question.time_limit_minutes ?
                     `
                         <span id="live-timer-${questionId}" style="background: rgba(255,255,255,0.2); padding: 2px 6px; border-radius: 8px; font-size: 0.8rem;">
-                            ⏰ ${question.time_remaining_seconds > 0 ? 
+                            ${question.time_remaining_seconds > 0 ? 
                                 `Tiempo restante: ${Math.floor(question.time_remaining_seconds/60)}:${String(question.time_remaining_seconds%60).padStart(2,'0')}` 
                                 : 'Tiempo agotado'}
                         </span>
