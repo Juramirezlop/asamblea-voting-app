@@ -1050,6 +1050,11 @@ function renderVotingQuestions(questions, votedQuestions = new Set()) {
     if (hasTimedQuestions) {
         setTimeout(initializeVotingTimer, 100);
     }
+
+    // Conectar WebSocket para actualizaciones en tiempo real si no está conectado
+    if (!window.voterWs || window.voterWs.readyState !== WebSocket.OPEN) {
+        connectVoterWebSocket();
+    }
 }
 
 function initializeVotingTimer() {
@@ -1071,7 +1076,7 @@ function initializeVotingTimer() {
                     
                     const minutes = Math.floor(newRemaining / 60);
                     const seconds = newRemaining % 60;
-                    timer.textContent = `⏰ ${minutes}:${String(seconds).padStart(2, '0')} restantes`;
+                    timer.textContent = `${minutes}:${String(seconds).padStart(2, '0')} restantes`;
                     
                     if (newRemaining <= 15) {
                         timer.style.color = 'var(--danger-color)';
@@ -1079,7 +1084,7 @@ function initializeVotingTimer() {
                     }
 
                 } else if (remaining === 0) {
-                    timer.textContent = '⏰ Tiempo agotado';
+                    timer.textContent = 'Tiempo agotado';
                     timer.style.color = 'var(--danger-color)';
                     timer.style.background = 'none';
                     timer.style.animation = 'none';
@@ -1664,6 +1669,20 @@ function startAdminTimers() {
                     if (question.time_remaining_seconds <= 0) {
                         timer.textContent = '(Tiempo agotado)';
                         timer.style.color = 'var(--danger-color)';
+                        
+                        // Auto-cerrar la encuesta
+                        if (!timer.getAttribute('data-auto-closed')) {
+                            timer.setAttribute('data-auto-closed', 'true');
+                            setTimeout(async () => {
+                                try {
+                                    await apiCall(`/voting/questions/${questionId}/toggle`, { method: 'PUT' });
+                                    await loadActiveQuestions();
+                                    notifications.show('Votación cerrada automáticamente por tiempo agotado', 'info');
+                                } catch (error) {
+                                    console.error('Error cerrando automáticamente:', error);
+                                }
+                            }, 1000);
+                        }
                     } else {
                         const minutes = Math.floor(question.time_remaining_seconds / 60);
                         const seconds = question.time_remaining_seconds % 60;
@@ -1789,7 +1808,7 @@ function renderActiveQuestions(questions) {
                             <span>⏰</span>
                             <span>Límite: ${q.time_limit_minutes} min
                                 ${q.expires_at && q.time_remaining_seconds !== null ?
-                                    `<span class="countdown-timer" data-question-id="${q.id}" style="color: ${q.time_remaining_seconds > 0 ? 'var(--warning-color)' : 'var(--danger-color)'}; font-weight: 600; margin-left: 8px;">
+                                    `<span class="countdown-timer" data-question-id="${q.id}" style="color: black; font-weight: 600; margin-left: 8px;">
                                         ${q.time_remaining_seconds > 0 ? 
                                             '⏰' + '(' + Math.floor(q.time_remaining_seconds/60) + ':' + String(q.time_remaining_seconds%60).padStart(2,'0') + ' restantes)' 
                                             : '(Tiempo agotado)'}
