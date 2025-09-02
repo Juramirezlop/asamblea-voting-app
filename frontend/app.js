@@ -1411,21 +1411,19 @@ function setupVotingFormListeners() {
     document.querySelectorAll('.timer-toggle-btn').forEach(btn => {
         const enabled = btn.getAttribute('data-enabled') === 'true';
         
-        // Estado inicial
+        // Estado inicial correcto
         btn.classList.remove('active');
         if (!enabled) {
-            // Botón "No" activo por defecto
             btn.classList.add('active');
-            btn.style.background = 'var(--gray-200)';
-            btn.style.borderColor = 'var(--gray-400)';
-            btn.style.color = 'var(--gray-700)';
+            btn.style.background = 'var(--danger-color)';  // CAMBIAR AQUÍ
+            btn.style.borderColor = 'var(--danger-color)';  // Y AQUÍ
+            btn.style.color = 'white';
         } else {
-            // Botón "Sí"
             btn.style.background = 'white';
             btn.style.borderColor = 'var(--gray-300)';
             btn.style.color = 'var(--gray-600)';
         }
-        
+
         // Event listener
         btn.addEventListener('click', (e) => {
             const clickedEnabled = e.target.getAttribute('data-enabled') === 'true';
@@ -1443,11 +1441,12 @@ function setupVotingFormListeners() {
             if (clickedEnabled) {
                 e.target.style.background = 'var(--success-color)';
                 e.target.style.borderColor = 'var(--success-color)';
+                e.target.style.color = 'white';
             } else {
-                e.target.style.background = 'var(--gray-200)';
-                e.target.style.borderColor = 'var(--gray-400)';
+                e.target.style.background = 'var(--danger-color)';  // CAMBIAR AQUÍ TAMBIÉN
+                e.target.style.borderColor = 'var(--danger-color)';  // Y AQUÍ
+                e.target.style.color = 'white';
             }
-            e.target.style.color = clickedEnabled ? 'white' : 'var(--gray-700)';
             
             // Mostrar/ocultar input de minutos
             const minutesContainer = document.getElementById('timer-minutes-container');
@@ -1748,9 +1747,11 @@ function renderActiveQuestions(questions) {
                     ${q.time_limit_minutes ? `
                         <div class="meta-item">
                             <span>⏰</span>
-                            <span>Límite: ${q.time_limit_minutes} min 
-                                ${q.expires_at && !q.closed ? 
-                                    `<span class="countdown-timer" data-expires="${q.expires_at}" data-question-id="${q.id}">Calculando...</span>` 
+                            <span>Límite: ${q.time_limit_minutes} min
+                                ${q.expires_at && !q.closed ?
+                                    `<span class="countdown-timer" data-expires="${q.expires_at}" data-question-id="${q.id}">
+                                        ${q.time_remaining_seconds ? Math.floor(q.time_remaining_seconds/60) + ':' + String(q.time_remaining_seconds%60).padStart(2,'0') + ' restantes' : 'Calculando...'}
+                                    </span>`
                                     : ''
                                 }
                             </span>
@@ -2307,21 +2308,19 @@ async function viewVotingResults(questionId) {
 
 function generateResultsHTML(results) {
     if (!results.results || results.results.length === 0) {
-        return '<p style="text-align: center; color: var(--gray-600); padding: 2rem;">Sin votos aún</p>';
+        return '<p style="text-align: center; color: var(--gray-600); padding: 2rem;">Sin votos registrados</p>';
     }
     
     return results.results.map(result => `
-        <div style="margin-bottom: 1rem; padding: 1rem; background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                <span style="font-weight: 600; color: var(--gray-800);">${result.option}</span>
-                <span style="font-weight: 600; color: var(--success-color);">${result.votes} votos</span>
+        <div style="padding: 0.5rem 0; border-bottom: 1px solid var(--gray-200);">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.3rem;">
+                <strong>${result.answer || 'Sin respuesta'}</strong>
+                <span>${result.votes} votos</span>
             </div>
-            <div style="background: var(--gray-200); height: 8px; border-radius: 4px; overflow: hidden;">
-                <div style="background: var(--success-color); height: 100%; width: ${result.percentage}%; transition: width 0.3s ease;"></div>
+            <div style="background: var(--gray-200); height: 6px; border-radius: 3px; overflow: hidden; margin-bottom: 0.2rem;">
+                <div style="height: 100%; background: var(--success-color); width: ${result.percentage}%; transition: width 0.3s ease;"></div>
             </div>
-            <div style="font-size: 0.875rem; color: var(--gray-600); margin-top: 0.25rem;">
-                ${result.percentage}% - ${result.coefficient}% coeficiente
-            </div>
+            <div style="font-size: 0.8rem; color: var(--gray-600);">${result.percentage}%</div>
         </div>
     `).join('');
 }

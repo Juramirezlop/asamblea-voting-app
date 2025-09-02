@@ -344,7 +344,7 @@ class VotingComponents {
                     </div>
                 ` : `
                     <div class="yesno-options">
-                        <div class="option-btn yes" onclick="voteYesNo(${question.id}, 'Si')">
+                        <div class="option-btn yes" onclick="voteYesNo(${question.id}, 'Sí')">
                             <div class="option-icon">✅</div>
                             <div>SÍ</div>
                         </div>
