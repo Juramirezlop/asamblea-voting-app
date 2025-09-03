@@ -1954,8 +1954,8 @@ let lastVoteCountUpdate = 0;
 
 async function updateVoteCountsForActiveQuestions() {
     const now = Date.now();
-    // Solo actualizar cada 3 segundos mínimo
-    if (now - lastVoteCountUpdate < 3000) {
+    // Reducir tiempo de espera para actualizaciones más frecuentes
+    if (now - lastVoteCountUpdate < 1000) {
         return;
     }
     lastVoteCountUpdate = now;
@@ -1964,35 +1964,28 @@ async function updateVoteCountsForActiveQuestions() {
         const questions = await apiCall('/voting/questions/active');
         for (const question of questions) {
             try {
-                // Usar cache para evitar saltos
-                const cacheKey = `votes_${question.id}`;
                 const results = await apiCall(`/voting/results/${question.id}`);
-                
                 const voteCount = results.total_participants || 0;
-                const cachedCount = voteCountCache.get(cacheKey);
                 
-                // Solo actualizar si cambió realmente
-                if (cachedCount !== voteCount) {
-                    voteCountCache.set(cacheKey, voteCount);
-                    
-                    // Debug: ver qué elementos encuentra
-                    console.log('Buscando elementos vote-count para pregunta', question.id);
-                    const allVoteElements = document.querySelectorAll('.vote-count');
-                    console.log('Todos los elementos vote-count encontrados:', allVoteElements);
-                    const specificElement = document.querySelector(`.vote-count[data-question-id="${question.id}"]`);
-                    console.log('Elemento específico encontrado:', specificElement);
-
-                    const voteCountElement = document.querySelector(`.vote-count[data-question-id="${question.id}"]`);
-                    if (voteCountElement) {
-                        voteCountElement.textContent = voteCount;
-                        console.log(`✅ Actualizado contador pregunta ${question.id} a ${voteCount}`);
-                    } else {
-                        console.log(`❌ NO encontrado elemento para pregunta ${question.id}`);
-                    }
+                // Buscar TODOS los elementos posibles para esta pregunta
+                const selectors = [
+                    `.vote-count[data-question-id="${question.id}"]`,
+                    `[data-question-id="${question.id}"] .vote-count`,
+                    `.voting-card[data-question-id="${question.id}"] .vote-count`
+                ];
+                
+                for (const selector of selectors) {
+                    const elements = document.querySelectorAll(selector);
+                    elements.forEach(el => {
+                        if (el.textContent !== voteCount.toString()) {
+                            el.textContent = voteCount;
+                            console.log(`Contador actualizado a ${voteCount} para pregunta ${question.id}`);
+                        }
+                    });
                 }
+                
             } catch (error) {
-                // Mantener último valor conocido en error
-                console.log(`No se pudo actualizar contador para pregunta ${question.id}`);
+                console.log(`Error actualizando pregunta ${question.id}:`, error);
             }
         }
     } catch (error) {
