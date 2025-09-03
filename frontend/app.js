@@ -3479,8 +3479,7 @@ function loadDemoVotingQuestions() {
         }
     ];
     
-    // Renderizar las votaciones demo
-    renderVotingQuestions(demoQuestions, new Set()); // Set vacío = no ha votado en ninguna
+    return demoQuestions;
 }
 
 function showTestUserAdminLogin() {
