@@ -102,11 +102,6 @@ function clearTokens() {
 // ================================
 
 async function apiCall(endpoint, options = {}) {
-
-    if (currentUser && currentUser.code === CODIGO_PRUEBA && endpoint.includes('/voting/vote')) {
-        throw new Error('Bypass para usuario de prueba');
-    }
-    
     const token = isAdmin ? adminToken : voterToken;
     
     const config = {
@@ -1876,7 +1871,7 @@ function renderActiveQuestions(questions) {
                     </div>
                     <div class="meta-item">
                         <span>🗳️</span>
-                        <span>Votos: <span class="vote-count" data-question-id="${q.id}">0</span></span>
+                        <span>Votos: <span class="vote-count" data-question-id="${q.id}">-</span></span>
                     </div>
                     <div class="meta-item">
                         <span>⏱️</span>
@@ -1939,6 +1934,7 @@ function renderActiveQuestions(questions) {
     }).join('');
     
     container.innerHTML = questionsHTML;
+    setTimeout(() => updateVoteCountsForActiveQuestions(), 100);
 }
 
 // Cache para evitar requests duplicados
