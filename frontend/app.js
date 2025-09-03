@@ -1186,6 +1186,9 @@ async function voteYesNo(questionId, answer) {
     try {
         // Bypass para usuario de prueba
         if (currentUser && currentUser.code === CODIGO_PRUEBA) {
+            if (!window.demoVotes) window.demoVotes = new Set();
+            window.demoVotes.add(questionId);
+
             notifications.show('✅ Voto simulado registrado (modo demostración)', 'success');
             await loadVotingQuestions();
             return;
@@ -1932,27 +1935,45 @@ function renderActiveQuestions(questions) {
     container.innerHTML = questionsHTML;
 }
 
+// Cache para evitar requests duplicados
+let voteCountCache = new Map();
+let lastVoteCountUpdate = 0;
+
 async function updateVoteCountsForActiveQuestions() {
+    const now = Date.now();
+    // Solo actualizar cada 3 segundos mínimo
+    if (now - lastVoteCountUpdate < 3000) {
+        return;
+    }
+    lastVoteCountUpdate = now;
+    
     try {
         const questions = await apiCall('/voting/questions/active');
         for (const question of questions) {
             try {
-                const results = await apiCall(`/voting/results/${question.id}`);                
-                const voteCountElement = document.querySelector(`.vote-count[data-question-id="${question.id}"]`);
+                // Usar cache para evitar saltos
+                const cacheKey = `votes_${question.id}`;
+                const results = await apiCall(`/voting/results/${question.id}`);
                 
-                if (voteCountElement) {
-                    voteCountElement.textContent = results.total_participants || 0;
+                const voteCount = results.total_participants || 0;
+                const cachedCount = voteCountCache.get(cacheKey);
+                
+                // Solo actualizar si cambió realmente
+                if (cachedCount !== voteCount) {
+                    voteCountCache.set(cacheKey, voteCount);
+                    
+                    const voteCountElement = document.querySelector(`.vote-count[data-question-id="${question.id}"]`);
+                    if (voteCountElement) {
+                        voteCountElement.textContent = voteCount;
+                    }
                 }
             } catch (error) {
-                const voteCountElement = document.querySelector(`.vote-count[data-question-id="${question.id}"]`);
-                
-                if (voteCountElement) {
-                    voteCountElement.textContent = '0';
-                }
+                // Mantener último valor conocido en error
+                console.log(`No se pudo actualizar contador para pregunta ${question.id}`);
             }
         }
     } catch (error) {
-        console.log('Error actualizando contadores de votos:', error);
+        console.error('Error actualizando contadores:', error);
     }
 }
 
@@ -3477,6 +3498,9 @@ function loadDemoVotingQuestions() {
         }
     ];
     
+    if (!window.demoVotes) {
+        window.demoVotes = new Set();
+    }
     // Renderizar las votaciones demo
     renderVotingQuestions(demoQuestions, new Set()); // Set vacío = no ha votado en ninguna
 }
