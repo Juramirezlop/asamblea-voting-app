@@ -1067,21 +1067,6 @@ body {
     background: transparent !important;
 }
 
-.multiple-option::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 0;
-    height: 100%;
-    background: linear-gradient(90deg, rgba(220, 38, 38, 0.1), rgba(225, 29, 72, 0.1));
-    transition: width 0.4s ease;
-}
-
-.multiple-option:hover::before {
-    width: 100%;
-}
-
 .multiple-option:hover {
     border-color: rgba(220, 38, 38, 0.5);
     background: rgba(255, 255, 255, 0.95);
@@ -1105,10 +1090,6 @@ body {
     border-color: rgba(190, 18, 60, 0.8) !important;
     outline: none !important;
     box-shadow: 0 4px 15px -3px rgba(220, 38, 38, 0.3) !important;
-}
-
-.multiple-option.selected::before {
-    display: none;
 }
 
 .multiple-option.selected {
