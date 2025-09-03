@@ -1023,6 +1023,7 @@ function renderVotingQuestions(questions, votedQuestions = new Set()) {
     const questionsHTML = availableQuestions.map(question => {
         const userVoted = votedQuestions.has(question.id);
         console.log('Procesando pregunta:', question.id, 'votado:', userVoted);
+        console.log('Estado de pregunta:', question.id, 'closed:', question.closed, 'time_remaining:', question.time_remaining_seconds);
         
         if (userVoted) {
             return VotingComponents.createVotedStatus(question, 'Ya votaste');
@@ -2447,7 +2448,7 @@ function startLiveResultsUpdate(questionId, hasTimer) {
                         } else {
                             const minutes = Math.floor(question.time_remaining_seconds / 60);
                             const seconds = question.time_remaining_seconds % 60;
-                            timerDiv.innerHTML = `⏰ Tiempo restante: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                            timerDiv.innerHTML = `Tiempo restante: ${minutes}:${seconds.toString().padStart(2, '0')}`;
                         }
                     }
                 }
@@ -2488,36 +2489,6 @@ document.addEventListener('click', (e) => {
     }
 });
 
-async function deleteVoting(questionId) {
-    try {
-        console.log('🗑️ Iniciando eliminación de votación:', questionId);
-        
-        const confirmed = await modals.confirm(
-            '¿Eliminar esta votación?\n\nSe borrarán también todos los votos registrados.',
-            'Confirmar eliminación'
-        );
-        
-        console.log('Respuesta de confirmación:', confirmed);
-        
-        if (!confirmed) {
-            console.log('Eliminación cancelada');
-            return;
-        }
-                
-        try {
-            await apiCall(`/voting/questions/${questionId}`, { method: 'DELETE' });
-            await loadActiveQuestions();
-            notifications.show('Votación eliminada correctamente', 'success');
-        } catch (error) {
-            console.error('Error eliminando votación:', error);
-            notifications.show(`Error al eliminar: ${error.message}`, 'error');
-        }
-        
-    } catch (error) {
-        console.error('Error con modal de confirmación:', error);
-        notifications.show('Error en la confirmación', 'error');
-    }
-}
 function showExtendTimeModal(questionId, questionText) {
     modals.show({
         title: '⏰ Extender Tiempo de Votación',
