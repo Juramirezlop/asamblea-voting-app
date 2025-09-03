@@ -1091,7 +1091,7 @@ body {
 
 .multiple-option.selected {
     border: 2px solid rgba(190, 18, 60, 0.8) !important;
-    background: linear-gradient(145deg, rgba(220, 38, 38, 0.15), rgba(225, 29, 72, 0.1)) !important;
+    background: linear-gradient(145deg, rgba(220, 38, 38, 0.2), rgba(225, 29, 72, 0.15)) !important;
     color: #7f1d1d !important;
     font-weight: 600;
     box-shadow: 0 4px 15px -3px rgba(220, 38, 38, 0.3) !important;
@@ -1108,8 +1108,7 @@ body {
 }
 
 .multiple-option.selected::before {
-    width: 100%;
-    background: linear-gradient(90deg, rgba(220, 38, 38, 0.05), rgba(225, 29, 72, 0.05));
+    display: none;
 }
 
 .multiple-option.selected {
