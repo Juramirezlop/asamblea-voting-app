@@ -1180,6 +1180,13 @@ async function checkUserVotes() {
 
 async function voteYesNo(questionId, answer) {
     try {
+        // Bypass para usuario de prueba
+        if (currentUser && currentUser.code === CODIGO_PRUEBA) {
+            notifications.show('✅ Voto simulado registrado (modo demostración)', 'success');
+            await loadVotingQuestions();
+            return;
+        }
+
         await apiCall('/voting/vote', {
             method: 'POST',
             body: JSON.stringify({
@@ -1189,7 +1196,7 @@ async function voteYesNo(questionId, answer) {
         });
         
         notifications.show('Voto registrado correctamente', 'success');
-        await loadVotingQuestions(); // Recargar para mostrar estado actualizado
+        await loadVotingQuestions();
         
     } catch (error) {
         notifications.show(`Error: ${error.message}`, 'error');
@@ -1231,6 +1238,11 @@ function selectMultipleOption(element, questionId, maxSelections, allowMultiple)
     if (allowMultiple) {
         // Selección múltiple
         if (!element.classList.contains('selected') && selectedOptions.length >= maxSelections) {
+            // Mejora para móvil - feedback visual más claro
+            if (window.innerWidth <= 768) {
+                element.style.animation = 'shake 0.5s ease-in-out';
+                setTimeout(() => element.style.animation = '', 500);
+            }
             notifications.show(`Solo puede seleccionar máximo ${maxSelections} opciones`, 'error');
             return;
         }
@@ -1243,10 +1255,30 @@ function selectMultipleOption(element, questionId, maxSelections, allowMultiple)
         });
         
         // Actualizar contadores
-        const nowSelected = container.querySelectorAll('.multiple-option.selected'); // <- AGREGAR ESTA LÍNEA
+        const nowSelected = container.querySelectorAll('.multiple-option.selected');
         const countDisplay = container.querySelector('.selected-count');
         if (countDisplay) {
             countDisplay.textContent = nowSelected.length;
+        }
+        
+        // Mejora para móvil - deshabilitar opciones cuando se alcanza el máximo
+        if (window.innerWidth <= 768) {
+            const selectionInfo = container.querySelector('.selection-info');
+            const unselectedOptions = container.querySelectorAll('.multiple-option:not(.selected)');
+            
+            if (nowSelected.length >= maxSelections) {
+                // Máximo alcanzado - deshabilitar opciones no seleccionadas
+                unselectedOptions.forEach(opt => opt.classList.add('disabled'));
+                if (selectionInfo) {
+                    selectionInfo.classList.add('at-max');
+                }
+            } else {
+                // Rehabilitar opciones
+                unselectedOptions.forEach(opt => opt.classList.remove('disabled'));
+                if (selectionInfo) {
+                    selectionInfo.classList.remove('at-max');
+                }
+            }
         }
         
         // Actualizar botón

@@ -1346,6 +1346,49 @@ body {
     }
 }
 
+/* Responsive específico para opciones múltiples */
+@media (max-width: 768px) {
+    .multiple-option {
+        padding: 20px 16px;
+        margin-bottom: 8px;
+    }
+    
+    .multiple-option.selected {
+        background: linear-gradient(145deg, rgba(220, 38, 38, 0.25), rgba(225, 29, 72, 0.2)) !important;
+        border-color: rgba(190, 18, 60, 1) !important;
+        border-width: 3px !important;
+    }
+    
+    /* Estado cuando está en máximo pero no seleccionada */
+    .multiple-option.disabled {
+        opacity: 0.4;
+        background: #f3f4f6 !important;
+        border-color: #d1d5db !important;
+        pointer-events: none;
+        cursor: not-allowed;
+    }
+    
+    .selection-info {
+        font-size: 0.9rem;
+        padding: 16px;
+        background: linear-gradient(145deg, #fef3cd, #fde68a) !important;
+        border: 2px solid #f59e0b !important;
+    }
+    
+    .selection-info.at-max {
+        background: linear-gradient(145deg, #fef2f2, #fecaca) !important;
+        border-color: #ef4444 !important;
+        color: #991b1b !important;
+        font-weight: 600;
+    }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
 /* ================================
    FILE UPLOAD
    ================================ */
