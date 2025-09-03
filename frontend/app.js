@@ -1185,13 +1185,19 @@ async function checkUserVotes() {
 async function voteYesNo(questionId, answer) {
     try {
         // Bypass para usuario de prueba
-        if (currentUser && currentUser.code === CODIGO_PRUEBA) {
-            if (!window.demoVotes) window.demoVotes = new Set();
-            window.demoVotes.add(questionId);
+        if (!window.demoVotes) window.demoVotes = new Set();
+        window.demoVotes.add(questionId);
 
-            notifications.show('✅ Voto simulado registrado (modo demostración)', 'success');
-            await loadVotingQuestions();
-            return;
+        notifications.show('✅ Voto simulado registrado (modo demostración)', 'success');
+
+        // Para preguntas Si/No, actualizar la UI inmediatamente
+        const container = document.querySelector(`[data-question-id="${questionId}"]`);
+        if (container) {
+            const questionTitle = container.querySelector('.question-title')?.textContent || 'Pregunta';
+            container.innerHTML = VotingComponents.createVotedStatus({
+                id: questionId,
+                text: questionTitle
+            }, answer);
         }
 
         await apiCall('/voting/vote', {

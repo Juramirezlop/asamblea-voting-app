@@ -685,8 +685,8 @@ def resultados(question_id: int):
                 conn,
                 """
                 SELECT 
-                    COUNT(v.participant_code) as participants,
-                    COALESCE(SUM(p.coefficient), 0) as weight
+                    COUNT(DISTINCT v.participant_code) as participants,
+                    COALESCE(SUM(DISTINCT p.coefficient), 0) as weight
                 FROM votes v
                 JOIN participants p ON v.participant_code = p.code
                 WHERE v.question_id = ? 
