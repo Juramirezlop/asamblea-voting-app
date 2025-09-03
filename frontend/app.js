@@ -1975,9 +1975,19 @@ async function updateVoteCountsForActiveQuestions() {
                 if (cachedCount !== voteCount) {
                     voteCountCache.set(cacheKey, voteCount);
                     
+                    // Debug: ver qué elementos encuentra
+                    console.log('Buscando elementos vote-count para pregunta', question.id);
+                    const allVoteElements = document.querySelectorAll('.vote-count');
+                    console.log('Todos los elementos vote-count encontrados:', allVoteElements);
+                    const specificElement = document.querySelector(`.vote-count[data-question-id="${question.id}"]`);
+                    console.log('Elemento específico encontrado:', specificElement);
+
                     const voteCountElement = document.querySelector(`.vote-count[data-question-id="${question.id}"]`);
                     if (voteCountElement) {
                         voteCountElement.textContent = voteCount;
+                        console.log(`✅ Actualizado contador pregunta ${question.id} a ${voteCount}`);
+                    } else {
+                        console.log(`❌ NO encontrado elemento para pregunta ${question.id}`);
                     }
                 }
             } catch (error) {
