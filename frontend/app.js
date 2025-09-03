@@ -344,6 +344,13 @@ function handleVoterWebSocketMessage(message) {
         case 'question_toggled':
             setTimeout(() => loadVotingQuestions(), 500);
             break;
+        case 'question_status_changed':
+            loadVotingQuestions();
+            if (message.data.reason === 'manual') {
+                const status = message.data.closed ? 'cerrada manualmente' : 'reabierta';
+                notifications.show(`📊 Votación ${status}: ${message.data.text}`, 'warning', 6000);
+            }
+            break;
     }
 }
 
