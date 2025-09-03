@@ -315,6 +315,9 @@ function handleVoterWebSocketMessage(message) {
             loadVotingQuestions();
             notifications.show(`⏰ Votación cerrada por tiempo agotado: ${message.data.text}`, 'warning', 8000);
             break;
+        case 'question_toggled':
+            setTimeout(() => loadVotingQuestions(), 500);
+            break;
     }
 }
 
@@ -1004,7 +1007,7 @@ function renderVotingQuestions(questions, votedQuestions = new Set()) {
 
     console.log('Renderizando', questions.length, 'preguntas');
     
-    const availableQuestions = questions.filter(q => !q.closed && !q.is_expired);
+    const availableQuestions = questions; // Mostrar todas las preguntas
 
     if (availableQuestions.length === 0) {
         container.innerHTML = `
