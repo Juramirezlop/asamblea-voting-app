@@ -1711,7 +1711,6 @@ async function loadAforoData() {
 }
 
 async function loadActiveQuestions() {
-    // Evitar llamadas múltiples
     if (loadActiveQuestionsTimeout) {
         clearTimeout(loadActiveQuestionsTimeout);
     }
@@ -1719,24 +1718,26 @@ async function loadActiveQuestions() {
     loadActiveQuestionsTimeout = setTimeout(async () => {
         try {
             const questions = await apiCall('/voting/questions/active');
-            renderActiveQuestions(questions);
+            
+            // Solo renderizar si hay cambios estructurales (no de conteos)
+            const currentCards = document.querySelectorAll('.voting-card[data-question-id]');
+            const currentIds = Array.from(currentCards).map(card => parseInt(card.dataset.questionId)).sort();
+            const newIds = questions.map(q => q.id).sort();
+            
+            // Solo re-renderizar si cambió la cantidad/IDs de preguntas
+            if (JSON.stringify(currentIds) !== JSON.stringify(newIds)) {
+                renderActiveQuestions(questions);
+                console.log('Panel re-renderizado por cambios estructurales');
+            }
+            
+            // Siempre actualizar contadores (sin re-renderizar)
             await updateVoteCountsForActiveQuestions();
             startAdminTimers();
+            
         } catch (error) {
             console.error('Error loading active questions:', error);
-            const container = document.getElementById('active-questions');
-            if (container) {
-                container.innerHTML = `
-                    <div style="text-align: center; padding: 2rem; color: var(--danger-color);">
-                        <p>Error al cargar las votaciones</p>
-                        <button onclick="loadActiveQuestions()" class="btn btn-primary" style="margin-top: 1rem;">
-                            Reintentar
-                        </button>
-                    </div>
-                `;
-            }
         }
-    }, 100);
+    }, 300);
 }
 
 function startAdminTimers() {
