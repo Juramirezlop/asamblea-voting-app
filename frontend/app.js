@@ -991,6 +991,7 @@ async function loadVotingQuestions() {
         
         if (currentUser && currentUser.code === CODIGO_PRUEBA) {
             const testQuestions = loadDemoVotingQuestions();
+            console.log('Demo questions:', testQuestions);
             renderVotingQuestions(testQuestions);
             return;
         }
