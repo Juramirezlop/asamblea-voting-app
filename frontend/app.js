@@ -282,6 +282,32 @@ function handleAdminWebSocketMessage(message) {
 }
 
 function handleVoterWebSocketMessage(message) {
+    // Control global de notificaciones duplicadas
+    if (!window.voterNotificationsTracker) window.voterNotificationsTracker = new Map();
+    
+    const notificationKey = `${message.type}_${message.data?.question_id || message.data?.text || Date.now()}`;
+    const now = Date.now();
+    
+    // Si ya procesamos esta notificación en los últimos 3 segundos, ignorar
+    if (window.voterNotificationsTracker.has(notificationKey)) {
+        const lastTime = window.voterNotificationsTracker.get(notificationKey);
+        if (now - lastTime < 3000) {
+            return; // Ignorar duplicado
+        }
+    }
+    
+    // Marcar como procesada
+    window.voterNotificationsTracker.set(notificationKey, now);
+    
+    // Limpiar entradas viejas cada 30 segundos
+    setTimeout(() => {
+        for (const [key, time] of window.voterNotificationsTracker.entries()) {
+            if (now - time > 30000) {
+                window.voterNotificationsTracker.delete(key);
+            }
+        }
+    }, 30000);
+
     switch (message.type) {
         case 'new_question':
             loadVotingQuestions();
