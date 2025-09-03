@@ -1006,6 +1006,9 @@ function renderVotingQuestions(questions, votedQuestions = new Set()) {
     }
 
     console.log('Renderizando', questions.length, 'preguntas');
+    questions.forEach(q => {
+        console.log(`Pregunta ${q.id}: closed=${q.closed}, time_remaining=${q.time_remaining_seconds}, text="${q.text}"`);
+    });
     
     const availableQuestions = questions; // Mostrar todas las preguntas
 
@@ -1026,7 +1029,7 @@ function renderVotingQuestions(questions, votedQuestions = new Set()) {
     const questionsHTML = availableQuestions.map(question => {
         const userVoted = votedQuestions.has(question.id);
         console.log('Procesando pregunta:', question.id, 'votado:', userVoted);
-        console.log('Estado de pregunta:', question.id, 'closed:', question.closed, 'time_remaining:', question.time_remaining_seconds);
+        console.log('¿Está cerrada?', question.closed, '¿Tiempo agotado?', question.time_remaining_seconds <= 0);
         
         if (userVoted) {
             return VotingComponents.createVotedStatus(question, 'Ya votaste');
