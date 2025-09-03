@@ -1179,22 +1179,26 @@ async function checkUserVotes() {
 
 async function voteYesNo(questionId, answer) {
     try {
-        // Bypass para usuario de prueba
-        if (!window.demoVotes) window.demoVotes = new Set();
-        window.demoVotes.add(questionId);
+        // Bypass para usuario de prueba - MOVER AL INICIO
+        if (currentUser && currentUser.code === CODIGO_PRUEBA) {
+            if (!window.demoVotes) window.demoVotes = new Set();
+            window.demoVotes.add(questionId);
 
-        notifications.show('✅ Voto simulado registrado (modo demostración)', 'success');
-
-        // Para preguntas Si/No, actualizar la UI inmediatamente
-        const container = document.querySelector(`[data-question-id="${questionId}"]`);
-        if (container) {
-            const questionTitle = container.querySelector('.question-title')?.textContent || 'Pregunta';
-            container.innerHTML = VotingComponents.createVotedStatus({
-                id: questionId,
-                text: questionTitle
-            }, answer);
+            notifications.show('✅ Voto registrado (demo)', 'success');
+            
+            // Para preguntas Si/No, actualizar la UI inmediatamente
+            const container = document.querySelector(`[data-question-id="${questionId}"]`);
+            if (container) {
+                const questionTitle = container.querySelector('.question-title')?.textContent || 'Pregunta';
+                container.innerHTML = VotingComponents.createVotedStatus({
+                    id: questionId,
+                    text: questionTitle
+                }, answer);
+            }
+            return; // Salir inmediatamente sin llamar al API
         }
 
+        // Código real para usuarios normales...
         await apiCall('/voting/vote', {
             method: 'POST',
             body: JSON.stringify({
@@ -1336,7 +1340,7 @@ async function submitMultipleVote(questionId) {
         );
         
         const answerText = answers.length === 1 ? answers[0] : answers.join(', ');
-        notifications.show(`Votos demo registrados: ${answerText}`, 'success');
+        notifications.show(`Votos registrados: ${answerText}`, 'success');
         
         // Simular que ya votó - mostrar estado votado
         setTimeout(() => {
@@ -1871,7 +1875,7 @@ function renderActiveQuestions(questions) {
                     </div>
                     <div class="meta-item">
                         <span>🗳️</span>
-                        <span>Votos: <span class="vote-count" data-question-id="${q.id}">-</span></span>
+                        <span>Votos: <span class="vote-count" data-question-id="${q.id}">0</span></span>
                     </div>
                     <div class="meta-item">
                         <span>⏱️</span>
@@ -1935,6 +1939,13 @@ function renderActiveQuestions(questions) {
     
     container.innerHTML = questionsHTML;
     setTimeout(() => updateVoteCountsForActiveQuestions(), 100);
+    setTimeout(async () => {
+        try {
+            await updateVoteCountsForActiveQuestions();
+        } catch (error) {
+            console.log('Error actualizando contadores iniciales:', error);
+        }
+    }, 200);
 }
 
 // Cache para evitar requests duplicados
