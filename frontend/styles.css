@@ -1053,9 +1053,18 @@ body {
     border-color: rgba(220, 38, 38, 0.5) !important;
 }
 
-.multiple-option::-moz-focus-inner {
-    border: 0;
-    outline: none;
+.multiple-option {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+}
+
+.multiple-option::-moz-selection {
+    background: transparent !important;
+}
+
+.multiple-option::selection {
+    background: transparent !important;
 }
 
 .multiple-option::before {
@@ -1081,11 +1090,21 @@ body {
 }
 
 .multiple-option.selected {
-    border-color: rgba(190, 18, 60, 0.8);
-    background: linear-gradient(145deg, rgba(220, 38, 38, 0.15), rgba(225, 29, 72, 0.1));
-    color: #7f1d1d;
+    border: 2px solid rgba(190, 18, 60, 0.8) !important;
+    background: linear-gradient(145deg, rgba(220, 38, 38, 0.15), rgba(225, 29, 72, 0.1)) !important;
+    color: #7f1d1d !important;
     font-weight: 600;
-    box-shadow: 0 4px 15px -3px rgba(220, 38, 38, 0.3);
+    box-shadow: 0 4px 15px -3px rgba(220, 38, 38, 0.3) !important;
+}
+
+.multiple-option.selected,
+.multiple-option.selected:focus,
+.multiple-option.selected:active,
+.multiple-option.selected:visited {
+    background: linear-gradient(145deg, rgba(220, 38, 38, 0.15), rgba(225, 29, 72, 0.1)) !important;
+    border-color: rgba(190, 18, 60, 0.8) !important;
+    outline: none !important;
+    box-shadow: 0 4px 15px -3px rgba(220, 38, 38, 0.3) !important;
 }
 
 .multiple-option.selected::before {
