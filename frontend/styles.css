@@ -1067,6 +1067,21 @@ body {
     background: transparent !important;
 }
 
+.multiple-option::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 100%;
+    background: linear-gradient(90deg, rgba(220, 38, 38, 0.1), rgba(225, 29, 72, 0.1));
+    transition: width 0.4s ease;
+}
+
+.multiple-option:hover::before {
+    width: 100%;
+}
+
 .multiple-option:hover {
     border-color: rgba(220, 38, 38, 0.5);
     background: rgba(255, 255, 255, 0.95);
@@ -1092,10 +1107,19 @@ body {
     box-shadow: 0 4px 15px -3px rgba(220, 38, 38, 0.3) !important;
 }
 
+.multiple-option.selected::before {
+    width: 100%;
+    background: linear-gradient(90deg, rgba(220, 38, 38, 0.05), rgba(225, 29, 72, 0.05));
+}
+
 .multiple-option.selected {
     border-color: var(--primary-color);
     background: linear-gradient(145deg, #dbeafe, #bfdbfe);
     color: var(--primary-dark);
+}
+
+.multiple-option.selected * {
+    background: transparent !important;
 }
 
 .submit-btn {
