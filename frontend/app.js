@@ -990,9 +990,7 @@ async function loadVotingQuestions() {
         console.log('Cargando votaciones para usuario:', currentUser?.code);
         
         if (currentUser && currentUser.code === CODIGO_PRUEBA) {
-            const testQuestions = loadDemoVotingQuestions();
-            console.log('Demo questions:', testQuestions);
-            renderVotingQuestions(testQuestions);
+            loadDemoVotingQuestions(); // Que haga el render directamente
             return;
         }
 
@@ -3479,7 +3477,8 @@ function loadDemoVotingQuestions() {
         }
     ];
     
-    return demoQuestions;
+    // Renderizar las votaciones demo
+    renderVotingQuestions(demoQuestions, new Set()); // Set vacío = no ha votado en ninguna
 }
 
 function showTestUserAdminLogin() {
