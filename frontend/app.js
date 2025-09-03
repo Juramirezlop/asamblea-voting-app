@@ -276,7 +276,6 @@ function handleAdminWebSocketMessage(message) {
             break;
 
         default:
-            // Solo log para mensajes no críticos
             console.log('Mensaje WebSocket:', message.type);
     }
 }

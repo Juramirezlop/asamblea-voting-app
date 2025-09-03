@@ -1250,22 +1250,6 @@ window.cleanupModalFunctions = function() {
     });
 };
 
-// Debugging helper
-window.debugState = function() {
-    console.log('Estado actual:', {
-        currentUser: window.currentUser,
-        isAdmin: window.isAdmin,
-        adminToken: !!window.adminToken,
-        voterToken: !!window.voterToken,
-        activeModals: !!window.modals?.activeModal,
-        intervals: {
-            timerInterval: !!window.timerInterval,
-            updateInterval: !!window.updateInterval,
-            usersRefreshInterval: !!window.usersRefreshInterval
-        }
-    });
-};
-
 // Exportar para uso en otros archivos
 window.VotingComponents = VotingComponents;
 window.AdminComponents = AdminComponents;

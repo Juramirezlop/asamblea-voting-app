@@ -71,7 +71,7 @@ html {
 
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 50%, #991b1b 100%); /* Cambiar esta línea */
+    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 50%, #991b1b 100%);
     min-height: 100vh;
     color: var(--dark-color);
     line-height: 1.6;
@@ -162,7 +162,7 @@ body {
 
 .header-content {
     padding: 2rem;
-    background: linear-gradient(135deg, var(--gray-800), var(--gray-700)); /* Cambiar esta línea */
+    background: linear-gradient(135deg, var(--gray-800), var(--gray-700));
     color: white;
     position: relative;
     z-index: 1;
@@ -1991,7 +1991,7 @@ body {
     font-weight: 700;
     color: var(--dark-color);
     margin-bottom: 0.8rem;
-    background: linear-gradient(135deg, var(--gray-700), var(--gray-800)); /* Cambiar colores */
+    background: linear-gradient(135deg, var(--gray-700), var(--gray-800));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
