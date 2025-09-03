@@ -509,6 +509,16 @@ async def toggle_question_status(question_id: int):
                 "closed": bool(new_status["closed"])
             }
         })
+
+        # Notificar también a los votantes
+        await manager.broadcast_to_voters({
+            "type": "question_toggled",
+            "data": {
+                "question_id": question_id,
+                "closed": bool(new_status["closed"]),
+                "text": question["text"]
+            }
+        })
         
         return {
             "status": "actualizado",
