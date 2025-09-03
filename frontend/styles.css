@@ -80,6 +80,20 @@ body {
     position: relative;
 }
 
+.voting-card * {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.voting-card *:focus {
+    outline: none !important;
+}
+
 /* ================================
    LAYOUT PRINCIPAL
    ================================ */
@@ -1020,6 +1034,28 @@ body {
     margin-bottom: 12px;
     color: var(--dark-color);
     font-weight: 500;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+.multiple-option:focus,
+.multiple-option:active,
+.multiple-option:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: rgba(220, 38, 38, 0.5) !important;
+}
+
+.multiple-option::-moz-focus-inner {
+    border: 0;
+    outline: none;
 }
 
 .multiple-option::before {
@@ -1148,7 +1184,12 @@ body {
 .option-text {
     flex: 1;
     font-weight: 500;
-    color: var(--gray-700);
+    color: var(--dark-color);    
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    pointer-events: none;
 }
 
 .voted-status {
