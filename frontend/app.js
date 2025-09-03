@@ -102,6 +102,11 @@ function clearTokens() {
 // ================================
 
 async function apiCall(endpoint, options = {}) {
+
+    if (currentUser && currentUser.code === CODIGO_PRUEBA && endpoint.includes('/voting/vote')) {
+        throw new Error('Bypass para usuario de prueba');
+    }
+    
     const token = isAdmin ? adminToken : voterToken;
     
     const config = {
