@@ -1710,6 +1710,8 @@ async function loadAforoData() {
 }
 
 async function loadActiveQuestions() {
+    const container = document.getElementById('active-questions');
+    
     if (loadActiveQuestionsTimeout) {
         clearTimeout(loadActiveQuestionsTimeout);
     }
@@ -1725,6 +1727,7 @@ async function loadActiveQuestions() {
             
             // Solo re-renderizar si cambió la cantidad/IDs de preguntas
             if (JSON.stringify(currentIds) !== JSON.stringify(newIds)) {
+                container.innerHTML = ''; // Ahora funciona porque container está definido
                 renderActiveQuestions(questions);
                 console.log('Panel re-renderizado por cambios estructurales');
             }
@@ -2135,9 +2138,11 @@ async function uploadExcel() {
         }
 
         const result = await response.json();
-        notifications.show(result.message || `✅ ${result.inserted} participantes cargados`, 'success', 8000);
         const statusDiv = document.getElementById('upload-status');
-        statusDiv.innerHTML = `<div style="color: var(--success-color); margin-top: 1rem;">${result.message}</div>`;
+        statusDiv.innerHTML = `<div style="color: var(--success-color); margin-top: 1rem; padding: 1rem; background: rgba(34, 197, 94, 0.1); border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3);">
+            ✅ ${result.inserted} participantes cargados exitosamente
+            <br><small style="opacity: 0.8;">Se procesaron ${result.sheets_processed || 1} hojas del archivo Excel</small>
+        </div>`;
         fileInput.value = '';
 
         if (result.inserted > 0) {
