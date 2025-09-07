@@ -1724,21 +1724,6 @@ async function loadActiveQuestions() {
             renderActiveQuestions(questions);
             console.log('Votaciones renderizadas:', questions.length);
             
-            // COMENTAR O ELIMINAR todo el bloque de optimización por ahora:
-            /*
-            // Solo renderizar si hay cambios estructurales (no de conteos)
-            const currentCards = document.querySelectorAll('.voting-card[data-question-id]');
-            const currentIds = Array.from(currentCards).map(card => parseInt(card.dataset.questionId)).sort();
-            const newIds = questions.map(q => q.id).sort();
-            
-            // Solo re-renderizar si cambió la cantidad/IDs de preguntas
-            if (JSON.stringify(currentIds) !== JSON.stringify(newIds)) {
-                container.innerHTML = ''; // Ahora funciona porque container está definido
-                renderActiveQuestions(questions);
-                console.log('Panel re-renderizado por cambios estructurales');
-            }
-            */
-            
             // Siempre actualizar contadores (sin re-renderizar)
             await updateVoteCountsForActiveQuestions();
             startAdminTimers();
@@ -1752,6 +1737,7 @@ async function loadActiveQuestions() {
 function startAdminTimers() {
 
     if (!isAdmin || !adminToken) {
+        console.log('startAdminTimers cancelado: no hay admin token');
         return;
     }
     
@@ -2300,7 +2286,11 @@ async function createNewVoting() {
         
         questionData.options = options;
         
-        const maxSelections = parseInt(document.getElementById('max-selections').value) || 1;
+        let maxSelections = parseInt(document.getElementById('max-selections').value) || 1;
+        if (selectedType === 'multiple' && maxSelections < 2) {
+            maxSelections = 2;
+            document.getElementById('max-selections').value = 2;
+        }
         const allowMultiple = maxSelections > 1;
 
         questionData.allow_multiple = allowMultiple;
@@ -2328,8 +2318,12 @@ async function createNewVoting() {
     if (timerEnabled) {
         const timeLimitInput = document.getElementById('time-limit-minutes');
         if (timeLimitInput) {
-            const timeLimit = parseInt(timeLimitInput.value);
+            let timeLimit = parseInt(timeLimitInput.value);
             if (timeLimit && timeLimit > 0) {
+                if (timeLimit < 5) {
+                    timeLimit = 5;
+                    timeLimitInput.value = 5;
+                }
                 questionData.time_limit_minutes = timeLimit;
             }
         }
