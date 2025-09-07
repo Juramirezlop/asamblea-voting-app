@@ -817,6 +817,8 @@ async def reset_db():
         execute_query(conn, "DELETE FROM questions", commit=True)
         execute_query(conn, "DELETE FROM participants", commit=True)
         execute_query(conn, "DELETE FROM config", commit=True)
+        execute_query(conn, "ALTER SEQUENCE questions_id_seq RESTART WITH 1", commit=True)
+        execute_query(conn, "ALTER SEQUENCE options_id_seq RESTART WITH 1", commit=True)
 
         # WEBSOCKET: Notificar reset completo
         from ..main import manager

@@ -161,13 +161,6 @@
                             </svg>
                             Configuración
                         </button>
-                        <button class="tab-button" data-tab="monitoreo">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 3v18h18"></path>
-                                <path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"></path>
-                            </svg>
-                            Monitoreo
-                        </button>
                     </div>
                 </div>
             </div>
@@ -301,20 +294,6 @@
                         <div id="upload-status" class="upload-status"></div>
                     </div>
 
-                    
-                    <!-- Usuarios Conectados -->
-                    <div class="panel">
-                        <div class="panel-header">
-                            <h3>Usuarios Conectados</h3>
-                        </div>
-                        <div id="connected-users-display">
-                            <div class="loading-state">
-                                <div class="spinner"></div>
-                                <p>Cargando usuarios...</p>
-                            </div>
-                        </div>
-                    </div>
-
                     <!-- Gestión de Participantes -->
                     <div class="panel">
                         <div class="panel-header">
@@ -360,59 +339,6 @@
                                 </svg>
                                 Mensaje a Votantes
                             </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TAB: MONITOREO -->
-                <div class="tab-content" id="tab-monitoreo">
-                    <!-- Estado del Servidor -->
-                    <div class="panel">
-                        <div class="panel-header">
-                            <h3>Estado del Servidor</h3>
-                            <button class="btn btn-info" onclick="refreshServerStatus()">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polyline points="23,4 23,10 17,10"></polyline>
-                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-                                </svg>
-                                Actualizar
-                            </button>
-                        </div>
-                        <div id="server-status-display">
-                            <div class="loading-state">
-                                <div class="spinner"></div>
-                                <p>Verificando estado del servidor...</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Métricas de Base de Datos -->
-                    <div class="panel">
-                        <div class="panel-header">
-                            <h3>Base de Datos y Conexiones</h3>
-                        </div>
-                        <div id="database-metrics">
-                            <div class="loading-state">
-                                <div class="spinner"></div>
-                                <p>Cargando métricas...</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Actividad en Tiempo Real -->
-                    <div class="panel">
-                        <div class="panel-header">
-                            <h3>Actividad en Tiempo Real</h3>
-                            <div style="display: flex; gap: 0.5rem;">
-                                <span id="monitoring-status" style="padding: 0.3rem 0.8rem; border-radius: 12px; font-size: 0.85rem; background: var(--success-color); color: white;">
-                                    🟢 Monitoreando
-                                </span>
-                            </div>
-                        </div>
-                        <div id="realtime-activity">
-                            <div style="background: var(--gray-100); border-radius: 8px; padding: 1rem; max-height: 300px; overflow-y: auto;" id="activity-log">
-                                <p style="text-align: center; color: var(--gray-600);">Esperando actividad...</p>
-                            </div>
                         </div>
                     </div>
                 </div>

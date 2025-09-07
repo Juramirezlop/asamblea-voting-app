@@ -122,7 +122,12 @@ async def agregar_participantes(data: Dict[str, dict]):
             "data": {"count": count}
         })
         
-        return {"status": "ok", "cantidad": count}
+        return {
+            "status": "ok", 
+            "inserted": count,
+            "message": f"✅ {count} participantes cargados exitosamente",
+            "total_participants": count
+        }
     finally:
         close_db(conn)
 

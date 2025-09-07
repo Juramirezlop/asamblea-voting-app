@@ -67,7 +67,6 @@ window.processDeleteCode = async function() {
         await apiCall(`/admin/delete-code/${code}`, { method: 'DELETE' });
         modals.hide();
         await loadAforoData();
-        await refreshConnectedUsers(); // Actualizar usuarios conectados
         notifications.show(`Código ${code} eliminado`, 'success');
     } catch (error) {
         notifications.show(`Error: ${error.message}`, 'error');
@@ -226,7 +225,6 @@ function handleAdminWebSocketMessage(message) {
     switch (message.type) {
         case 'attendance_registered':
             setTimeout(() => loadAforoData(), 500);
-            addActivityLog(`Nueva asistencia: ${message.data.code} - ${message.data.name}`, 'success');
             break;
 
         case 'vote_registered':
@@ -241,7 +239,6 @@ function handleAdminWebSocketMessage(message) {
                 updateLiveResults(window.currentResultsModal);
             }
             
-            addActivityLog(`Voto registrado: ${message.data.participant_code}`, 'info');
             break;
 
         case 'question_created':
@@ -250,13 +247,11 @@ function handleAdminWebSocketMessage(message) {
             if (activeTab && activeTab.getAttribute('data-tab') === 'votaciones') {
                 setTimeout(() => loadActiveQuestions(), 800);
             }
-            addActivityLog('Nueva votación creada', 'success');
             break;
 
         case 'participant_removed':
             setTimeout(() => loadAforoData(), 500);
             notifications.show(`Código eliminado: ${message.data.code}`, 'warning', 4000);
-            addActivityLog(`Código eliminado: ${message.data.code}`, 'warning');
             break;
 
         case 'question_expired':
@@ -270,7 +265,6 @@ function handleAdminWebSocketMessage(message) {
                 
                 window.lastNotifications[lastExpiredKey] = now;
                 setTimeout(() => loadActiveQuestions(), 500);
-                addActivityLog(`Votación expirada: ${message.data.text}`, 'warning');
                 notifications.show('Una votación ha expirado automáticamente', 'warning');
             }
             break;
@@ -420,8 +414,6 @@ function logout() {
         clearInterval(updateInterval);
         updateInterval = null;
     }
-    
-    stopMonitoring();
 
     // Limpiar formularios
     const accessCode = document.getElementById('access-code');
@@ -1405,7 +1397,6 @@ async function showAdminScreen() {
             estadoDisplay.textContent = 'Configurar Nombre del Conjunto';
         }
     }
-    startMonitoring();
 }
 
 function showConjuntoModal() {
@@ -1620,10 +1611,6 @@ function showAdminTab(tabName) {
             setTimeout(() => loadActiveQuestions(), 100);
         } else if (tabName === 'estado') {
             setTimeout(() => loadAforoData(), 100);
-        } else if (tabName === 'configuracion') {
-            setTimeout(() => refreshConnectedUsers(), 100);
-        } else if (tabName === 'monitoreo') {
-            setTimeout(() => refreshServerStatus(), 100);
         }
     }
 }
@@ -1632,7 +1619,6 @@ async function loadAdminData() {
     console.log('Iniciando carga de datos admin...');
     await Promise.all([
         loadAforoData(),
-        refreshConnectedUsers(),
         loadParticipantsStatus()
     ]);
     
@@ -1695,10 +1681,10 @@ async function loadAforoData() {
             quorumText.className = 'quorum-text error';
         }
 
-        // Animar números
-        Utils.animateNumber(document.getElementById('total-participants'), 0, data.total_participants || 0);
-        Utils.animateNumber(document.getElementById('present-count'), 0, data.present_count || 0);
-        
+        // Actualización directa sin animación (mejor para ingreso masivo)
+        document.getElementById('total-participants').textContent = data.total_participants || 0;
+        document.getElementById('present-count').textContent = data.present_count || 0;
+
     } catch (error) {
         console.error('Error loading aforo:', error);
         // Mostrar valores de error
@@ -1778,60 +1764,6 @@ function startAdminTimers() {
             console.error('Error actualizando timers admin:', error);
         }
     }, 1000);
-}
-
-async function refreshConnectedUsers() {
-    try {
-        const users = await apiCall('/admin/connected-users');
-        renderConnectedUsers(users);
-    } catch (error) {
-        console.error('Error loading connected users:', error);
-        document.getElementById('connected-users-display').innerHTML = 
-            '<p style="color: var(--danger-color);">Error cargando usuarios conectados</p>';
-    }
-}
-
-function renderConnectedUsers(data) {
-    const container = document.getElementById('connected-users-display');
-    
-    const adminCount = data.admin_connections || 0;
-    const voterCount = data.voter_connections || 0;
-    const connectedVoters = data.connected_voters || [];
-    
-    container.innerHTML = `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-            <div class="stat-card">
-                <div class="stat-number">${adminCount}</div>
-                <div class="stat-label">Admins</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">${voterCount}</div>
-                <div class="stat-label">Votantes</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">${data.total_connected || 0}</div>
-                <div class="stat-label">Total</div>
-            </div>
-        </div>
-        
-        ${connectedVoters.length > 0 ? `
-            <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--gray-300); border-radius: 12px;">
-                <div style="background: var(--gray-100); padding: 0.8rem; font-weight: 600; border-bottom: 1px solid var(--gray-300);">
-                    Votantes Conectados
-                </div>
-                ${connectedVoters.map(voter => `
-                    <div style="padding: 0.8rem; border-bottom: 1px solid var(--gray-200); display: grid; grid-template-columns: auto 1fr auto auto; gap: 1rem; align-items: center;">
-                        <strong style="color: var(--dark-color);">${voter.code}</strong>
-                        <span style="overflow: hidden; text-overflow: ellipsis;">${voter.name}</span>
-                        <span style="color: var(--primary-color); font-weight: 600;">${voter.coefficient.toFixed(2)}%</span>
-                        <span style="background: ${voter.is_power ? 'var(--warning-color)' : 'var(--success-color)'}; color: white; padding: 0.3rem 0.8rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
-                            ${voter.is_power ? 'Poder' : 'Propio'}
-                        </span>
-                    </div>
-                `).join('')}
-            </div>
-        ` : '<p style="text-align: center; color: var(--gray-600); padding: 2rem;">No hay votantes conectados</p>'}
-    `;
 }
 
 function renderActiveQuestions(questions) {
@@ -2189,9 +2121,11 @@ async function uploadExcel() {
         }
 
         const result = await response.json();
+        notifications.show(result.message || `✅ ${result.inserted} participantes cargados`, 'success', 8000);
         const statusDiv = document.getElementById('upload-status');
-        statusDiv.innerHTML = `<div style="color: var(--success-color); margin-top: 1rem;">✅ ${result.inserted} participantes cargados correctamente</div>`;
-                
+        statusDiv.innerHTML = `<div style="color: var(--success-color); margin-top: 1rem;">${result.message}</div>`;
+        fileInput.value = '';
+
         if (result.inserted > 0) {
             const statusCircle = document.getElementById('status-circle');
             const statusText = document.getElementById('status-text');
@@ -2498,18 +2432,21 @@ function generateResultsHTML(results) {
     }
     
     return results.results.map(result => `
-        <div style="display: flex; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--gray-200);">
-            <div style="flex: 0 0 40px; font-weight: 600; color: var(--gray-800);">${result.answer || 'Sin respuesta'}</div>
-            <div style="flex: 1; margin: 0 8px; height: 6px; background: var(--gray-200); border-radius: 3px; overflow: hidden;">
-                <div style="height: 100%; background: linear-gradient(90deg, var(--danger-color), #f87171); border-radius: 3px; width: ${result.percentage}%; transition: width 0.4s ease;"></div>
+        <div style="display: flex; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--gray-200); gap: 12px;">
+            <div style="flex: 0 0 200px; font-weight: 600; color: var(--gray-800); line-height: 1.3; word-wrap: break-word; hyphens: auto;">${result.answer || 'Sin respuesta'}</div>
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 24px;">
+                <div style="height: 8px; background: var(--gray-200); border-radius: 4px; overflow: hidden; margin-bottom: 2px;">
+                    <div style="height: 100%; background: linear-gradient(90deg, var(--danger-color), #f87171); border-radius: 4px; width: ${result.percentage}%; transition: width 0.4s ease;"></div>
+                </div>
             </div>
-            <div style="flex: 0 0 120px; text-align: right; font-size: 0.85rem;">
-                <span style="font-weight: 600; color: var(--gray-700);">${result.votes} votos</span>
-                <span style="color: var(--gray-500);"> | ${result.percentage}%</span>
+            <div style="flex: 0 0 100px; text-align: right; font-size: 0.85rem; display: flex; flex-direction: column; justify-content: center; min-height: 24px;">
+                <div style="font-weight: 600; color: var(--gray-700);">${result.votes} votos</div>
+                <div style="color: var(--gray-500); font-size: 0.8rem;">${result.percentage}%</div>
             </div>
         </div>
     `).join('');
 }
+
 let liveUpdateInterval = null;
 
 function startLiveResultsUpdate(questionId, hasTimer) {
@@ -2918,7 +2855,6 @@ async function processDeleteCode() {
         
         modals.hide();
         await loadAforoData();
-        await refreshConnectedUsers();
         notifications.show(`Código ${code} eliminado correctamente`, 'success');
         
     } catch (error) {
@@ -3320,152 +3256,6 @@ function setupVisualEffects() {
     });
 }
 
-// ================================
-// SISTEMA DE MONITOREO
-// ================================
-
-let monitoringInterval = null;
-let activityLog = [];
-
-async function refreshServerStatus() {
-    try {
-        const status = await apiCall('/monitoring/server-status');
-        renderServerStatus(status);
-        renderDatabaseMetrics(status);
-    } catch (error) {
-        console.error('Error loading server status:', error);
-        document.getElementById('server-status-display').innerHTML = 
-            '<p style="color: var(--danger-color);">❌ Error obteniendo estado del servidor</p>';
-    }
-}
-
-function renderServerStatus(data) {
-    const container = document.getElementById('server-status-display');
-    const statusColor = {
-        'healthy': 'var(--success-color)',
-        'moderate': 'var(--warning-color)',
-        'warning': 'var(--danger-color)',
-        'critical': 'var(--danger-color)',
-        'error': 'var(--danger-color)'
-    }[data.status] || 'var(--gray-500)';
-    
-    container.innerHTML = `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-            <div class="stat-card" style="border-left: 4px solid ${statusColor};">
-                <div style="font-size: 1.5rem; margin-bottom: 0.5rem;">${data.status_text}</div>
-                <div class="stat-label">Estado General</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">${data.load_percentage || 0}%</div>
-                <div class="stat-label">Carga del Sistema</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">${data.websockets?.total_connections || 0}</div>
-                <div class="stat-label">Conexiones Activas</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">${data.limits?.max_connections || 0}</div>
-                <div class="stat-label">Límite Máximo</div>
-            </div>
-        </div>
-        
-        ${data.load_percentage > 80 ? `
-            <div style="background: linear-gradient(135deg, var(--danger-color), var(--danger-dark)); color: white; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-                <strong>⚠️ Advertencia de Sobrecarga:</strong>
-                <p>El servidor está cerca de su capacidad máxima. Considere limitar nuevos accesos.</p>
-            </div>
-        ` : ''}
-        
-        <div style="font-size: 0.9rem; color: var(--gray-600); margin-top: 1rem;">
-            Última actualización: ${new Date().toLocaleTimeString('es-CO')}
-        </div>
-    `;
-}
-
-function renderDatabaseMetrics(data) {
-    const container = document.getElementById('database-metrics');
-    
-    container.innerHTML = `
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem;">
-            <div class="stat-card">
-                <div class="stat-number">${data.connection_pool?.status === 'healthy' ? '🟢' : '🔴'}</div>
-                <div class="stat-label">Pool BD</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">${data.limits?.pool_max || 0}</div>
-                <div class="stat-label">Pool Máximo</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">${data.cache?.entries || 0}</div>
-                <div class="stat-label">Cache Entradas</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-number">${data.database?.status === 'healthy' ? '✅' : '❌'}</div>
-                <div class="stat-label">Estado BD</div>
-            </div>
-        </div>
-    `;
-}
-
-function startMonitoring() {
-    if (monitoringInterval) return;
-    
-    monitoringInterval = setInterval(async () => {
-        if (isAdmin) {
-            const activeTab = document.querySelector('.tab-button.active');
-            if (activeTab && activeTab.getAttribute('data-tab') === 'monitoreo') {
-                await refreshServerStatus();
-            }
-            if (activeTab && activeTab.getAttribute('data-tab') === 'configuracion') {
-                await refreshConnectedUsers();
-            }
-        }
-    }, 3000);
-}
-
-function stopMonitoring() {
-    if (monitoringInterval) {
-        clearInterval(monitoringInterval);
-        monitoringInterval = null;
-    }
-}
-
-function addActivityLog(message, type = 'info') {
-    const timestamp = new Date().toLocaleTimeString('es-CO');
-    const color = {
-        'info': 'var(--info-color)',
-        'warning': 'var(--warning-color)',
-        'error': 'var(--danger-color)',
-        'success': 'var(--success-color)'
-    }[type] || 'var(--gray-600)';
-    
-    activityLog.unshift({ message, type, timestamp, color });
-    
-    // Mantener solo los últimos 50 logs
-    if (activityLog.length > 50) {
-        activityLog = activityLog.slice(0, 50);
-    }
-    
-    updateActivityDisplay();
-}
-
-function updateActivityDisplay() {
-    const container = document.getElementById('activity-log');
-    if (!container) return;
-    
-    if (activityLog.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: var(--gray-600);">Esperando actividad...</p>';
-        return;
-    }
-    
-    container.innerHTML = activityLog.map(log => `
-        <div style="padding: 0.5rem; border-bottom: 1px solid var(--gray-300); display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: ${log.color};">${log.message}</span>
-            <span style="color: var(--gray-500); font-size: 0.8rem;">${log.timestamp}</span>
-        </div>
-    `).join('');
-}
-
 function loadDemoVotingQuestions() {
     const demoQuestions = [
         {
@@ -3638,25 +3428,6 @@ async function validateTestUserAdmin() {
         
     } catch (error) {
         notifications.show('Credenciales de administrador incorrectas', 'error');
-    }
-}
-
-let usersRefreshInterval = null;
-
-function startUsersRefreshInterval() {
-    if (usersRefreshInterval) return;
-    
-    usersRefreshInterval = setInterval(async () => {
-        if (isAdmin && document.querySelector('.tab-button[data-tab="configuracion"].active')) {
-            await refreshConnectedUsers();
-        }
-    }, 2000); 
-}
-
-function stopUsersRefreshInterval() {
-    if (usersRefreshInterval) {
-        clearInterval(usersRefreshInterval);
-        usersRefreshInterval = null;
     }
 }
 
