@@ -321,15 +321,12 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
                             conn,
                             """
                             SELECT 
-                                COUNT(*) as unique_voters,
-                                COALESCE(SUM(p.coefficient), 0) as coefficient_sum
-                            FROM (
-                                SELECT DISTINCT v.participant_code 
-                                FROM votes v 
-                                WHERE v.question_id = ? 
-                                AND (v.answer = ? OR v.answer LIKE ? OR v.answer LIKE ? OR v.answer LIKE ?)
-                            ) distinct_voters
-                            JOIN participants p ON distinct_voters.participant_code = p.code
+                                COUNT(DISTINCT v.participant_code) as unique_voters,  -- Cuenta participantes únicos directamente
+                                COALESCE(SUM(DISTINCT p.coefficient), 0) as coefficient_sum
+                            FROM votes v
+                            JOIN participants p ON v.participant_code = p.code
+                            WHERE v.question_id = ? 
+                            AND (v.answer = ? OR v.answer LIKE ?, ...)
                             """,
                             (pregunta['id'], opcion, f"{opcion},%", f"%, {opcion},%", f"%, {opcion}"),
                             fetchone=True
