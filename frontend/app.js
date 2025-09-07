@@ -2060,13 +2060,7 @@ function showParticipantsModal(title, participants) {
                 ${renderPage()}
             </div>
         `,
-        actions: [
-            {
-                text: 'Cerrar',
-                class: 'btn-secondary',
-                handler: 'closeParticipantsModal()'
-            }
-        ]
+        actions: []
     });
     
     // Funciones del modal con namespace seguro
@@ -2143,6 +2137,7 @@ async function uploadExcel() {
             ✅ ${result.inserted} participantes cargados exitosamente
             <br><small style="opacity: 0.8;">Se procesaron ${result.sheets_processed || 1} hojas del archivo Excel</small>
         </div>`;
+        notifications.show(`✅ ${result.inserted} participantes cargados exitosamente`, 'success', 5000);
         fileInput.value = '';
 
         if (result.inserted > 0) {
