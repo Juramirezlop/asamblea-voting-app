@@ -1637,7 +1637,6 @@ async function loadAdminData() {
     ]);
     
     await loadActiveQuestions();
-    startUsersRefreshInterval();
 }
 
 async function loadParticipantsStatus() {
@@ -1720,6 +1719,13 @@ async function loadActiveQuestions() {
         try {
             const questions = await apiCall('/voting/questions/active');
             
+            // Limpiar loading state y renderizar siempre
+            container.innerHTML = '';
+            renderActiveQuestions(questions);
+            console.log('Votaciones renderizadas:', questions.length);
+            
+            // COMENTAR O ELIMINAR todo el bloque de optimización por ahora:
+            /*
             // Solo renderizar si hay cambios estructurales (no de conteos)
             const currentCards = document.querySelectorAll('.voting-card[data-question-id]');
             const currentIds = Array.from(currentCards).map(card => parseInt(card.dataset.questionId)).sort();
@@ -1731,6 +1737,7 @@ async function loadActiveQuestions() {
                 renderActiveQuestions(questions);
                 console.log('Panel re-renderizado por cambios estructurales');
             }
+            */
             
             // Siempre actualizar contadores (sin re-renderizar)
             await updateVoteCountsForActiveQuestions();
@@ -1743,6 +1750,11 @@ async function loadActiveQuestions() {
 }
 
 function startAdminTimers() {
+
+    if (!isAdmin || !adminToken) {
+        return;
+    }
+    
     if (window.adminTimerInterval) {
         clearInterval(window.adminTimerInterval);
     }
