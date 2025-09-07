@@ -994,6 +994,20 @@ async function loadVotingQuestions() {
         const votedQuestions = new Set(userVotes.map(vote => vote.question_id));
         
         console.log('Preguntas cargadas:', questions.length);
+        if (questions.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-4"></path>
+                        <path d="M9 7V3a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path>
+                    </svg>
+                    <h3>No hay votaciones activas</h3>
+                    <p>Espere a que el administrador active nuevas votaciones para poder participar</p>
+                </div>
+            `;
+            return;
+        }
+
         renderVotingQuestions(questions, votedQuestions);
 
     } catch (error) {
