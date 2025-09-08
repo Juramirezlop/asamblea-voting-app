@@ -570,7 +570,7 @@ class AdminComponents {
                         <!-- Las opciones se agregan dinámicamente -->
                     </div>
 
-                    <div class="add-option" onclick="addNewOption()">
+                    <div class="add-option" onclick="add-option()">
                         <span style="font-size: 1.5rem;">➕</span>
                         <span>Agregar nueva opción</span>
                     </div>

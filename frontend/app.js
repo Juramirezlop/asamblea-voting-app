@@ -401,6 +401,13 @@ function showScreen(screenId) {
 }
 
 function logout() {
+
+    // Limpiar timer de admin
+    if (window.adminTimerInterval) {
+        clearInterval(window.adminTimerInterval);
+        window.adminTimerInterval = null;
+    }
+
     // Limpiar tokens y variables
     clearTokens();
     disconnectWebSocket();
@@ -1406,7 +1413,7 @@ async function showAdminScreen() {
             }
         });
     }
-    
+
     setupAdminEventListeners();
     showAdminTab('estado');
     await loadAdminData();
@@ -3498,4 +3505,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Configurar efectos visuales
     setupVisualEffects();
+});
+
+document.addEventListener('click', function(e) {
+    if (e.target.closest('[data-action="add-option"]')) {
+        e.preventDefault();
+        e.stopPropagation();
+        addNewOption();
+    }
 });
