@@ -430,7 +430,6 @@ function logout() {
 
     showScreen('welcome-screen');
     notifications.show('Sesión cerrada correctamente', 'info');
-    stopUsersRefreshInterval();
 }
 
 // Funciones globales para modales
@@ -1384,6 +1383,30 @@ async function showAdminScreen() {
     showScreen('admin-screen');
     connectWebSocket();
     document.getElementById('create-voting-form').innerHTML = AdminComponents.createVotingForm();
+    // Event listeners para validación visual
+    const maxSelectionsInput = document.getElementById('max-selections');
+    if (maxSelectionsInput) {
+        maxSelectionsInput.addEventListener('blur', function() {
+            const selectedType = document.querySelector('.type-option.selected')?.dataset.type;
+            if (selectedType === 'multiple') {
+                let value = parseInt(this.value) || 1;
+                if (value < 2) {
+                    this.value = 2;
+                }
+            }
+        });
+    }
+
+    const timeLimitInput = document.getElementById('time-limit-minutes');
+    if (timeLimitInput) {
+        timeLimitInput.addEventListener('blur', function() {
+            let value = parseInt(this.value);
+            if (value > 0 && value < 5) {
+                this.value = 5;
+            }
+        });
+    }
+    
     setupAdminEventListeners();
     showAdminTab('estado');
     await loadAdminData();
@@ -1726,7 +1749,9 @@ async function loadActiveQuestions() {
             
             // Siempre actualizar contadores (sin re-renderizar)
             await updateVoteCountsForActiveQuestions();
-            startAdminTimers();
+            if (isAdmin && adminToken) {
+                startAdminTimers();
+            }
             
         } catch (error) {
             console.error('Error loading active questions:', error);
