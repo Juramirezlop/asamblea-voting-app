@@ -1235,6 +1235,42 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// Event delegation mejorado para opciones dinámicas
+document.addEventListener('click', (e) => {
+    // Remover opciones
+    if (e.target.closest('.remove-option-btn')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const optionItem = e.target.closest('.option-item');
+        if (optionItem) {
+            // Prevenir eliminar si es la última opción visible
+            const optionsContainer = optionItem.closest('.options-container');
+            const totalOptions = optionsContainer.querySelectorAll('.option-item').length;
+            if (totalOptions > 2) {
+                optionItem.remove();
+                validateCreateForm();
+            } else {
+                notifications.show('Debe mantener al menos 2 opciones', 'warning');
+            }
+        }
+        return;
+    }
+    
+    // Agregar opciones
+    if (e.target.closest('[data-action="add-option"]')) {
+        e.preventDefault();
+        e.stopPropagation();
+        addNewOption();
+        return;
+    }
+    
+    // Focus automático en inputs de opciones
+    if (e.target.classList.contains('option-text')) {
+        e.target.focus();
+        e.target.select();
+    }
+});
+
 // Función global para limpiar estado de modales
 window.cleanupModalFunctions = function() {
     const functionsToClean = [

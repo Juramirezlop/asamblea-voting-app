@@ -1632,6 +1632,31 @@ function setupVotingFormListeners() {
     }
 }
 
+// Event delegation específico para opciones dinámicas
+document.addEventListener('focusout', (e) => {
+    if (e.target.classList.contains('option-text')) {
+        const value = e.target.value.trim();
+        if (!value) {
+            // Si está vacío y no es la última opción, eliminarla
+            const optionItem = e.target.closest('.option-item');
+            const container = optionItem.closest('.options-container');
+            const allOptions = container.querySelectorAll('.option-item');
+            
+            if (allOptions.length > 2) {
+                optionItem.remove();
+                validateCreateForm();
+            }
+        }
+    }
+});
+
+// Prevenir pérdida de foco involuntario
+document.addEventListener('mousedown', (e) => {
+    if (e.target.closest('.options-container') && !e.target.closest('.option-item')) {
+        e.preventDefault();
+    }
+});
+
 function showAdminTab(tabName) {
     // Ocultar todas las pestañas
     document.querySelectorAll('.tab-content').forEach(tab => {
@@ -2242,7 +2267,13 @@ function setSelectionMode(mode) {
 
 function addNewOption(text = '') {
     const optionsList = document.getElementById('options-list');
+    if (!optionsList) return;
+    
     const currentOptions = optionsList.querySelectorAll('.option-item').length;
+    if (currentOptions >= 8) {
+        notifications.show('Máximo 8 opciones permitidas', 'warning');
+        return;
+    }
     
     const optionHTML = AdminComponents.createOptionItem(currentOptions + 1, text);
     optionsList.insertAdjacentHTML('beforeend', optionHTML);
@@ -2250,7 +2281,7 @@ function addNewOption(text = '') {
     // Focus en el nuevo input si no tiene texto
     if (!text) {
         const newInput = optionsList.lastElementChild.querySelector('.option-text');
-        newInput.focus();
+        if (newInput) newInput.focus();
     }
     
     updateOptionNumbers();
