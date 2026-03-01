@@ -1265,11 +1265,6 @@ document.addEventListener('click', (e) => {
         return;
     }
     
-    // Focus automático en inputs de opciones
-    if (e.target.classList.contains('option-text')) {
-        e.target.focus();
-        e.target.select();
-    }
 });
 
 // Función global para limpiar estado de modales

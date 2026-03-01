@@ -1212,7 +1212,7 @@ body {
     transform: translate(-50%, -50%);
 }
 
-.option-text {
+.multiple-option .option-text {
     flex: 1;
     font-weight: 500;
     color: var(--dark-color);    
