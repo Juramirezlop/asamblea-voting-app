@@ -1,5 +1,6 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import Annotated
+from fastapi import APIRouter, Depends, HTTPException, status, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from datetime import datetime
@@ -50,9 +51,12 @@ def register_user(payload: RegisterUser):
 
 # ---------- Admin login (using form because OAuth2PasswordRequestForm expects form-data) ----------
 @router.post("/login/admin")
-def login_admin(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = get_user_by_username(form_data.username)
-    if not user or not verify_password(form_data.password, user["password_hash"]):
+def login_admin(
+    username: Annotated[str, Form()],
+    password: Annotated[str, Form()]
+):
+    user = get_user_by_username(username)
+    if not user or not verify_password(password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
     token = create_access_token({"sub": user["username"], "role": "admin"})
     return {"access_token": token, "token_type": "bearer"}
