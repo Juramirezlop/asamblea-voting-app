@@ -688,12 +688,13 @@ class AdminComponents {
 
 class Utils {
     static formatCode(code) {
-        // Formatear código de apartamento
-        return code.toUpperCase().replace(/[^0-9-]/g, '');
+        // Formatear código de apartamento - permite letras, números y guión
+        return code.toUpperCase().replace(/[^A-Z0-9-]/g, '');
     }
 
     static validateCode(code) {
-        const regex = /^\d+-\d+$/;
+        // Validar formato: TORRE-APTO (donde torre puede ser letra o número)
+        const regex = /^[A-Z0-9]+-\d+$/;
         return regex.test(code);
     }
 
@@ -1196,7 +1197,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const accessInput = document.getElementById('access-code');
     if (accessInput) {
         accessInput.addEventListener('input', (e) => {
-            const code = e.target.value.toUpperCase().replace(/[^0-9-]/g, '');
+            const code = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
             e.target.value = code;
             
             const statusElement = document.getElementById('input-status');
