@@ -1639,13 +1639,6 @@ document.addEventListener('focusout', (e) => {
     }
 });
 
-// Prevenir pérdida de foco involuntario
-document.addEventListener('mousedown', (e) => {
-    if (e.target.closest('.options-container') && !e.target.closest('.option-item')) {
-        e.preventDefault();
-    }
-});
-
 function showAdminTab(tabName) {
     // Ocultar todas las pestañas
     document.querySelectorAll('.tab-content').forEach(tab => {
