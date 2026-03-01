@@ -1635,18 +1635,7 @@ function setupVotingFormListeners() {
 // Event delegation específico para opciones dinámicas
 document.addEventListener('focusout', (e) => {
     if (e.target.classList.contains('option-text')) {
-        const value = e.target.value.trim();
-        if (!value) {
-            // Si está vacío y no es la última opción, eliminarla
-            const optionItem = e.target.closest('.option-item');
-            const container = optionItem.closest('.options-container');
-            const allOptions = container.querySelectorAll('.option-item');
-            
-            if (allOptions.length > 2) {
-                optionItem.remove();
-                validateCreateForm();
-            }
-        }
+        // No eliminar al perder foco - el usuario puede volver a editar libremente
     }
 });
 
@@ -2350,11 +2339,11 @@ async function createNewVoting() {
         questionData.options = options;
         
         let maxSelections = parseInt(document.getElementById('max-selections').value) || 1;
-        if (selectedType === 'multiple' && maxSelections < 2) {
+        const allowMultiple = maxSelections > 1;
+        if (selectedType === 'multiple' && allowMultiple && maxSelections < 2) {
             maxSelections = 2;
             document.getElementById('max-selections').value = 2;
         }
-        const allowMultiple = maxSelections > 1;
 
         questionData.allow_multiple = allowMultiple;
         questionData.max_selections = maxSelections;
