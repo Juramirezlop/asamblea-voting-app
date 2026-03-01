@@ -53,18 +53,6 @@ window.addEventListener('beforeunload', (e) => {
 console.log('🗳️ Sistema de Votación inicializado correctamente');
 
 // ================================
-// UTILIDADES
-// ================================
-const Utils = {
-    // Valida formato Torre-Apto: acepta letras y números en la torre
-    // Ejemplos válidos: A-201, B-1503, 1-201, L-302, 12-405
-    validateCode(code) {
-        if (!code) return false;
-        return /^[A-Z0-9]{1,5}-[A-Z0-9]{1,6}$/i.test(code.trim());
-    }
-};
-
-// ================================
 // FUNCIONES GLOBALES PARA MODALES
 // ================================
 window.processDeleteCode = async function() {

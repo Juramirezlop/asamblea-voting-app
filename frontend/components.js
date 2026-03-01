@@ -693,9 +693,9 @@ class Utils {
     }
 
     static validateCode(code) {
-        // Validar formato: TORRE-APTO (donde torre puede ser letra o número)
-        const regex = /^[A-Z0-9]+-\d+$/;
-        return regex.test(code);
+        // Validar formato: TORRE-APTO (donde torre y apto pueden ser letras o números)
+        if (!code) return false;
+        return /^[A-Z0-9]{1,5}-[A-Z0-9]{1,6}$/i.test(code.trim());
     }
 
     static formatTime(timestamp) {
