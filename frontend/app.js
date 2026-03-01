@@ -2284,7 +2284,6 @@ function setupOptionInputListeners() {
             addNewOption();
         }
     });
-    setupOptionInputListeners();
 }
 
 function removeOptionItem(button) {
@@ -2338,11 +2337,15 @@ async function createNewVoting() {
         
         questionData.options = options;
         
-        let maxSelections = parseInt(document.getElementById('max-selections').value) || 1;
-        const allowMultiple = maxSelections > 1;
-        if (selectedType === 'multiple' && allowMultiple && maxSelections < 2) {
-            maxSelections = 2;
-            document.getElementById('max-selections').value = 2;
+        // Leer el modo directamente del botón activo, no del input
+        const activeToggleBtn = document.querySelector('.toggle-btn.active');
+        const selectionMode = activeToggleBtn ? activeToggleBtn.getAttribute('data-mode') : 'single';
+        const allowMultiple = selectionMode === 'multiple';
+        
+        let maxSelections = 1;
+        if (allowMultiple) {
+            maxSelections = parseInt(document.getElementById('max-selections').value) || 2;
+            if (maxSelections < 2) maxSelections = 2;
         }
 
         questionData.allow_multiple = allowMultiple;
