@@ -3038,9 +3038,24 @@ async function clearVoterVote(code, questionId) {
 
 async function showEditVoteModal(code, questionId, currentAnswer) {
     try {
-        // Obtener opciones de la pregunta
+        // Obtener opciones de la pregunta (activa o cerrada)
+        let question = null;
         const questions = await apiCall('/voting/questions/active');
-        const question = questions.find(q => q.id === questionId);
+        question = questions.find(q => q.id === questionId);
+        
+        // Si no está activa, buscar en resultados (puede estar cerrada)
+        if (!question) {
+            try {
+                const result = await apiCall(`/voting/results/${questionId}`);
+                if (result) {
+                    question = {
+                        id: result.question_id,
+                        text: result.question_text,
+                        options: result.results.map(r => ({ text: r.answer }))
+                    };
+                }
+            } catch (e) { /* ignorar */ }
+        }
         
         if (!question) {
             notifications.show('Pregunta no encontrada', 'error');
