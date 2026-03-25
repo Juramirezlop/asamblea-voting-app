@@ -112,11 +112,13 @@ class ModalSystem {
     }
 
     show(config) {
-        // Si hay un modal activo, lo dejamos en el stack pero lo ocultamos visualmente
-        if (this.activeModal) {
-            this.activeModal.style.display = 'none';
-            this.modalStack.push(this.activeModal);
+        // Si hay modal activo, eliminarlo del DOM antes de abrir el nuevo
+        if (this.activeModal && this.activeModal.parentNode) {
+            this.activeModal.parentNode.removeChild(this.activeModal);
         }
+        this.modalStack.forEach(m => { if (m.parentNode) m.parentNode.removeChild(m); });
+        this.modalStack = [];
+        this.activeModal = null;
 
         const modal = this.createModal(config);
         this.container.appendChild(modal);
@@ -185,19 +187,16 @@ class ModalSystem {
     }
 
     hide() {
-        if (this.activeModal && this.activeModal.parentNode) {
-            this.activeModal.classList.remove('show');
-            this.cleanupModalState();
-
-            const closing = this.activeModal;
+        if (!this.activeModal) return;
+        this.cleanupModalState();
+        const closing = this.activeModal;
+        this.activeModal = null;
+        this.modalStack.forEach(m => { if (m.parentNode) m.parentNode.removeChild(m); });
+        this.modalStack = [];
+        if (closing.parentNode) {
+            closing.classList.remove('show');
             setTimeout(() => {
-                if (closing && closing.parentNode) {
-                    closing.parentNode.removeChild(closing);
-                }
-                // No restaurar stack automáticamente — cada modal se abre limpio
-                this.modalStack.forEach(m => { if (m.parentNode) m.parentNode.removeChild(m); });
-                this.modalStack = [];
-                this.activeModal = null;
+                if (closing.parentNode) closing.parentNode.removeChild(closing);
             }, 300);
         }
     }
