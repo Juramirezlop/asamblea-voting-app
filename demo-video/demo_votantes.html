@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tutorial Votantes - Sistema de Votación</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+
+        .demo-wrapper {
+            background: white;
+            border-radius: 24px;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.4);
+            width: 980px;
+            max-width: 98vw;
+            height: 96vh;
+            max-height: 680px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .demo-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; padding: 14px 28px;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0;
+        }
+        .demo-header h1 { font-size: 1.15rem; font-weight: 700; }
+        .demo-header p  { font-size: 0.78rem; opacity: 0.85; margin-top: 1px; }
+        .screen-label   { font-size: 0.78rem; opacity: 0.8; white-space: nowrap; }
+
+        /* Step bar */
+        .step-bar {
+            display: flex; align-items: center; justify-content: center; gap: 0;
+            padding: 10px 28px; background: #f4f6ff;
+            border-bottom: 1px solid #e0e5f7; flex-shrink: 0;
+        }
+        .step-dot {
+            width: 28px; height: 28px; border-radius: 50%;
+            background: #dde2f0; color: #999;
+            font-size: 0.72rem; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; transition: all 0.35s ease;
+        }
+        .step-dot.active { background:#667eea; color:white; transform:scale(1.25); box-shadow:0 0 0 4px rgba(102,126,234,0.25); }
+        .step-dot.done   { background:#10b981; color:white; }
+        .step-line { width:32px; height:3px; background:#dde2f0; flex-shrink:0; transition:background 0.35s; }
+        .step-line.done  { background:#10b981; }
+
+        /* ── CUERPO: dos zonas absolutas que se intercambian ── */
+        .main-body {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Pantalla 0 especial */
+        .slide-0 {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 36px; text-align: center;
+            background: white;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+        .slide-0.show { opacity: 1; pointer-events: auto; }
+        .slide-0 .hero { font-size: 3.6rem; margin-bottom: 14px; }
+        .slide-0 h2 { font-size: 1.5rem; font-weight: 800; color: #1e1b4b; margin-bottom: 8px; }
+        .slide-0 .sub { color: #6b7280; font-size: 0.92rem; line-height: 1.6; max-width: 460px; margin-bottom: 24px; }
+        .slide-0 .feats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:28px; width:100%; max-width:580px; }
+        .slide-0 .feat  { background:#f4f6ff; border-radius:12px; padding:12px 8px; border:1px solid #dde2f0; }
+        .slide-0 .feat .icon { font-size:1.4rem; margin-bottom:4px; }
+        .slide-0 .feat p { font-size:0.76rem; color:#555; font-weight:600; }
+        .start-btn {
+            padding:13px 44px;
+            background:linear-gradient(135deg,#667eea,#764ba2);
+            color:white; border:none; border-radius:14px;
+            font-size:1.05rem; font-weight:700; cursor:pointer;
+            box-shadow:0 6px 20px rgba(102,126,234,0.4);
+            transition:all 0.2s;
+        }
+        .start-btn:hover { transform:translateY(-3px); box-shadow:0 12px 28px rgba(102,126,234,0.5); }
+
+        /* Slides 1-7: grid dos columnas */
+        .slide {
+            position: absolute; inset: 0;
+            display: grid; grid-template-columns: 1fr 1fr;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.4s ease;
+        }
+        .slide.show { opacity: 1; pointer-events: auto; }
+
+        /* Col izquierda */
+        .col-left {
+            padding: 28px 28px 20px;
+            display: flex; flex-direction: column; justify-content: center;
+            border-right: 1px solid #e8eaf6;
+            background: #fafbff;
+            overflow: hidden;
+        }
+        .step-lbl { font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#667eea; margin-bottom:8px; }
+        .slide-title { font-size:1.35rem; font-weight:800; color:#1e1b4b; margin-bottom:12px; line-height:1.3; }
+        .slide-text  { font-size:0.93rem; color:#4b5563; line-height:1.6; }
+        .tip-box { margin-top:16px; background:linear-gradient(135deg,rgba(102,126,234,0.08),rgba(118,75,162,0.06)); border-left:4px solid #667eea; border-radius:10px; padding:11px 14px; font-size:0.82rem; color:#4338ca; line-height:1.5; }
+
+        /* Col derecha */
+        .col-right {
+            padding: 18px 22px 18px 18px;
+            display: flex; flex-direction: column; justify-content: center;
+            overflow: hidden;
+        }
+
+        /* App simulada */
+        .app-sim {
+            background:#f4f6fb; border-radius:14px; padding:14px;
+            border:1.5px solid #dde2f0;
+            display:flex; flex-direction:column; gap:8px;
+            overflow:hidden; flex:1;
+        }
+        .app-header { display:flex; align-items:center; gap:9px; background:linear-gradient(135deg,#667eea,#764ba2); color:white; border-radius:9px; padding:9px 13px; flex-shrink:0; }
+        .app-header .ic { font-size:1.2rem; }
+        .app-header h2 { font-size:0.88rem; font-weight:700; }
+        .app-header p  { font-size:0.7rem; opacity:0.85; }
+
+        /* Input de código */
+        .sim-input-wrap { background:white; border-radius:9px; padding:12px; box-shadow:0 2px 7px rgba(0,0,0,0.05); }
+        .sim-input-wrap label { font-size:0.75rem; color:#666; margin-bottom:5px; display:block; font-weight:600; }
+        .sim-input { width:100%; padding:9px 10px; border:2px solid #667eea; border-radius:7px; font-size:1rem; font-weight:700; text-align:center; color:#333; letter-spacing:2px; background:#f8f9ff; }
+        .sim-hint  { font-size:0.68rem; color:#888; margin-top:4px; text-align:center; }
+        .sim-buttons { display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+        .sim-btn { padding:9px; border-radius:7px; border:none; font-size:0.8rem; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; }
+        .sim-btn.primary   { background:linear-gradient(135deg,#667eea,#764ba2); color:white; }
+        .sim-btn.secondary { background:white; color:#667eea; border:2px solid #667eea; }
+        .sim-btn.hl        { background:#667eea; color:white; }
+
+        /* Error */
+        .sim-error { background:#fff5f5; border:2px solid #fed7d7; border-radius:9px; padding:11px; display:flex; align-items:flex-start; gap:7px; }
+        .sim-error h4 { color:#c53030; font-size:0.8rem; margin-bottom:3px; }
+        .sim-error p  { color:#742a2a; font-size:0.74rem; line-height:1.4; }
+
+        /* Vacío */
+        .sim-empty { text-align:center; padding:20px 8px; background:white; border-radius:9px; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+        .sim-empty .big-icon { font-size:2rem; margin-bottom:7px; }
+        .sim-empty h4 { color:#555; font-size:0.85rem; margin-bottom:5px; }
+        .sim-empty p  { color:#888; font-size:0.74rem; line-height:1.4; }
+        .pulse-dot { display:inline-block; width:6px; height:6px; background:#10b981; border-radius:50%; margin-right:4px; animation:pulseDot 1.2s ease-in-out infinite; }
+        @keyframes pulseDot { 0%,100%{transform:scale(1)} 50%{transform:scale(1.7);opacity:0.5} }
+
+        /* Tarjeta votación */
+        .vcard { background:white; border-radius:9px; padding:10px; box-shadow:0 2px 7px rgba(0,0,0,0.06); flex-shrink:0; }
+        .q-type  { font-size:0.65rem; color:#667eea; font-weight:700; margin-bottom:4px; }
+        .q-title { font-size:0.78rem; font-weight:600; color:#333; margin-bottom:8px; line-height:1.3; }
+
+        .yesno-row { display:flex; gap:7px; }
+        .yesno-btn { flex:1; padding:8px 5px; border-radius:7px; border:none; font-size:0.76rem; font-weight:700; display:flex; flex-direction:column; align-items:center; gap:2px; }
+        .yesno-btn.yes { background:#f0fdf4; color:#15803d; border:2px solid #86efac; }
+        .yesno-btn.no  { background:#fff5f5; color:#b91c1c; border:2px solid #fca5a5; }
+        .yesno-btn.yes.sel { background:#15803d; color:white; border-color:#15803d; }
+        .yesno-btn.no.sel  { background:#b91c1c; color:white; border-color:#b91c1c; }
+
+        .mopt { padding:7px 10px; border-radius:6px; border:2px solid #e5e7eb; background:white; margin-bottom:5px; font-size:0.76rem; font-weight:500; color:#333; }
+        .mopt.sel { border-color:#667eea; background:#f0f0ff; color:#4338ca; }
+        .mopt.dis { opacity:0.38; }
+        .cfm-btn  { width:100%; padding:8px; background:linear-gradient(135deg,#667eea,#764ba2); color:white; border:none; border-radius:7px; font-size:0.78rem; font-weight:700; margin-top:5px; }
+
+        /* Voto OK */
+        .voted-ok { background:linear-gradient(135deg,#10b981,#059669); color:white; border-radius:9px; padding:11px; text-align:center; }
+        .voted-ok h4 { font-size:0.85rem; margin-bottom:3px; }
+        .voted-ok p  { font-size:0.72rem; opacity:0.9; }
+
+        /* Red */
+        .net-card { background:#fffbeb; border:2px solid #fcd34d; border-radius:9px; padding:11px; text-align:center; }
+        .net-card h4 { color:#92400e; font-size:0.82rem; margin-bottom:4px; }
+        .net-card p  { color:#78350f; font-size:0.74rem; margin-bottom:7px; }
+        .rel-btn     { padding:6px 14px; background:#f59e0b; color:white; border:none; border-radius:5px; font-size:0.74rem; font-weight:700; }
+
+        /* Final */
+        .final-c { text-align:center; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:8px; }
+        .final-c .big { font-size:2.4rem; margin-bottom:8px; }
+        .final-c h3 { font-size:0.92rem; color:#333; margin-bottom:6px; }
+        .final-c p  { color:#666; font-size:0.78rem; line-height:1.5; }
+        .log-badge  { display:inline-block; margin-top:10px; background:#667eea; color:white; padding:6px 14px; border-radius:18px; font-size:0.74rem; font-weight:600; }
+
+        /* Controles */
+        .controls {
+            padding: 12px 28px;
+            background: #f4f6ff;
+            border-top: 1px solid #e0e5f7;
+            display: flex; align-items: center; justify-content: center; gap: 18px;
+            flex-shrink: 0;
+        }
+        .progress-dots { display:flex; gap:5px; align-items:center; }
+        .pdot { width:7px; height:7px; border-radius:50%; background:#dde2f0; transition:all 0.3s; }
+        .pdot.active { background:#667eea; transform:scale(1.35); }
+        .pdot.done   { background:#10b981; }
+
+        .play-btn {
+            padding:10px 32px;
+            background:linear-gradient(135deg,#10b981,#059669);
+            color:white; border:none; border-radius:11px;
+            font-size:0.95rem; font-weight:700; cursor:pointer;
+            box-shadow:0 4px 14px rgba(16,185,129,0.35);
+            transition:all 0.2s; display:none;
+        }
+        .play-btn:hover { transform:translateY(-2px); }
+        .play-btn.pausing { background:linear-gradient(135deg,#f59e0b,#d97706); box-shadow:0 4px 14px rgba(245,158,11,0.35); }
+
+        /* Audio pill */
+        .audio-pill {
+            position:fixed; bottom:22px; right:22px;
+            background:rgba(20,20,40,0.85); color:white;
+            padding:8px 15px; border-radius:28px;
+            display:none; align-items:center; gap:7px;
+            font-size:0.78rem; font-weight:600;
+            backdrop-filter:blur(6px); z-index:999;
+        }
+        .audio-pill.show { display:flex; }
+        .wave { display:flex; align-items:center; gap:2px; }
+        .wave span { display:block; width:3px; background:#10b981; border-radius:2px; animation:wv 0.7s ease-in-out infinite; }
+        .wave span:nth-child(2){ animation-delay:.15s; }
+        .wave span:nth-child(3){ animation-delay:.3s; }
+        @keyframes wv { 0%,100%{height:4px} 50%{height:15px} }
+
+        @keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+        .show { animation: fadeIn 0.4s ease; }
+    </style>
+</head>
+<body>
+<div class="demo-wrapper">
+
+    <!-- Header -->
+    <div class="demo-header">
+        <div>
+            <h1>🗳️ Sistema de Votación — Tutorial para propietarios</h1>
+            <p>Asamblea General de Copropietarios</p>
+        </div>
+        <div class="screen-label" id="screenLabel"></div>
+    </div>
+
+    <!-- Step bar (generada por JS) -->
+    <div class="step-bar" id="stepBar"></div>
+
+    <!-- Cuerpo -->
+    <div class="main-body">
+
+        <!-- Slide 0: Inicio -->
+        <div class="slide-0 show" id="slide0">
+            <div class="hero">🗳️</div>
+            <h2>Tutorial de votación para propietarios</h2>
+            <p class="sub">Aprende en pocos minutos cómo participar en la asamblea desde tu celular o computador. El tutorial es automático con narración de voz.</p>
+            <div class="feats">
+                <div class="feat"><div class="icon">📱</div><p>Cualquier dispositivo</p></div>
+                <div class="feat"><div class="icon">⚡</div><p>Rápido y sencillo</p></div>
+                <div class="feat"><div class="icon">🔐</div><p>Seguro y verificado</p></div>
+                <div class="feat"><div class="icon">✅</div><p>Voto al instante</p></div>
+            </div>
+            <button class="start-btn" onclick="startTutorial()">▶ Iniciar Tutorial</button>
+        </div>
+
+        <!-- Slide 1 -->
+        <div class="slide" id="slide1">
+            <div class="col-left">
+                <div class="step-lbl">Paso 1 de 7 — Pantalla de inicio</div>
+                <div class="slide-title">Pantalla de inicio</div>
+                <div class="slide-text">Al abrir la aplicación verás esta pantalla. Aquí debes ingresar el código de tu apartamento para acceder a las votaciones.</div>
+                <div class="tip-box">💡 El código tiene el formato <strong>Torre-Número</strong>. Ejemplo: <strong>A-201</strong>, <strong>B-1503</strong></div>
+            </div>
+            <div class="col-right">
+                <div class="app-sim">
+                    <div class="app-header"><div class="ic">🗳️</div><div><h2>Sistema de Votación</h2><p>Asamblea General</p></div></div>
+                    <div class="sim-input-wrap">
+                        <label>Ingrese su código de acceso</label>
+                        <input class="sim-input" value="" readonly placeholder="A-201">
+                        <div class="sim-hint">Formato: Torre-Apartamento · Ej: A-201, B-1503, 1-302</div>
+                        <div class="sim-buttons">
+                            <button class="sim-btn primary">👥 Registro de Asistencia</button>
+                            <button class="sim-btn secondary">🗳️ Acceder a Votaciones</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 2 -->
+        <div class="slide" id="slide2">
+            <div class="col-left">
+                <div class="step-lbl">Paso 2 de 7 — Ingresar código</div>
+                <div class="slide-title">Ingresa tu código de apartamento</div>
+                <div class="slide-text">Escribe el código exactamente como indican las instrucciones que estan en la pantalla principal. El sistema validará que sea correcto antes de ingresar.</div>
+                <div class="tip-box">✅ Cuando el código es válido aparece en verde. Luego presiona <strong>Acceder a Votaciones</strong>.</div>
+            </div>
+            <div class="col-right">
+                <div class="app-sim">
+                    <div class="app-header"><div class="ic">🗳️</div><div><h2>Sistema de Votación</h2><p>Asamblea General</p></div></div>
+                    <div class="sim-input-wrap">
+                        <label>Ingrese su código de acceso</label>
+                        <input class="sim-input" value="B-402" readonly style="border-color:#10b981;background:#f0fdf4;">
+                        <div class="sim-hint" style="color:#10b981;font-weight:700;">✅ Código válido</div>
+                        <div class="sim-buttons">
+                            <button class="sim-btn primary">👥 Registro de Asistencia</button>
+                            <button class="sim-btn hl">🗳️ Acceder a Votaciones</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 3 -->
+        <div class="slide" id="slide3">
+            <div class="col-left">
+                <div class="step-lbl">Paso 3 de 7 — Si hay un error</div>
+                <div class="slide-title">¿Qué hacer si hay un error?</div>
+                <div class="slide-text">Si el código no es reconocido, verás un mensaje de error. No te preocupes, simplemente repórtalo con el equipo de logística.</div>
+                <div class="tip-box">📋 Acércate al puesto de logística con tu número de apartamento y ellos te ayudarán.</div>
+            </div>
+            <div class="col-right">
+                <div class="app-sim">
+                    <div class="app-header"><div class="ic">🗳️</div><div><h2>Sistema de Votación</h2><p>Asamblea General</p></div></div>
+                    <div class="sim-error">
+                        <div style="font-size:1.3rem;flex-shrink:0;">⚠️</div>
+                        <div><h4>Código no encontrado</h4><p>El código ingresado no está registrado. Verifica que sea correcto o repórtalo con logística.</p></div>
+                    </div>
+                    <div style="background:#fff3cd;border-radius:8px;padding:10px;font-size:0.74rem;color:#856404;text-align:center;">
+                        📋 <strong>¿Tienes problemas?</strong><br>Acércate al puesto de logística con tu número de apartamento.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 4 -->
+        <div class="slide" id="slide4">
+            <div class="col-left">
+                <div class="step-lbl">Paso 4 de 7 — Pantalla de votaciones</div>
+                <div class="slide-title">Pantalla de votaciones</div>
+                <div class="slide-text">Al ingresar correctamente verás tus votaciones activas. Si aún no aparece ninguna, el administrador todavía no ha abierto la votación.</div>
+                <div class="tip-box">⏳ La aplicación se actualiza automáticamente. Solo espera unos momentos.</div>
+            </div>
+            <div class="col-right">
+                <div class="app-sim">
+                    <div class="app-header"><div class="ic">🗳️</div><div><h2>Sus Votaciones</h2><p>Código: B-402 · <span style="color:#86efac;">● Conectado</span></p></div></div>
+                    <div class="sim-empty">
+                        <div class="big-icon">⏳</div>
+                        <h4>No hay votaciones activas aún</h4>
+                        <p><span class="pulse-dot"></span>La app se actualiza en tiempo real.<br>Espera a que el administrador abra una votación.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 5 -->
+        <div class="slide" id="slide5">
+            <div class="col-left">
+                <div class="step-lbl">Paso 5 de 7 — Cómo votar</div>
+                <div class="slide-title">Cómo emitir tu voto</div>
+                <div class="slide-text">Cuando aparezca una votación, lee la pregunta, selecciona tu opción y presiona confirmar. Una vez enviado, el voto no se puede cambiar.</div>
+                <div class="tip-box">⚠️ <strong>El voto es definitivo.</strong> Asegúrate de tu elección antes de confirmar.</div>
+            </div>
+            <div class="col-right">
+                <div class="app-sim">
+                    <div class="app-header"><div class="ic">🗳️</div><div><h2>Sus Votaciones</h2><p>B-402 · <span style="color:#86efac;">● Conectado</span></p></div></div>
+                    <div class="vcard">
+                        <div class="q-type">✅❌ Sí/No · 🟢 Abierta</div>
+                        <div class="q-title">¿Aprueba el presupuesto de mantenimiento para el año 2025?</div>
+                        <div class="yesno-row">
+                            <button class="yesno-btn yes sel">✅<span>SÍ</span></button>
+                            <button class="yesno-btn no">❌<span>NO</span></button>
+                        </div>
+                    </div>
+                    <div class="voted-ok">
+                        <h4>✅ ¡Voto registrado!</h4>
+                        <p>Tu participación ha sido guardada.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 6 -->
+        <div class="slide" id="slide6">
+            <div class="col-left">
+                <div class="step-lbl">Paso 6 de 7 — Tipos de votación</div>
+                <div class="slide-title">Tipos de votación</div>
+                <div class="slide-text">Existen tres tipos: <strong>Sí o No</strong>, <strong>selección única</strong> donde eliges solo una opción, y <strong>selección múltiple</strong> donde puedes elegir hasta un máximo indicado en pantalla.</div>
+                <div class="tip-box">🗳️ El tipo y las instrucciones siempre están indicados en cada tarjeta de votación.</div>
+            </div>
+            <div class="col-right">
+                <div class="app-sim" style="gap:6px;">
+                    <div class="vcard">
+                        <div class="q-type">✅❌ Tipo 1 — Sí / No</div>
+                        <div class="q-title">¿Aprueba el reglamento de convivencia?</div>
+                        <div class="yesno-row">
+                            <button class="yesno-btn yes" style="padding:6px;">✅ SÍ</button>
+                            <button class="yesno-btn no"  style="padding:6px;">❌ NO</button>
+                        </div>
+                    </div>
+                    <div class="vcard">
+                        <div class="q-type">🎯 Tipo 2 — Selección única</div>
+                        <div class="q-title">¿Cuál empresa de vigilancia prefiere?</div>
+                        <div class="mopt" style="margin-bottom:4px;">🏢 Seguridad Total S.A.</div>
+                        <div class="mopt sel" style="margin-bottom:0;">🏢 Vigilancia Andina ✓</div>
+                    </div>
+                    <div class="vcard">
+                        <div class="q-type">✨ Tipo 3 — Selección múltiple (máx. 2)</div>
+                        <div class="q-title">Proyectos de mejora prioritarios</div>
+                        <div class="mopt sel" style="margin-bottom:4px;">🔧 Reparación ascensores ✓</div>
+                        <div class="mopt sel" style="margin-bottom:4px;">💡 Iluminación zonas comunes ✓</div>
+                        <div class="mopt dis" style="margin-bottom:0;">🌿 Jardines (máximo alcanzado)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 7 -->
+        <div class="slide" id="slide7">
+            <div class="col-left">
+                <div class="step-lbl">Paso 7 de 7 — Problemas y cierre</div>
+                <div class="slide-title">Si tienes problemas técnicos</div>
+                <div class="slide-text">Si la app falla o no carga, recarga la página. Para cualquier otro inconveniente, el equipo de logística está disponible para ayudarte.</div>
+                <div class="tip-box">🙌 <strong>¡Gracias por participar!</strong><br>Tu voto es fundamental para las decisiones de nuestra comunidad.</div>
+            </div>
+            <div class="col-right">
+                <div class="app-sim">
+                    <div class="net-card">
+                        <h4>⚠️ Error de conexión</h4>
+                        <p>No se pudo conectar. Verifica tu internet.</p>
+                        <button class="rel-btn">🔄 Recargar página</button>
+                    </div>
+                    <div class="final-c">
+                        <div class="big">🙌</div>
+                        <h3>¡Muchas gracias por participar!</h3>
+                        <p>Cualquier novedad o pregunta,<br>repórtala con el equipo de logística.</p>
+                        <span class="log-badge">📋 Logística disponible en la entrada</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /main-body -->
+
+    <!-- Controles -->
+    <div class="controls">
+        <div class="progress-dots" id="progressDots"></div>
+        <button class="play-btn" id="playBtn" onclick="togglePlay()">⏸ Pausar</button>
+    </div>
+
+</div><!-- /demo-wrapper -->
+
+<div class="audio-pill" id="audioPill">
+    <div class="wave"><span style="height:6px"></span><span style="height:13px"></span><span style="height:6px"></span></div>
+    <span>Narrando...</span>
+</div>
+
+<script>
+    const TOTAL = 8; // 0..7
+    let cur = 0, playing = false, speechDone = false, cancelAdv = false;
+
+    const stepLabels = ['','Paso 1 de 7 — Pantalla de inicio','Paso 2 de 7 — Ingresar código','Paso 3 de 7 — Si hay un error','Paso 4 de 7 — Pantalla de votaciones','Paso 5 de 7 — Cómo votar','Paso 6 de 7 — Tipos de votación','Paso 7 de 7 — Problemas y cierre'];
+
+    const narrations = [
+        '',
+        'Pantalla de inicio. Al abrir la aplicación verás esta pantalla. Aquí debes ingresar el código de tu apartamento en el formato Torre guión número. Por ejemplo, A guión 201, o B guión 1503.',
+        'Escribe tu código y presiona el botón Acceder a Votaciones. Asegúrate de escribirlo de la siguiente manera: tu torre, puede ser 1 o A seguido de un guion y por ultimo el numero de tu apartamento. El sistema confirmará que el código es válido mostrándolo en verde.',
+        'Si ves un mensaje de error, no te preocupes. Puede ser que el código esté mal escrito. En ese caso, acércate al puesto de logística con tu número de apartamento y ellos te ayudarán a ingresar.',
+        'Una vez dentro verás la pantalla de votaciones. Si no aparece ninguna todavía, el administrador aún no ha abierto la votación. Espera unos momentos, la aplicación se actualiza automáticamente en tiempo real.',
+        'Cuando aparezca una votación, lee bien la pregunta y selecciona tu opción. Luego confirma tu voto. Recuerda que el voto es definitivo: una vez enviado, no se puede cambiar. Asegúrate antes de confirmar.',
+        'Existen tres tipos de votación. Primero, preguntas de Sí o No. Segundo, selección única, donde eliges solo una opción entre varias. Y tercero, selección múltiple, donde puedes elegir hasta un número máximo de opciones indicado en la pantalla.',
+        'Si en algún momento la aplicación no carga o muestra un error de conexión, simplemente recarga la página. Si el problema persiste, repórtalo con logística. Muchas gracias por tu participación. Tu voto es fundamental para nuestra comunidad.',
+    ];
+
+    // Construir step bar y progress dots
+    (function init(){
+        const bar = document.getElementById('stepBar');
+        const dots = document.getElementById('progressDots');
+        for(let i = 0; i < TOTAL; i++){
+            if(i > 0){ const l = document.createElement('div'); l.className='step-line'; l.id='line'+i; bar.appendChild(l); }
+            const d = document.createElement('div');
+            d.className='step-dot'; d.id='dot'+i;
+            d.textContent = i===0 ? '▶' : (i===TOTAL-1 ? '✓' : i);
+            bar.appendChild(d);
+            if(i > 0){ const pd = document.createElement('div'); pd.className='pdot'; pd.id='pd'+i; dots.appendChild(pd); }
+        }
+        updateUI();
+    })();
+
+    function updateUI(){
+        // Slides
+        document.getElementById('slide0').classList.toggle('show', cur===0);
+        for(let i=1;i<TOTAL;i++){
+            const s = document.getElementById('slide'+i);
+            if(s) s.classList.toggle('show', i===cur);
+        }
+        // Dots
+        for(let i=0;i<TOTAL;i++){
+            const d=document.getElementById('dot'+i);
+            if(!d) continue;
+            d.classList.remove('active','done');
+            if(i<cur) d.classList.add('done');
+            if(i===cur) d.classList.add('active');
+        }
+        for(let i=1;i<TOTAL;i++){
+            const l=document.getElementById('line'+i);
+            if(l) l.classList.toggle('done', i<=cur);
+        }
+        // Progress dots
+        for(let i=1;i<TOTAL;i++){
+            const pd=document.getElementById('pd'+i);
+            if(!pd) continue;
+            pd.classList.remove('active','done');
+            if(i<cur) pd.classList.add('done');
+            if(i===cur) pd.classList.add('active');
+        }
+        document.getElementById('screenLabel').textContent = cur>0 ? stepLabels[cur] : '';
+    }
+
+    function speak(text){
+        if(!('speechSynthesis' in window)||!text){ speechDone=true; return; }
+        stopSpeech(false);
+        speechDone=false;
+        document.getElementById('audioPill').classList.add('show');
+        const utt=new SpeechSynthesisUtterance(text);
+        utt.lang='es-CO'; utt.rate=1.15; utt.pitch=1; utt.volume=1;
+        utt.onend=utt.onerror=()=>{ speechDone=true; document.getElementById('audioPill').classList.remove('show'); };
+        speechSynthesis.speak(utt);
+    }
+
+    function stopSpeech(pill=true){
+        if('speechSynthesis' in window) speechSynthesis.cancel();
+        if(pill) document.getElementById('audioPill').classList.remove('show');
+        speechDone=true;
+    }
+
+    function startTutorial(){
+        document.getElementById('playBtn').style.display='inline-block';
+        playing=true; cancelAdv=false;
+        cur=1; updateUI();
+        speak(narrations[cur]);
+        autoAdvance();
+    }
+
+    function togglePlay(){
+        const btn=document.getElementById('playBtn');
+        if(playing){
+            playing=false; cancelAdv=true; stopSpeech();
+            btn.textContent='▶ Continuar'; btn.classList.remove('pausing');
+        } else {
+            playing=true; cancelAdv=false;
+            btn.textContent='⏸ Pausar'; btn.classList.add('pausing');
+            speak(narrations[cur]);
+            autoAdvance();
+        }
+    }
+
+    function autoAdvance(){
+        const btn=document.getElementById('playBtn');
+        btn.textContent='⏸ Pausar'; btn.classList.add('pausing');
+        const check=setInterval(()=>{
+            if(cancelAdv){ clearInterval(check); return; }
+            if(!speechDone) return;
+            clearInterval(check);
+            setTimeout(()=>{
+                if(cancelAdv||!playing) return;
+                if(cur < TOTAL-1){
+                    cur++; updateUI();
+                    speak(narrations[cur]);
+                    autoAdvance();
+                } else {
+                    // Ciclo: volver a 1
+                    setTimeout(()=>{
+                        if(cancelAdv||!playing) return;
+                        cur=1; updateUI();
+                        speak(narrations[cur]);
+                        autoAdvance();
+                    }, 3000);
+                }
+            }, 2200);
+        }, 150);
+    }
+
+    document.addEventListener('keydown', e=>{
+        if(e.key===' '){ e.preventDefault(); if(cur===0) startTutorial(); else togglePlay(); }
+    });
+</script>
+</body>
+</html>

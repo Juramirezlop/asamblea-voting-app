@@ -7,6 +7,20 @@ from ..auth.auth import admin_required
 from typing import Dict
 from fastapi.responses import StreamingResponse
 from fpdf import FPDF
+import unicodedata
+
+def safe(text):
+    """Convierte texto a latin-1 seguro para fpdf con Helvetica."""
+    if not isinstance(text, str):
+        text = str(text)
+    replacements = {
+        '\u201c': '"', '\u201d': '"', '\u2018': "'", '\u2019': "'",
+        '\u2013': '-', '\u2014': '-', '\u2026': '...', '\u00b0': 'o',
+    }
+    for k, v in replacements.items():
+        text = text.replace(k, v)
+    text = unicodedata.normalize('NFKD', text)
+    return text.encode('latin-1', errors='replace').decode('latin-1')
 from io import BytesIO
 from pydantic import BaseModel
 from datetime import datetime, timezone, timedelta
@@ -350,7 +364,7 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
         pdf.set_font("Helvetica", 'B', 18)
         pdf.cell(0, 12, "REPORTE COMPLETO DE ASAMBLEA", ln=True, align="C")
         pdf.set_font("Helvetica", 'B', 14)
-        pdf.cell(0, 8, conjunto_name, ln=True, align="C")
+        pdf.cell(0, 8, safe(conjunto_name), ln=True, align="C")
         pdf.set_font("Helvetica", size=10)
         pdf.cell(0, 6, f"Fecha: {fecha_actual.strftime('%d/%m/%Y %H:%M')}", ln=True, align="C")
         pdf.ln(8)
@@ -388,10 +402,10 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
 
             pdf.cell(15, 6, str(id_counter), border=1, align="C")
             pdf.cell(25, 6, str(p.get("code", "")), border=1, align="C")
-            pdf.cell(50, 6, str(p.get("name", ""))[:25], border=1)
+            pdf.cell(50, 6, safe(str(p.get("name", "")))[:25], border=1)
             pdf.cell(20, 6, f"{float(p.get('coefficient', 0)):.2f}", border=1, align="C")
             pdf.cell(30, 6, fecha_ingreso, border=1, align="C")
-            pdf.cell(20, 6, asistencia, border=1, align="C")
+            pdf.cell(20, 6, safe(asistencia), border=1, align="C")
             pdf.cell(20, 6, poder if p.get("present") else "-", border=1, align="C", ln=True)
             id_counter += 1
 
@@ -416,11 +430,11 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
         if quorum_met:
             pdf.set_text_color(0, 128, 0)
             pdf.set_font("Helvetica", 'B', 11)
-            pdf.cell(0, 8, f"QUÓRUM ALCANZADO ({coefficient_percentage:.2f}% >= 51%)", ln=True)
+            pdf.cell(0, 8, safe(f"QUORUM ALCANZADO ({coefficient_percentage:.2f}% >= 51%)"), ln=True)
         else:
             pdf.set_text_color(255, 0, 0)
             pdf.set_font("Helvetica", 'B', 11)
-            pdf.cell(0, 8, f"SIN QUÓRUM ({coefficient_percentage:.2f}% < 51%)", ln=True)
+            pdf.cell(0, 8, safe(f"SIN QUORUM ({coefficient_percentage:.2f}% < 51%)"), ln=True)
         pdf.set_text_color(0, 0, 0)
         pdf.ln(5)
 
@@ -434,7 +448,7 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
                 resultados = resultado['resultados']
 
                 pdf.set_font("Helvetica", 'B', 10)
-                pdf.cell(0, 7, f"Pregunta {i}: {str(pregunta['text'])}", ln=True)
+                pdf.cell(0, 7, safe(f"Pregunta {i}: {str(pregunta['text'])}"), ln=True)
                 pdf.ln(2)
                 pdf.set_font("Helvetica", size=8)
                 pdf.cell(0, 4, f"Total presentes en asamblea: {stats['present_count']}", ln=True)
@@ -459,7 +473,7 @@ async def generar_pdf_asistencia(user=Depends(admin_required)):
                         else:
                             pdf.set_text_color(0, 0, 0)
                             pdf.set_font("Helvetica", size=8)
-                        pdf.cell(0, 5, f"- {res['answer']}: {res['coefficient_sum']:.2f} % ({res['votes']} votos)", ln=True)
+                        pdf.cell(0, 5, safe(f"- {res['answer']}: {res['coefficient_sum']:.2f} % ({res['votes']} votos)"), ln=True)
                     pdf.set_text_color(0, 0, 0)
                     pdf.set_font("Helvetica", size=8)
                 else:
