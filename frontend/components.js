@@ -194,13 +194,10 @@ class ModalSystem {
                 if (closing && closing.parentNode) {
                     closing.parentNode.removeChild(closing);
                 }
-                // Restaurar modal anterior del stack si existe
-                if (this.modalStack.length > 0) {
-                    this.activeModal = this.modalStack.pop();
-                    this.activeModal.style.display = '';
-                } else {
-                    this.activeModal = null;
-                }
+                // No restaurar stack automáticamente — cada modal se abre limpio
+                this.modalStack.forEach(m => { if (m.parentNode) m.parentNode.removeChild(m); });
+                this.modalStack = [];
+                this.activeModal = null;
             }, 300);
         }
     }
