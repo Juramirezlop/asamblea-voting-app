@@ -93,18 +93,17 @@ class ModalSystem {
     constructor() {
         this.container = document.getElementById('modal-container');
         this.activeModal = null;
+        this.modalStack = [];
         this.setupEventListeners();
     }
 
     setupEventListeners() {
-        // Cerrar modal con Escape
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.activeModal) {
                 this.hide();
             }
         });
 
-        // Cerrar modal clickeando fuera
         this.container.addEventListener('click', (e) => {
             if (e.target === this.activeModal) {
                 this.hide();
@@ -113,16 +112,20 @@ class ModalSystem {
     }
 
     show(config) {
+        // Si hay un modal activo, lo dejamos en el stack pero lo ocultamos visualmente
+        if (this.activeModal) {
+            this.activeModal.style.display = 'none';
+            this.modalStack.push(this.activeModal);
+        }
+
         const modal = this.createModal(config);
         this.container.appendChild(modal);
         this.activeModal = modal;
 
-        // Animar entrada
         requestAnimationFrame(() => {
             modal.classList.add('show');
         });
 
-        // Focus en primer input si existe
         const firstInput = modal.querySelector('input, textarea, select');
         if (firstInput) {
             setTimeout(() => firstInput.focus(), 100);
@@ -183,14 +186,21 @@ class ModalSystem {
 
     hide() {
         if (this.activeModal && this.activeModal.parentNode) {
-            this.activeModal.classList.remove('show');            
+            this.activeModal.classList.remove('show');
             this.cleanupModalState();
-            
+
+            const closing = this.activeModal;
             setTimeout(() => {
-                if (this.activeModal && this.activeModal.parentNode) {
-                    this.activeModal.parentNode.removeChild(this.activeModal);
+                if (closing && closing.parentNode) {
+                    closing.parentNode.removeChild(closing);
                 }
-                this.activeModal = null;
+                // Restaurar modal anterior del stack si existe
+                if (this.modalStack.length > 0) {
+                    this.activeModal = this.modalStack.pop();
+                    this.activeModal.style.display = '';
+                } else {
+                    this.activeModal = null;
+                }
             }, 300);
         }
     }

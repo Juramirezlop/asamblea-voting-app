@@ -3127,6 +3127,8 @@ async function saveVoteEdit(code, questionId) {
         
         modals.hide();
         notifications.show('Voto actualizado correctamente', 'success');
+        // Refrescar modal de gestión con los votos actualizados
+        setTimeout(() => showVoterManagementModal(code), 350);
         
     } catch (error) {
         notifications.show(`Error: ${error.message}`, 'error');
