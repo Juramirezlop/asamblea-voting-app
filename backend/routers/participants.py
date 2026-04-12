@@ -19,7 +19,7 @@ def safe(text):
     }
     for k, v in replacements.items():
         text = text.replace(k, v)
-    text = unicodedata.normalize('NFKD', text)
+    text = unicodedata.normalize('NFC', text)
     return text.encode('latin-1', errors='replace').decode('latin-1')
 from io import BytesIO
 from pydantic import BaseModel
@@ -173,7 +173,8 @@ async def upload_xlsx(file: UploadFile = File(...)):
         contents = await file.read()
         xls = pd.read_excel(BytesIO(contents), sheet_name=None, header=None)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error leyendo Excel: {e}")
+        logger.error(f"Error leyendo Excel: {type(e).__name__}: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Error leyendo Excel: {type(e).__name__}: {e}")
 
     participantes = {}
 
